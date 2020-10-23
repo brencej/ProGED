@@ -13,8 +13,47 @@ from model_box import ModelBox
 from generators.grammar import GeneratorGrammar
 from generators.grammar_construction import grammar_from_template
 
+"""Functions for generating models using a given generator. 
+
+Attributes:
+    STRATEGY_LIBRARY (dict): Dictionary defining the implemented strategies. Items:
+        key (string): strategy name
+        value (function): function implementing the generation strategy with arguments:
+            model_generator (BaseExpressionGenerator): generator object to be used,
+            symbols (dict): dictionary containing:
+                "start": start symbol (str)
+                "const": unique symbol representing free constants, to be later enumerated (str)
+                "x": list of strings, representing variable symbols (list of strings)
+            kwargs: a dictionary of keyword arguments to be passed to the strategy function.
+                See specific strategy for details.
+
+Methods:
+    generate_models: High-level interface to the generation strategies. Intended to be called from outside.
+    monte_carlo_sampling: Monte-Carlo strategy to sampling models from a model generator.
+    
+"""
+
 
 def generate_models(model_generator, symbols, strategy = "monte-carlo", strategy_parameters = {"N":5}, verbosity=0):
+    """Generate models using given generator and specified strategy.
+    
+    generate_models is intended as an interface to the generation methods defined in the module.
+    
+    Arguments:
+        model_generator (BaseExpressionGenerator): Model generator instance. Should inherit from 
+            BaseExpressionGenerator and implement generate_one.
+        symbols (dict): Dictionary containing:
+                "start": start symbol (str)
+                "const": unique symbol representing free constants, to be later enumerated (str)
+                "x": list of strings, representing variable symbols (list of strings)
+        strategy (str): Name of strategy, as defined in STRATEGY_LIBRARY. 
+            Currently only the Monte-Carlo method is implemented.
+        strategy_parameters (dict): Dictionary of keywords to be passed to the generator function.
+        verbosity (int): Level of printout desired. 0: none, 1: info, 2+: debug.
+        
+    Returns:
+        ModelBox instance, containing the generated models.
+    """
     if isinstance(strategy, str):
         if strategy in STRATEGY_LIBRARY:
             return STRATEGY_LIBRARY[strategy](model_generator, symbols, verbosity=verbosity,  **strategy_parameters)
@@ -30,6 +69,26 @@ def generate_models(model_generator, symbols, strategy = "monte-carlo", strategy
                          "Input: " + str(type(strategy)))
 
 def monte_carlo_sampling (model_generator, symbols, N=5, max_repeat = 10, verbosity=0):
+    """Generate models using the Monte-Carlo approach to sampling.
+    
+    Randomly sample the stochastic generator until N models have been generated. 
+    Models that ModelBox considers invalid, according to ModelBox.add_model, are rejected.
+    The sampling is repeated until a valid model is generated or max_repeat attempts are made.
+    
+    Arguments:
+        model_generator (BaseExpressionGenerator): Model generator instance. Should inherit from 
+            BaseExpressionGenerator and implement generate_one.
+        symbols (dict): Dictionary containing:
+                "start": start symbol (str)
+                "const": unique symbol representing free constants, to be later enumerated (str)
+                "x": list of strings, representing variable symbols (list of strings)
+        N (int): Number of (valid) models to sample.
+        max_repeat (int): Number of allowed repeated attempts at sampling a single model.
+        verbosity (int): Level of printout desired. 0: none, 1: info, 2+: debug.
+    
+    Returns:
+        ModelBox instance containing the generated models.
+    """
     x = [s.strip("'") for s in symbols["x"]]
     models = ModelBox()
     
@@ -43,7 +102,7 @@ def monte_carlo_sampling (model_generator, symbols, N=5, max_repeat = 10, verbos
             if verbosity > 1:
                 print("-> ", expr_str, p, code)
                 
-            valid, expr = models.new_model(expr_str, symbols, model_generator, code=code, p=p)
+            valid, expr = models.add_model(expr_str, symbols, model_generator, code=code, p=p)
             
             if verbosity > 1:
                 print("---> ", valid, expr)

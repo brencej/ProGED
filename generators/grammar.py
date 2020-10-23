@@ -35,6 +35,7 @@ class GeneratorGrammar (BaseExpressionGenerator):
     def count_trees (self, start):
         """GrammarCounter could be implemented here."""
         return None
+    
     def count_coverage (self, start):
         """GrammarCounter could be implemented here."""
         return None

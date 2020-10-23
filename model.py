@@ -10,6 +10,15 @@ from nltk import PCFG
 import numpy as np
 import sympy as sp
 
+"""Module implementing the Module class that represents a single model, 
+defined by its canonical expression string.
+    
+An object of Model acts as a container for various representations of the model,
+including its expression, symbols, parameters, the parse trees that simplify to it,
+and associated information and references. 
+Class methods serve as an interfance to interact with the model.
+The class is intended to be used as part of an equation discovery algorithm."""
+
 class Model:
     """Class that represents a single model, defined by its canonical expression string.
     
@@ -19,16 +28,51 @@ class Model:
     Class methods serve as an interfance to interact with the model.
     The class is intended to be used as part of an equation discovery algorithm.
     
-    TODO
-    
-    list the member variables and methods
-    document the methods
+    Attributes:
+        expr (SymPy expression): The canonical expression defining the model.
+        sym_vars (list of Sympy symbols): The symbols appearing in expr that are to be interpreted as variables.
+        sym_params (list of strings): Symbols appearing in expr that are to be interpreted as free constants.
+        params (list of floats): The values for the parameters, initial or estimated.
+        estimated (dict): Results of optimization. Required items:
+            "x": solution of optimization, i.e. optimal parameter values (list of floats)
+            "fun": value of optimization function, i.e. error of model (float)
+        valid (boolean): True if parameters successfully estimated. 
+            False if estimation has not been performed yet or if it was unsuccessful. 
+        trees (dict): Tracks parse trees that simplify to expr. Keys are codes of parse trees, values are a list with:
+            probability of parse tree (float)
+            number of occurences during sampling (int)
+        p (float): Total probability of model. Computed as sum of probabilities of parse trees.
+        grammar (GeneratorGrammar): Grammar the produced the model. 
+                In the future will likely be generalized to BaseExpressionGenerator and tracked for each parse tree.
+        
+    Methods:
+        add_tree: Add a new parse tree to the parse tree dict and update the probabilities.
+        set_estimated: Save results of parameter estimation and set model validity according to input.
+        get_error: Return the model error if model valid or a dummy value if model not valid.
+        lambdify: Produce callable function from symbolic expression and parameter values. 
+        evaluate: Compute the value of the expression for given variable values and parameter values.
+        full_expr: Produce symbolic expression with parameters substituted by their values.
     """
     
-    def __init__(self, expr = None, grammar=None, params=[], sym_params=[], sym_vars = [], code="", p=0):
+    def __init__(self, expr, code, p, grammar=None, params=[], sym_params=[], sym_vars = []):
+        """Initialize a Model with the initial parse tree and information on the task.
+        
+        Arguments:
+            expr (Sympy expression or string): Expression that defines the model.
+            code (string): Parse tree code, expressed as string of integers, corresponding to the choice of 
+                production rules when generating the expression. Allows the generator to replicate 
+                the generation. Requires the originating grammar to be useful.
+            p (float): Probability of initial parse tree.
+            grammar (nltk.PCFG or GeneratorGrammar): Grammar that generates the parse trees for this model.
+                In the future will likely be generalized to BaseExpressionGenerator and tracked for each parse tree.
+            params (list of floats): (Initial) parameter values.
+            sym_vars (list of Sympy symbols): The symbols appearing in expr that are to be interpreted as variables.
+            sym_params (list of strings): Symbols appearing in expr that are to be interpreted as free constants.
+            """
         
         self.grammar = grammar
         self.params = params
+        
         if isinstance(expr, type("")):
             self.expr = sp.sympify(expr)
         else:
@@ -49,14 +93,20 @@ class Model:
             print(expr, params, sym_params, sym_vars)
         self.sym_vars = sp.symbols(sym_vars)
         self.p = 0
-        """self.trees has form {"code":[p,n]}"""
-        self.trees = {}
+        self.trees = {} #trees has form {"code":[p,n]}"
+        
         if len(code)>0:
             self.add_tree(code, p)
         self.estimated = {}
         self.valid = False
         
     def add_tree (self, code, p):
+        """Add a new parse tree to the model.
+        
+        Arguments:
+            code (str): The parse tree code, expressed as a string of integers.
+            p (float): Probability of parse tree.
+        """
         if code in self.trees:
             self.trees[code][1] += 1
         else:
@@ -64,12 +114,35 @@ class Model:
             self.p += p
         
     def set_estimated(self, result, valid=True):
+        """Store results of parameter estimation and set validity of model according to input.
+        
+        Arguments:
+            result (dict): Results of parameter estimation. 
+                Designed for use with methods, implemented in scipy.optimize, but works with any method.
+                Required items:
+                    "x": solution of optimization, i.e. optimal parameter values (list of floats)
+                    "fun": value of optimization function, i.e. error of model (float).
+            valid: True if the parameter estimation succeeded.
+                Set as False if the optimization was unsuccessfull or the model was found to not fit 
+                the requirements. For example, we might want to limit ED to models with 5 or fewer parameters
+                due to computational time concerns. In this case the parameter estimator would refuse
+                to fit the parameters and set valid = False. 
+                Invalid models are typically excluded from post-analysis."""
+        
         self.estimated = result
         self.valid = valid
         if valid:
             self.params = result["x"]
         
     def get_error(self, dummy=10**8):
+        """Return model error if the model is valid, or dummy if the model is not valid.
+        
+        Arguments:
+            dummy: Value to be returned if the parameter have not been estimated successfully.
+            
+        Returns:
+            error of the model, as reported by set_estimated, or the dummy value.
+        """
         if self.valid:
             return self.estimated["fun"]
         else:
@@ -79,6 +152,20 @@ class Model:
         self.params=params
         
     def lambdify (self, arg="numpy"):
+        """Produce a callable function from the symbolic expression and the parameter values.
+        
+        This function is required for the evaluate function. It relies on sympy.lambdify, which in turn 
+            relies on eval. This makes the function somewhat problematic and can sometimes produce unexpected
+            results. Syntactic errors in variable or parameter names will likely produce an error here.
+        
+        Arguments:
+            arg (string): Passed on to sympy.lambdify. Defines the engine for the mathematical operations,
+                that the symbolic operations are transformed into. Default: numpy.
+                See sympy documentation for details.
+                
+        Returns:
+            callable function that takes variable values as inputs and return the model value.
+        """
         self.lamb_expr = sp.lambdify(self.sym_vars, self.expr.subs(list(zip(self.sym_params, self.params))), arg)
         test = self.lamb_expr(np.array([1,2,3, 4]))
         if type(test) != type(np.array([])):
@@ -86,6 +173,21 @@ class Model:
         return self.lamb_expr
 
     def evaluate (self, points, *args):
+        """Evaluate the model for given variable and parameter values.
+        
+        If possible, use this function when you want to do computations with the model.
+        It relies on lambdify so it shares the same issues, but includes some safety checks.
+        Example of use with stored parameter values:
+            predictions = model.evaluate(X, *model.params)
+        
+        Arguments:
+            points (numpy array): Input data, shaped N x M, where N is the number of samples and
+                M the number of variables.
+            args (list of floats): Parameter values.
+            
+        Returns:
+            Numpy array of shape N x D, where N is the number of samples and D the number of output variables.
+        """
         lamb_expr = sp.lambdify(self.sym_vars, self.full_expr(*args), "numpy")
         
         if type(points[0]) != type(np.array([1])):
@@ -99,6 +201,13 @@ class Model:
             return lamb_expr(*points.T)
     
     def full_expr (self, *params):
+        """Substitutes parameter symbols in the symbolic expression with given parameter values.
+        
+        Arguments:
+            params (list of floats): Parameter values.
+            
+        Returns:
+            sympy expression."""
         if type(self.sym_params) != type((1,2)):
             return self.expr.subs([[self.sym_params, params]])
         else:

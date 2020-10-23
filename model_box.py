@@ -12,12 +12,36 @@ import sympy as sp
 
 from model import Model
 
+"""Implements ModelBox, an class that stores and manages a collection of Model instances."""
+
 class ModelBox:
-    """Container for a dictionary of Model instances, as well as accompanying methods."""
+    """Container for a dictionary of Model instances, as well as accompanying methods.
+    
+    Object that stores and organizes Model instances in a dictionary. 
+    The keys are canonical expression strings and the values are Model instances.
+    Newly generated expressions are processed, simplified into its canonical respresentation,
+    and stored into the appropriate dictionary item. 
+    The string representation of ModelBox produces a nice printout of the contents.
+    
+    Attributes:
+        models_dict (dict): Dictionary with canonical expression strings as keys 
+            and Model instances as values.
+    
+    Methods:
+        add_model: Proccess and store a new model.
+        verify_expression: Used by add_model. Check if expression fits basic requirements.
+        enunerate_constants: Used by add_model. Identifies and enumerates parameter symbols in expression.
+        simplify_constants: Used by add_model. Attemps to simplify expression by considering free constants.
+        string_to_canonic_expression: Used by add model. Series of transformation that 
+            produce a canonic representation.
+        keys: Return the canonical expression strings acting as keys for models_dict.
+        values: Return the Model instances in models_dict.
+        items: Return the key and value pairs in models_dict.
+    """
     def __init__ (self, models_dict = {}):
         self.models_dict = models_dict
         
-    def new_model (self, expr_str, symbols, grammar, code="0", p=1.0, **kwargs):
+    def add_model (self, expr_str, symbols, grammar, code="0", p=1.0, **kwargs):
         x = [s.strip("'") for s in symbols["x"]]
         expr, symbols_params = self.string_to_canonic_expression(expr_str, symbols)
         
@@ -158,8 +182,8 @@ if __name__ == "__main__":
     symbols = {"x":['x'], "const":"c", "start":"S"}
     
     models = ModelBox()
-    print(models.new_model(expr1_str, symbols, grammar))
-    print(models.new_model(expr2_str, symbols, grammar, p=0.5, code="1"))
+    print(models.add_model(expr1_str, symbols, grammar))
+    print(models.add_model(expr2_str, symbols, grammar, p=0.5, code="1"))
     
     print(models)
     
