@@ -31,15 +31,39 @@ class GeneratorGrammar (BaseExpressionGenerator):
     
     def code_to_expression (self, code):
         return code_to_sample(code, self.grammar, items=[self.start_symbol])
-    
-    def count_trees (self, start):
-        """GrammarCounter could be implemented here."""
-        return None
-    
-    def count_coverage (self, start):
-        """GrammarCounter could be implemented here."""
-        return None
-    
+
+   def count_trees(self, start, height):
+        """Counts all trees of height <= height."""
+        if not isinstance(start, Nonterminal):
+            return 1
+        elif height == 0:
+            return 0
+        else:
+            counter = 0
+            prods = self.grammar.productions(lhs=start)
+            for prod in prods:
+                combinations = 1
+                for symbol in prod.rhs():
+                    combinations *= self.count_trees(symbol, height-1)
+                counter += combinations
+            return counter
+
+    def count_coverage(self, start, height):
+        """Counts total probability of all parse trees of height <= height."""
+        if not isinstance(start, Nonterminal):
+            return 1
+        elif height == 0:
+            return 0
+        else:
+            coverage = 0
+            prods = self.grammar.productions(lhs=start)
+            for prod in prods:
+                subprobabs = prod.prob()
+                for symbol in prod.rhs():
+                    subprobabs *= self.count_coverage(symbol, height-1)
+                coverage += subprobabs
+            return coverage
+
     def __str__ (self):
         return str(self.grammar)
     
