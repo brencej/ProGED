@@ -9,8 +9,7 @@ import numpy as np
 from nltk import PCFG
 from nltk.grammar import Nonterminal
 
-# from generators.base_generator import BaseExpressionGenerator
-from base_generator import BaseExpressionGenerator
+from generators.base_generator import BaseExpressionGenerator
 
 class GeneratorGrammar (BaseExpressionGenerator):
     def __init__ (self, grammar):
