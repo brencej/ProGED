@@ -10,6 +10,7 @@ from nltk import PCFG
 from nltk.grammar import Nonterminal
 
 from generators.base_generator import BaseExpressionGenerator
+# from base_generator import BaseExpressionGenerator
 
 class GeneratorGrammar (BaseExpressionGenerator):
     def __init__ (self, grammar):
@@ -70,7 +71,23 @@ class GeneratorGrammar (BaseExpressionGenerator):
     def __repr__ (self):
         return str(self.grammar)
     
-    
+def generate_sample_alternative(grammar, start):
+    """Alternative implementation of generate_sample. Just for example."""
+    if not isinstance(start, Nonterminal):
+        return [start], 1, ""
+    else:
+        prods = grammar.productions(lhs=start)
+        probs = [p.prob() for p in prods]
+        prod_i = np.random.choice(list(range(len(prods))), p = probs)
+        frags = []
+        probab = probs[prod_i]
+        code = str(prod_i)
+        for symbol in prods[prod_i].rhs():
+            frag, p, h = generate_sample_alternative(grammar, symbol)
+            frags += frag
+            probab *= p
+            code += h
+        return frags, probab, code
     
 def generate_sample(grammar, items=[Nonterminal("S")]):
     """Samples PCFG once. 
