@@ -172,5 +172,58 @@ if __name__ == "__main__":
         print(code_to_sample(c, grammar.grammar, [grammar.start_symbol]))
         print(grammar.count_trees(grammar.start_symbol,i))
         print(grammar.count_coverage(grammar.start_symbol,i))
-    
-    
+    print("\n-- testing different grammars: --\n")
+    pgram0 = GeneratorGrammar("""
+        S -> 'a' [0.3]
+        S -> 'b' [0.7]
+    """)
+    pgram1 = GeneratorGrammar("""
+        S -> A B [0.8]
+        S -> 's' [0.2]
+        A -> 'a' [1]
+        B -> 'b' [0.3]
+        B -> C D [0.7]
+        C -> 'c' [1]
+        D -> 'd' [1]
+    """)
+    pgramSS = GeneratorGrammar("""
+        S -> S S [0.3]
+        S -> 'a' [0.7]  
+    """)
+    def pgramSSparam(p=0.3):
+        return GeneratorGrammar(f"""
+                S -> S S [{p}]
+                S -> 'a' [{1-p}]  
+    """)
+    pgrama = GeneratorGrammar("""
+        S -> A B [0.7]
+        S -> 'a' [0.1]
+        S -> 'b' [0.1]
+        S -> 'c' [0.1]
+        A -> A1 A2 [0.3]
+        A -> 'aq' [0.5]
+        A -> 'bq' [0.2]
+        B -> 'aw' [0.1]
+        B -> 'bw' [0.9]
+        A2 -> 'ak' [0.4]
+        A2 -> 'bk' [0.6]
+        A1 -> A11 A12 [1]
+        A11 -> 'ar' [0.8]
+        A11 -> 'br' [0.2]
+        A12 -> 'af' [0.3]
+        A12 -> 'bf' [0.7]
+    """)
+    p=0.6
+    for gramm in [grammar, pgram0, pgram1, pgrama, pgramSS, pgramSSparam(p) ]:
+        print(f"\nFor grammar:\n {gramm}")
+        for i in range(0,5):
+            print(gramm.count_trees(gramm.start_symbol,i), f" = count trees of height <= {i}")
+            print(gramm.count_coverage(gramm.start_symbol,i), f" = total probability of height <= {i}")
+    # for gramm in [pgramSSparam(p)]:
+    #     print(f"For grammar:\n {gramm}")
+    #     for i in range(0,5):
+    #         print(gramm.count_trees(gramm.start_symbol,i), f" = count trees of height <= {i}")
+    #         print(gramm.count_coverage(gramm.start_symbol,i), f" = total probability of height <= {i}")
+    print(f"Chi says: limit probablity = 1/p - 1, i.e. p={p} => prob={1/p-1}")
+        
+        
