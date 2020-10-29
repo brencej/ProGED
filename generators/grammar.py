@@ -9,7 +9,8 @@ import numpy as np
 from nltk import PCFG
 from nltk.grammar import Nonterminal
 
-from generators.base_generator import BaseExpressionGenerator
+# from generators.base_generator import BaseExpressionGenerator
+from base_generator import BaseExpressionGenerator
 
 class GeneratorGrammar (BaseExpressionGenerator):
     def __init__ (self, grammar):
@@ -32,7 +33,7 @@ class GeneratorGrammar (BaseExpressionGenerator):
     def code_to_expression (self, code):
         return code_to_sample(code, self.grammar, items=[self.start_symbol])
 
-   def count_trees(self, start, height):
+    def count_trees(self, start, height):
         """Counts all trees of height <= height."""
         if not isinstance(start, Nonterminal):
             return 1
@@ -147,6 +148,10 @@ if __name__ == "__main__":
     np.random.seed(0)
     grammar = GeneratorGrammar("E -> 'x' [0.7] | E '*' 'x' [0.3]")
     for i in range(5):
-        print(grammar.generate_one())
+        f, p, c = grammar.generate_one()
+        print(f, p, c)
+        print(code_to_sample(c, grammar.grammar, [grammar.start_symbol]))
+        print(grammar.count_trees(grammar.start_symbol,i))
+        print(grammar.count_coverage(grammar.start_symbol,i))
     
     
