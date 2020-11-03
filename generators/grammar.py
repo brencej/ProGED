@@ -71,6 +71,25 @@ class GeneratorGrammar (BaseExpressionGenerator):
         return str(self.grammar)
     
     
+    
+def generate_sample_alternative(grammar, start):
+    """Alternative implementation of generate_sample. Just for example."""
+    if not isinstance(start, Nonterminal):
+        return [start], 1, ""
+    else:
+        prods = grammar.productions(lhs=start)
+        probs = [p.prob() for p in prods]
+        prod_i = np.random.choice(list(range(len(prods))), p = probs)
+        frags = []
+        probab = probs[prod_i]
+        code = str(prod_i)
+        for symbol in prods[prod_i].rhs():
+            frag, p, h = generate_sample_alternative(grammar, symbol)
+            frags += frag
+            probab *= p
+            code += h
+        return frags, probab, code
+    
 def generate_sample(grammar, items=[Nonterminal("S")]):
     """Samples PCFG once. 
     Input:
@@ -195,17 +214,30 @@ if __name__ == "__main__":
         A12 -> 'af' [0.3]
         A12 -> 'bf' [0.7]
     """)
+    pgramw = GeneratorGrammar("""
+    S -> A B A2 A1 B2 B1 [0.7]
+    A -> A1 A2 [0.3]
+    B -> B1 B2 [0.1]
+    S -> 'a' [0.1]
+    S -> 'b' [0.1]
+    S -> 'c' [0.1]
+    A -> 'aq' [0.5]
+    A -> 'bq' [0.2]
+    B -> 'aw' [0.1]
+    B -> 'bw' [0.8]
+    A2 -> 'ak' [0.4]
+    A2 -> 'bk' [0.6]
+    A1 -> 'ar' [0.8]
+    A1 -> 'br' [0.2]
+    B2 -> 'af' [1]
+    B1 -> 'bf' [1]
+""")
     p=0.6
-    for gramm in [grammar, pgram0, pgram1, pgrama, pgramSS, pgramSSparam(p) ]:
+    for gramm in [grammar, pgram0, pgram1, pgrama, pgramw, pgramSS, pgramSSparam(p) ]:
         print(f"\nFor grammar:\n {gramm}")
         for i in range(0,5):
             print(gramm.count_trees(gramm.start_symbol,i), f" = count trees of height <= {i}")
             print(gramm.count_coverage(gramm.start_symbol,i), f" = total probability of height <= {i}")
-    # for gramm in [pgramSSparam(p)]:
-    #     print(f"For grammar:\n {gramm}")
-    #     for i in range(0,5):
-    #         print(gramm.count_trees(gramm.start_symbol,i), f" = count trees of height <= {i}")
-    #         print(gramm.count_coverage(gramm.start_symbol,i), f" = total probability of height <= {i}")
     print(f"Chi says: limit probablity = 1/p - 1, i.e. p={p} => prob={1/p-1}")
         
         
