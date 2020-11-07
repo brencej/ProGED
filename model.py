@@ -196,8 +196,6 @@ class Model:
             return lamb_expr(points)
         else:
 #            if type(lamb_expr(np.array([np.array([1,2,3])]).T)) != type(np.array([1,2,3])):
-            if len(str(self.expr)) < 0:
-                return np.ones(len(points))*lamb_expr(*np.array([np.array([1,2,3])]).T)
             return lamb_expr(*points.T)
     
     def full_expr (self, *params):

@@ -89,7 +89,6 @@ def monte_carlo_sampling (model_generator, symbols, N=5, max_repeat = 10, verbos
     Returns:
         ModelBox instance containing the generated models.
     """
-    x = [s.strip("'") for s in symbols["x"]]
     models = ModelBox()
     
     for n in range(N):
@@ -97,7 +96,7 @@ def monte_carlo_sampling (model_generator, symbols, N=5, max_repeat = 10, verbos
         n = 0
         while not good and n < max_repeat:
             sample, p, code = model_generator.generate_one()
-            expr_str = "".join(np.array(sample))
+            expr_str = "".join(sample)
             
             if verbosity > 1:
                 print("-> ", expr_str, p, code)
