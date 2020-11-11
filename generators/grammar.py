@@ -7,7 +7,7 @@ Created on Thu Oct 22 12:00:39 2020
 
 import numpy as np
 from nltk import PCFG
-from nltk.grammar import Nonterminal
+from nltk.grammar import Nonterminal, ProbabilisticProduction
 
 from generators.base_generator import BaseExpressionGenerator
 
@@ -64,6 +64,81 @@ class GeneratorGrammar (BaseExpressionGenerator):
                 coverage += subprobabs
             return coverage
 
+    def list_coverages(self, height, tol=10**(-17),
+                            min_height=100, verbosity=0):
+        """Counts coverage of maximal height using cache(dictionary).
+        Input:
+            height - maximal height of parse trees of which the
+                coverage is calculated of.
+            tol - tolerance as a stopping condition. If change
+                is smaller than the input tolerance, then it stops.
+            min_height - overrides tolerance stopping condition and
+                calculates coverage of all heights <= min_height. It
+                also determines for how many previous steps the change
+                is measured, i.e. for levels (height-1 - min_height/2).
+            verbosity - if set to > 0, it prints stopping probability
+                change, height and input tolerance.
+        Output:
+            Dictionary with nonterminals as keys and coverages of all
+            parse trees with root in given key nonterminal and their
+            heights at most the input height as their values.
+        """
+        nonterminals = list(set([prod.lhs() for prod
+                                in self.grammar.productions()]))
+        if height == 0:
+            return {A: 0 for A in nonterminals}
+        probs_dict = {}
+        for A in nonterminals:      # height = 0:
+            probs_dict[(A, 0)] = 0
+        min_height = max(min_height, 2)  # to avoid int(min_height/2)=0
+        for level in range(1, height+1):    # height > 0:
+            if level > min_height:  # Do `min_height` levels without stopping.
+                # Measure change from last min_height/2 levels:
+                change = max(abs(probs_dict[(A, level-1)]
+                                 - probs_dict[(A, level-int(min_height/2))])
+                                 for A in nonterminals)
+                if change < tol:
+                    if verbosity > 0:
+                        print(change, level, tol, "change of probability")
+                    return {A: probs_dict[(A, level-1)] for A in nonterminals}
+            for A in nonterminals:
+                coverage = 0
+                prods = self.grammar.productions(lhs=A)
+                for prod in prods:
+                    subprobabs = prod.prob()
+                    for symbol in prod.rhs():
+                        if not isinstance(symbol, Nonterminal):
+                            continue  # or subprobabs = 1
+                        else:
+                            subprobabs *= probs_dict[(symbol, level-1)]
+                    coverage += subprobabs
+                probs_dict[(A, level)] = coverage
+        if verbosity > 0:
+            print("The input height %d was reached. " % height
+                +"Bigger height is needed for better precision.")
+        return {A: probs_dict[(A, height)] for A in nonterminals}
+
+    def renormalize(self, height=10**4, tol=10**(-17), min_height=100):
+        """Returns renormalized grammar. Inputs like list_coverages."""
+        coverages_dict = self.list_coverages(height, tol, min_height)
+        if min(coverages_dict[A] for A in coverages_dict) < tol:  # input tol
+            raise ValueError("Not all coverages are positive, so"
+                            + " renormalization cannot be performed since zero"
+                            + " division.")
+        def chi(prod, coverages_dict):
+            """Renormalizes production probability p^~ as in Chi paper(22)."""
+            subprobabs = prod.prob()
+            for symbol in prod.rhs():
+                if not isinstance(symbol, Nonterminal):
+                    continue  # or subprobabs = 1
+                else:
+                    subprobabs *= coverages_dict[symbol]
+            return subprobabs/coverages_dict[prod.lhs()]
+        prods = [ProbabilisticProduction(prod.lhs(), prod.rhs(),
+                                        prob=chi(prod, coverages_dict))
+                for prod in self.grammar.productions()]
+        return PCFG(self.grammar.start(), prods)
+
     def __str__ (self):
         return str(self.grammar)
     
@@ -71,7 +146,7 @@ class GeneratorGrammar (BaseExpressionGenerator):
         return str(self.grammar)
     
     
-    
+
 def generate_sample_alternative(grammar, start):
     """Alternative implementation of generate_sample. Just for example."""
     if not isinstance(start, Nonterminal):
@@ -173,6 +248,7 @@ if __name__ == "__main__":
         print(code_to_sample(c, grammar.grammar, [grammar.start_symbol]))
         print(grammar.count_trees(grammar.start_symbol,i))
         print(grammar.count_coverage(grammar.start_symbol,i))
+        print(grammar.list_coverages(i)[grammar.start_symbol])
     print("\n-- testing different grammars: --\n")
     pgram0 = GeneratorGrammar("""
         S -> 'a' [0.3]
@@ -231,13 +307,32 @@ if __name__ == "__main__":
     A1 -> 'br' [0.2]
     B2 -> 'af' [1]
     B1 -> 'bf' [1]
-""")
-    p=0.6
-    for gramm in [grammar, pgram0, pgram1, pgrama, pgramw, pgramSS, pgramSSparam(p) ]:
+    """)
+    pgramCounterExample = GeneratorGrammar("""
+        A -> S 'c' [0.7]
+        A -> 'b' [0.3]
+        S -> S S [0.8]
+        S -> 'a' [0.2]
+    """)
+    from time import time
+    t1=0
+    def display_time(t1): t2 = time(); print(10**(-3)*int((t2-t1)*10**3), "= seconds consumed"); return t2
+    height = 10**5
+    p=0.9
+    for gramm in [grammar, pgram0, pgram1, pgrama, pgramw, pgramSS,
+                    pgramCounterExample, pgramSSparam(p) ]:
         print(f"\nFor grammar:\n {gramm}")
-        for i in range(0,5):
-            print(gramm.count_trees(gramm.start_symbol,i), f" = count trees of height <= {i}")
-            print(gramm.count_coverage(gramm.start_symbol,i), f" = total probability of height <= {i}")
+        for i in range(height, height+1):
+        # for i in range(0, 5):
+            t2=display_time(t1); t1=t2
+            # print(gramm.count_trees(gramm.start_symbol,i), f" = count trees of height <= {i}")
+            # print(gramm.count_coverage(gramm.start_symbol,i), f" = coverage(start,{i}) of height <= {i}")
+            # t2=display_time(t1); t1=t2;
+            print(gramm.list_coverages(i, tol=10**(-17), min_height=100,
+                verbosity=1)[gramm.grammar.start()],
+                f" = coverage = list_coverages({i})[start] of height <= {i}")
+            t2=display_time(t1); t1=t2
+            gramm.grammar = gramm.renormalize()
+            print("Renormalized grammar:\n %s" % gramm)
+            print(gramm.list_coverages(i), " = renormalized coverages")
     print(f"Chi says: limit probablity = 1/p - 1, i.e. p={p} => prob={1/p-1}")
-        
-        
