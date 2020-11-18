@@ -39,7 +39,7 @@ class ModelBox:
         items: Return the key and value pairs in models_dict.
     """
     def __init__ (self, models_dict = {}):
-        self.models_dict = models_dict
+        self.models_dict = dict(models_dict)
         
     def add_model (self, expr_str, symbols, grammar, code="0", p=1.0, **kwargs):
         x = [s.strip("'") for s in symbols["x"]]
@@ -140,7 +140,7 @@ class ModelBox:
         return expr, symbols_params
 
     def __str__(self):
-        txt = "ModelsBox: " + str(len(self.models_dict)) + " models"
+        txt = "ModelBox: " + str(len(self.models_dict)) + " models"
         for m in self.models_dict:
             txt += "\n-> " + str(self.models_dict[m].expr) + ", p = " + str(self.models_dict[m].p)
             txt += ", parse trees = " + str(len(self.models_dict[m].trees))
