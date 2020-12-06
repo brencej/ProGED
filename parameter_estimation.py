@@ -7,12 +7,12 @@ Created on Thu Oct 22 09:12:29 2020
 
 import numpy as np
 from scipy.optimize import differential_evolution, minimize
-from nltk import PCFG
+# from nltk import PCFG
 
-from model import Model
+# from model import Model
 from model_box import ModelBox
-from generate import generate_models
-from generators.grammar import GeneratorGrammar
+# from generate import generate_models
+# from generators.grammar import GeneratorGrammar
 
 """Methods for estimating model parameters. Currently implemented: differential evolution.
 
@@ -131,7 +131,9 @@ if __name__ == "__main__":
     np.random.seed(2)
     
     from pyDOE import lhs
-    
+    from generators.grammar import GeneratorGrammar
+    from generate import generate_models
+
     def testf (x):
         return 3*x[:,0]*x[:,1]**2 + 0.5
     

@@ -17,7 +17,10 @@ def construct_right (right = "a", prob = 1):
     return right + " [" + str(prob) + "]"
 
 def construct_production (left = "S", items = ["a"], probs=[1]):
-    return "\n" + left + " -> " + construct_right_distribution (items=items, probs=probs)
+    if not items:
+        return ""
+    else:
+        return "\n" + left + " -> " + construct_right_distribution (items=items, probs=probs)
 
 def construct_right_distribution (items=[], probs=[]):
     p = np.array(probs)/np.sum(probs)
@@ -26,17 +29,17 @@ def construct_right_distribution (items=[], probs=[]):
         S += " | " + construct_right(right=items[i], prob=p[i])
     return S
 
-def construct_grammar_trigonometric (probs1 = [0.8,0.2], probs2=[0.4,0.4,0.2], symbols = {"x":"'x'", "start":"S", "T1":"T1", "T2":"T2"}):
+def construct_grammar_trigonometric (probs1 = [0.8,0.2], probs2=[0.4,0.4,0.2]):
     items1 = ["'sin'", "'cos'", "'tan'"]
-    grammar = construct_production(left=symbols["start"], items=[symbols["T1"]+"'('"+symbols["x"]+"')'",
-                                                symbols["T1"]+" "+symbols["T2"]+"'('"+symbols["x"]+"')'"], probs=probs1)
-    grammar += construct_production(left=symbols["T1"], items=items1, probs=probs2)
-    grammar += construct_production(left=symbols["T2"], items=["'h'"], probs=[1])
+    grammar = construct_production(left="S", items=["T1"+"'('"+"'x'"+"')'",
+                                                    "T1"+" "+"T2"+"'('"+"'x'"+"')'"], probs=probs1)
+    grammar += construct_production(left="T1", items=items1, probs=probs2)
+    grammar += construct_production(left="T2", items=["'h'"], probs=[1])
     return grammar
     
-def construct_grammar_function (functions=["'sin'", "'cos'"], probs=[0.5,0.5], symbols = {"x":"'x'", "start":"S", "A":"A1"}, string=True):
-    grammar = construct_production(left=symbols["start"], items=[symbols["A"]+"'('"+symbols["x"]+"')'"], probs=[1])
-    grammar += construct_production(left=symbols["A"], items=functions, probs=probs)
+def construct_grammar_function (functions=["'sin'", "'cos'"], probs=[0.5,0.5], string=True):
+    grammar = construct_production(left="S", items=["A'(''x'')'"], probs=[1])
+    grammar += construct_production(left="A", items=functions, probs=probs)
     return grammar
     
 def construct_grammar_polytrig (p_more_terms=[0.7,0.15,0.15], p_higher_terms=0.5, p_vars = [0.5,0.3,0.2], variables = ["'x'", "'v'", "'a'", "'sin(C*x + C)'"]):
@@ -93,7 +96,9 @@ GRAMMAR_LIBRARY = {
     "simplerational": construct_grammar_simplerational,
     "polytrig": construct_grammar_polytrig,
     "trigonometric": construct_grammar_trigonometric,
-    "polynomial": construct_grammar_polynomial}
+    "polynomial": construct_grammar_polynomial,
+    "function": construct_grammar_function}
+
 
 if __name__ == "__main__":
     print("--- grammar_construction.py test ---")
@@ -103,3 +108,4 @@ if __name__ == "__main__":
     print(grammar)
     for i in range(5):
         print(grammar.generate_one())
+    print(construct_production("s",[],[]))

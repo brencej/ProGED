@@ -5,10 +5,12 @@ Created on Wed Oct 21 14:05:57 2020
 @author: Jure
 """
 
-from nltk.grammar import Nonterminal
-from nltk import PCFG
+# from nltk.grammar import Nonterminal
+# from nltk import PCFG  # moved to bottom
 import numpy as np
-import sympy as sp
+# import sympy as sp  # Intentionally commented to avoid warning, look next line.
+# May be a better call to avoid warnning in Sympy version >= 1.6.2.:
+import sympy.core as sp
 
 from model import Model
 
@@ -32,7 +34,7 @@ class ModelBox:
         verify_expression: Used by add_model. Check if expression fits basic requirements.
         enunerate_constants: Used by add_model. Identifies and enumerates parameter symbols in expression.
         simplify_constants: Used by add_model. Attemps to simplify expression by considering free constants.
-        string_to_canonic_expression: Used by add model. Series of transformation that 
+        string_to_canonic_expression: Used by add_model. Series of transformation that
             produce a canonic representation.
         keys: Return the canonical expression strings acting as keys for models_dict.
         values: Return the Model instances in models_dict.
@@ -124,16 +126,17 @@ class ModelBox:
                 return True in has_var, True in has_c, [(eq, eq.func(*args))]
             
     def string_to_canonic_expression (self, expr_str, symbols={"x":["'x'"], "const":"'C'", "start":"S", "A":"A"}):
-        """ Samples PCFG grammar and converts the string into a Sympy expression.
+        """Convert the string into the canonical Sympy expression.
+
         Input:
-            grammar - PCFG object to sample
-        Returns:
-            sympy expression object
-            p - parse tree probability
-            code - parse tree encoding"""
+            expr_str -- String expression e.g. joined sample string
+                generated from grammar.
+        Output:
+            expr -- Sympy expression object in canonical form.
+            symbols_params -- Tuple of enumerated constants.
+        """
         x = [sp.symbols(s.strip("'")) for s in symbols["x"]]
         c = sp.symbols(symbols["const"].strip("'"))
-        #sample, p, code = generate_sample(grammar)
         expr = sp.sympify(expr_str)
         expr = self.simplify_constants(expr, c, x)[2][0][1]
         expr, symbols_params = self.enumerate_constants(expr, symbols)
@@ -174,6 +177,7 @@ class ModelBox:
                             "Expected canonical expression string or integer index.")
         
 if __name__ == "__main__":
+    from nltk import PCFG
     print("--- models_box.py test ---")
     grammar_str = "S -> 'c' '*' 'x' [0.5] | 'x' [0.5]"
     grammar = PCFG.fromstring(grammar_str)

@@ -5,8 +5,8 @@ Created on Wed Oct 21 11:25:27 2020
 @author: Jure
 """
 
-from nltk.grammar import Nonterminal
-from nltk import PCFG
+# from nltk.grammar import Nonterminal
+# from nltk import PCFG
 import numpy as np
 import sympy as sp
 
@@ -224,6 +224,7 @@ class Model:
     
 if __name__ == '__main__':
     print("--- model.py test ---")
+    from nltk import PCFG
     grammar_str = "S -> 'c' '*' 'x' [1.0]"
     grammar = PCFG.fromstring(grammar_str)
     parse_tree_code = "0"
@@ -262,4 +263,4 @@ if __name__ == '__main__':
     assert isinstance(y, type(np.array([0])))
     assert sum((y - np.array([0, 6.0]))**2) < 1e-15
     
-    
+
