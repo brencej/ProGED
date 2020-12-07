@@ -5,13 +5,13 @@ Created on Wed Oct 21 17:34:31 2020
 @author: Jure
 """
 
-import numpy as np
+# import numpy as np # moved to bottom
 
-from model import Model
+# from model import Model
 from model_box import ModelBox
 
-from generators.grammar import GeneratorGrammar
-from generators.grammar_construction import grammar_from_template
+# from generators.grammar import GeneratorGrammar
+# from generators.grammar_construction import grammar_from_template # moved to bottom
 
 """Functions for generating models using a given generator. 
 
@@ -119,6 +119,8 @@ STRATEGY_LIBRARY = {"monte-carlo": monte_carlo_sampling}
 
 if __name__ == "__main__":
     print("--- generate.py test ---")
+    import numpy as np
+    from generators.grammar_construction import grammar_from_template
     np.random.seed(0)
     generator = grammar_from_template("polynomial", {"variables":["'x'", "'y'"], "p_vars":[0.3,0.7]})
     symbols = {"x":['x', 'y'], "start":"S", "const":"C"}

@@ -14,6 +14,8 @@ from generators.base_generator import BaseExpressionGenerator
 class GeneratorGrammar (BaseExpressionGenerator):
     def __init__ (self, grammar):
         self.generator_type = "PCFG"
+        self.coverage_dict = {}
+        self.count_dict = {}
     
         if isinstance(grammar, str):
             self.grammar = PCFG.fromstring(grammar)
@@ -44,7 +46,10 @@ class GeneratorGrammar (BaseExpressionGenerator):
             for prod in prods:
                 combinations = 1
                 for symbol in prod.rhs():
-                    combinations *= self.count_trees(symbol, height-1)
+                    symbol_height_key = "("+str(symbol)+","+str(height-1)+")" 
+                    if not symbol_height_key in self.count_dict:
+                        self.count_dict[symbol_height_key] = self.count_trees(symbol, height-1)
+                    combinations *= self.count_dict[symbol_height_key]
                 counter += combinations
             return counter
 
@@ -63,6 +68,30 @@ class GeneratorGrammar (BaseExpressionGenerator):
                     subprobabs *= self.count_coverage(symbol, height-1)
                 coverage += subprobabs
             return coverage
+
+    def count_coverage_external(self, start, height):
+        """Counts coverage fast using external (objective) cache."""
+        if height == 0:
+            return 0
+        coverage = 0
+        prods = self.grammar.productions(lhs=start)
+        for prod in prods:
+            subprobabs = prod.prob()
+            for symbol in prod.rhs():
+                if not isinstance(symbol, Nonterminal):
+                    continue
+                elif (height-1) == 0:
+                    subprobabs = 0
+                    break
+                else:
+                    if "("+str(symbol)+","+str(height-1)+")" in self.coverage_dict:
+                        subprobabs *= self.coverage_dict["("+str(symbol)+","+str(height-1)+")"]
+                    else:
+                        newprob = self.count_coverage_external(symbol, height-1)
+                        self.coverage_dict["("+str(symbol)+","+str(height-1)+")"] = newprob
+                        subprobabs *= newprob
+            coverage += subprobabs
+        return coverage
 
     def list_coverages(self, height, tol=10**(-17),
                             min_height=100, verbosity=0):
@@ -119,7 +148,12 @@ class GeneratorGrammar (BaseExpressionGenerator):
         return {A: probs_dict[(A, height)] for A in nonterminals}
 
     def renormalize(self, height=10**4, tol=10**(-17), min_height=100):
-        """Returns renormalized grammar. Inputs like list_coverages."""
+        """Return renormalized grammar. 
+        
+        Raise ValueError if for at least one nonterminal, its coverage
+        equals zero.
+        Inputs are like in list_coverages.
+        """
         coverages_dict = self.list_coverages(height, tol, min_height)
         if min(coverages_dict[A] for A in coverages_dict) < tol:  # input tol
             raise ValueError("Not all coverages are positive, so"
@@ -317,7 +351,7 @@ if __name__ == "__main__":
     from time import time
     t1=0
     def display_time(t1): t2 = time(); print(10**(-3)*int((t2-t1)*10**3), "= seconds consumed"); return t2
-    height = 10**5
+    height = 10**1+5
     p=0.9
     for gramm in [grammar, pgram0, pgram1, pgrama, pgramw, pgramSS,
                     pgramCounterExample, pgramSSparam(p) ]:
@@ -325,13 +359,20 @@ if __name__ == "__main__":
         for i in range(height, height+1):
         # for i in range(0, 5):
             t2=display_time(t1); t1=t2
-            # print(gramm.count_trees(gramm.start_symbol,i), f" = count trees of height <= {i}")
+            print(gramm.count_trees(gramm.start_symbol,i), f" = count trees of height <= {i}")
             # print(gramm.count_coverage(gramm.start_symbol,i), f" = coverage(start,{i}) of height <= {i}")
             # t2=display_time(t1); t1=t2;
-            print(gramm.list_coverages(i, tol=10**(-17), min_height=100,
-                verbosity=1)[gramm.grammar.start()],
-                f" = coverage = list_coverages({i})[start] of height <= {i}")
+            b = gramm.count_coverage_external(gramm.start_symbol,i)
+            print(b, f" = coverage(start,{i}) of height <= {i}")
+            t2=display_time(t1); t1=t2;
+            c = gramm.list_coverages(i, tol=10**(-17), min_height=100,
+                 verbosity=1)[gramm.grammar.start()] 
+            print(c, f" = list_coverages({i})[start] of height <= {i}")
+            # print(gramm.list_coverages(i, tol=10**(-17), min_height=100,
+            #     verbosity=1)[gramm.grammar.start()],
+            #     f" = coverage = list_coverages({i})[start] of height <= {i}")
             t2=display_time(t1); t1=t2
+            if not (b == c): raise ValueError("Coverages do not match!!!!")
             gramm.grammar = gramm.renormalize()
             print("Renormalized grammar:\n %s" % gramm)
             print(gramm.list_coverages(i), " = renormalized coverages")

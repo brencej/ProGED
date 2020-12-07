@@ -6,15 +6,15 @@ Created on Thu Oct 22 14:43:01 2020
 """
 
 import numpy as np
-import sympy as sp
-from nltk import PCFG
+# import sympy as sp
+# from nltk import PCFG
 
-from model import Model
-from model_box import ModelBox
+# from model import Model
+# from model_box import ModelBox
 from generate import generate_models
 from parameter_estimation import fit_models
 from generators.base_generator import BaseExpressionGenerator
-from generators.grammar import GeneratorGrammar
+# from generators.grammar import GeneratorGrammar
 from generators.grammar_construction import grammar_from_template
 from task import EDTask
 
@@ -53,7 +53,7 @@ class EqDisco:
         else:
             raise TypeError ("Invalid generator specification. Expected: class that inherits from "\
                              "generators.base_generator.BaseExpressionGenerator or string, corresponding to template name.\n"\
-                             "Input: " + str(type(task)))
+                             "Input: " + str(type(generator)))
             
         self.strategy = strategy
         self.strategy_parameters = strategy_parameters
