@@ -96,6 +96,7 @@ class GeneratorGrammar (BaseExpressionGenerator):
     def list_coverages(self, height, tol=10**(-17),
                             min_height=100, verbosity=0):
         """Counts coverage of maximal height using cache(dictionary).
+
         Input:
             height - maximal height of parse trees of which the
                 coverage is calculated of.
@@ -152,7 +153,17 @@ class GeneratorGrammar (BaseExpressionGenerator):
         
         Raise ValueError if for at least one nonterminal, its coverage
         equals zero.
-        Inputs are like in list_coverages.
+        Input:
+            height - maximal height of parse trees of which the
+                coverage is calculated of.
+            tol - tolerance as a stopping condition. If change
+                is smaller than the input tolerance, then it stops.
+            min_height - overrides tolerance stopping condition and
+                calculates coverage of all heights <= min_height. It
+                also determines for how many previous steps the change
+                is measured, i.e. for levels (height-1 - min_height/2).
+            verbosity - if set to > 0, it prints stopping probability
+                change, height and input tolerance.
         """
         coverages_dict = self.list_coverages(height, tol, min_height)
         if min(coverages_dict[A] for A in coverages_dict) < tol:  # input tol
