@@ -30,10 +30,10 @@ def construct_right_distribution (items=[], probs=[]):
     return S
 
 def construct_grammar_trigonometric (probs1 = [0.8,0.2], probs2=[0.4,0.4,0.2]):
-    items1 = ["'sin'", "'cos'", "'tan'"]
+    functions = ["'sin'", "'cos'", "'tan'"]
     grammar = construct_production(left="S", items=["T1"+"'('"+"'x'"+"')'",
                                                     "T1"+" "+"T2"+"'('"+"'x'"+"')'"], probs=probs1)
-    grammar += construct_production(left="T1", items=items1, probs=probs2)
+    grammar += construct_production(left="T1", items=functions, probs=probs2)
     grammar += construct_production(left="T2", items=["'h'"], probs=[1])
     return grammar
     
@@ -96,8 +96,7 @@ GRAMMAR_LIBRARY = {
     "simplerational": construct_grammar_simplerational,
     "polytrig": construct_grammar_polytrig,
     "trigonometric": construct_grammar_trigonometric,
-    "polynomial": construct_grammar_polynomial,
-    "function": construct_grammar_function}
+    "polynomial": construct_grammar_polynomial}
 
 
 if __name__ == "__main__":
