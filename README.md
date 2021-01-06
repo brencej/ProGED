@@ -5,7 +5,7 @@ A probabilistic context-free grammar (PCFG) is used to generate candidate equati
 Their optimal values of their parameters are estimated and their perfomance evaluated.
 The output of ProGED is a list of equations, ordered according to the likelihood that they represent the best model for the data.
 
-#Features
+# Features
 - algebraic equations
 - 1st order ordinary differential equations
 - construct a grammar from a template or write a custom grammar
@@ -13,15 +13,40 @@ The output of ProGED is a list of equations, ordered according to the likelihood
 
 Details in https://arxiv.org/abs/2012.00428.
 
-#Dependencies
+# Dependencies
 - numpy
 - scipy
 - sympy
 - NLTK
 
-#Setup
+# Setup
 You can install the package directly from the git repository:
-pip install git+https://github.com/brencej/PCFGproject
+pip install git+https://github.com/brencej/ProGED.
+
+# Usage guide and examples
+## Simple use
+First, generate data for a simple 1-dimensional problem:
+```
+def f(x):
+    return 2.0 * (x + 0.3)
+	
+X = [-1 + 0.1*i for i in range(20)]
+Y = [f(x) for x in X]
+```
+ProGED provides an interface for common usage through the class EqDisco:
+```
+from ProGED import EqDisco
+
+ED = EqDisco(dataX = X,
+             dataY = Y,
+			 strategy_parameters = {"N": 10},
+			 verbosity = 1)
+```
+The algorithm has two steps: generating the models and fiting the models:
+```
+print(ED.generate_models())
+print(ED.fit_models())
+```
 
 
 
