@@ -21,7 +21,9 @@ Details in https://arxiv.org/abs/2012.00428.
 
 # Setup
 You can install the package directly from the git repository:
+```
 pip install git+https://github.com/brencej/ProGED.
+```
 
 # Usage guide and examples
 ## Simple use
@@ -39,8 +41,8 @@ from ProGED import EqDisco
 
 ED = EqDisco(dataX = X,
              dataY = Y,
-			 strategy_parameters = {"N": 10},
-			 verbosity = 1)
+             strategy_parameters = {"N": 10},
+             verbosity = 1)
 ```
 The algorithm has two steps: generating the models and fiting the models:
 ```
