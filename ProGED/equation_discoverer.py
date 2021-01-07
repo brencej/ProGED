@@ -21,10 +21,10 @@ from task import EDTask
 GENERATOR_LIBRARY = {"grammar": grammar_from_template}
 
 class EqDisco:
-    def __init__ (self, task = None,  dataX = None, dataY = None, variable_names = None, output_variable = None, 
-                  success_threshold = 1e-8, task_type = "algebraic",
+    def __init__ (self, task = None,  dataX = None, dataY = None, variable_names = None, output_variable = None,
+                  variable_probabilities = None, success_threshold = 1e-8, task_type = "algebraic",
                   generator = "grammar", generator_template_name = "universal", generator_parameters = {},
-                  strategy = "monte-carlo", strategy_parameters = {"N":5},
+                  strategy = "monte-carlo", strategy_parameters = None, sample_size = 10,
                   verbosity = 1):        
         
         if not task:
@@ -35,13 +35,15 @@ class EqDisco:
                     variable_names = [chr(97+i) for i in range(dataX.shape[-1])]
                 if not output_variable:
                     output_variable = "f"
+                if not variable_probabilities:
+                    variable_probabilities = [1/len(variable_names)]*len(variable_names)
                 self.task = EDTask(dataX, dataY, variable_names, output_variable, success_threshold, task_type)
         elif isinstance(task, EDTask):
             self.task = task
         else:
             raise TypeError ("Missing task information!")
             
-        generator_parameters.update({"variables":self.task.symbols["x"]})
+        generator_parameters.update({"variables":self.task.symbols["x"], "p_vars": variable_probabilities})
         if isinstance(generator, BaseExpressionGenerator):
             self.generator = generator
         elif isinstance(generator, str):
@@ -56,7 +58,10 @@ class EqDisco:
                              "Input: " + str(type(generator)))
             
         self.strategy = strategy
-        self.strategy_parameters = strategy_parameters
+        if not strategy_parameters:
+            self.strategy_parameters = {"N": sample_size}
+        else:
+            self.strategy_parameters = strategy_parameters
         
         self.models = None
         self.solution = None
@@ -77,19 +82,18 @@ class EqDisco:
     
 if __name__ == "__main__":
     print("--- equation_discoverer.py test --- ")
-    np.random.seed(2)
+    np.random.seed(4)
     
-    from pyDOE import lhs
+    def f(x):
+        return 2.0 * (x + 0.3)
+	
+    X = np.linspace(-1, 1, 20)
+    Y = f(X)
+        
+    ED = EqDisco(dataX = X,
+                 dataY = Y,
+                 sample_size = 5,
+                 verbosity = 1)
     
-    def testf (x):
-        return 3*x[:,0]*x[:,1]**2 + 0.5
-    
-    X = lhs(2, 10)*5
-    y = testf(X)
-    
-    N = 2
-    disco = EqDisco(dataX = X, dataY = y, strategy_parameters = {"N":10}, verbosity = 0,
-                    generator="grammar", generator_template_name="universal")
-    
-    print(disco.generate_models())
-    print(disco.fit_models())
+    print(ED.generate_models())
+    print(ED.fit_models())

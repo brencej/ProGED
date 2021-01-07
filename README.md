@@ -29,11 +29,13 @@ pip install git+https://github.com/brencej/ProGED.
 ## Simple use
 First, generate data for a simple 1-dimensional problem:
 ```
+import numpy as np
+
 def f(x):
     return 2.0 * (x + 0.3)
 	
-X = [-1 + 0.1*i for i in range(20)]
-Y = [f(x) for x in X]
+X = np.linspace(-1, 1, 20)
+Y = f(X)
 ```
 ProGED provides an interface for common usage through the class EqDisco:
 ```
@@ -41,7 +43,7 @@ from ProGED import EqDisco
 
 ED = EqDisco(dataX = X,
              dataY = Y,
-             strategy_parameters = {"N": 10},
+             sample_size = 5,
              verbosity = 1)
 ```
 The algorithm has two steps: generating the models and fiting the models:
