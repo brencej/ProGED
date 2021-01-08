@@ -11,6 +11,7 @@ import numpy as np
 # import sympy as sp  # Intentionally commented to avoid warning, look next line.
 # May be a better call to avoid warnning in Sympy version >= 1.6.2.:
 import sympy.core as sp
+from sympy.simplify import simplify as sympy_simplify
 
 from model import Model
 
@@ -176,6 +177,13 @@ class ModelBox:
             raise KeyError ("Invalid key for model dictionary. "\
                             "Expected canonical expression string or integer index.")
         
+def symbolic_difference(ex1, ex2, thr = 9):
+    dif = sp.N(sympy_simplify(ex2 - ex1))
+    for a in sp.preorder_traversal(dif):
+        if isinstance(a, sp.Float):
+            dif = dif.subs(a, round(a, thr))
+    return sympy_simplify(dif)
+
 if __name__ == "__main__":
     from nltk import PCFG
     print("--- models_box.py test ---")
