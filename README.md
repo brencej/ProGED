@@ -21,14 +21,14 @@ Details in https://arxiv.org/abs/2012.00428.
 
 # Setup
 You can install the package directly from the git repository:
-```
+```python3
 pip install git+https://github.com/brencej/ProGED.
 ```
 
 # Usage guide and examples
 ## Simple use
 First, generate data for a simple 1-dimensional problem:
-```
+```python3
 import numpy as np
 
 def f(x):
@@ -38,7 +38,7 @@ X = np.linspace(-1, 1, 20)
 Y = f(X)
 ```
 ProGED provides an interface for common usage through the class EqDisco:
-```
+```python3
 from ProGED import EqDisco
 
 ED = EqDisco(dataX = X,
@@ -47,7 +47,7 @@ ED = EqDisco(dataX = X,
              verbosity = 1)
 ```
 The algorithm has two steps: generating the models and fiting the models:
-```
+```python3
 print(ED.generate_models())
 print(ED.fit_models())
 ```
