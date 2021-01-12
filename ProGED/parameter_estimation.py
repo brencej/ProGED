@@ -18,6 +18,15 @@ from model_box import ModelBox
 # from generate import generate_models
 # from generators.grammar import GeneratorGrammar
 
+import warnings
+warnings.filterwarnings("ignore", message="divide by zero encountered in divide")
+warnings.filterwarnings("ignore", message="divide by zero encountered in true_divide")
+warnings.filterwarnings("ignore", message="invalid value encountered in power")
+warnings.filterwarnings("ignore", message="invalid value encountered in sqrt")
+warnings.filterwarnings("ignore", message="overflow encountered in exp")
+warnings.filterwarnings("ignore", message="overflow encountered in square")
+
+
 """Methods for estimating model parameters. Currently implemented: differential evolution.
 
 Methods:

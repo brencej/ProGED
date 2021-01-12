@@ -42,7 +42,8 @@ def construct_grammar_function (functions=["'sin'", "'cos'"], probs=[0.5,0.5], s
     grammar += construct_production(left="A", items=functions, probs=probs)
     return grammar
     
-def construct_grammar_polytrig (p_more_terms=[0.7,0.15,0.15], p_higher_terms=0.5, p_vars = [0.5,0.3,0.2], variables = ["'x'", "'v'", "'a'", "'sin(C*x + C)'"]):
+def construct_grammar_polytrig (p_more_terms=[0.7,0.15,0.15], p_higher_terms=0.5, p_vars = [0.5,0.3,0.2], 
+                                variables = ["'x'", "'v'", "'a'", "'sin(C*x + C)'"]):
     grammar = construct_production(left="S", items=["'C' '+' S2"], probs=[1])
     grammar += construct_production(left="S2", items=["'C' '*' T '+' S2", "'C' '*' T", "'C'"], probs=p_more_terms)
     grammar += construct_production(left="T", items=["T '*' V", "V"], probs=[p_higher_terms, 1-p_higher_terms])
@@ -58,24 +59,24 @@ def construct_grammar_polynomial (p_S = [0.4, 0.6], p_T = [0.4, 0.6], p_vars = [
     grammar += construct_production(left="V", items=variables, probs=p_vars)
     return grammar
 
-def construct_grammar_simplerational (p_S = [0.2, 0.8], p_P = [0.4, 0.3, 0.3], p_R = [0.4, 0.6], p_M = [0.4, 0.6], p_F = [1], p_V = [1],
-                                      functions = ["'exp'"], variables = ["'x'"]):
+def construct_grammar_simplerational (p_S = [0.2, 0.8], p_P = [0.4, 0.3, 0.3], p_R = [0.4, 0.6], p_M = [0.4, 0.6], 
+                                      p_F = [1], p_vars = [1], functions = ["'exp'"], variables = ["'x'"]):
     grammar = construct_production(left="S", items=["P '/' R", "P"], probs=p_S)
     grammar += construct_production(left="P", items=["P '+' 'C' '*' R", "'C' '*' R", "'C'"], probs=p_P)
     grammar += construct_production(left="R", items=["F '(' 'C' '*' M ')'", "M"], probs=p_R)
     grammar += construct_production(left="M", items=["M '*' V", "V"], probs=p_M)
     grammar += construct_production(left="F", items=functions, probs=p_F)
-    grammar += construct_production(left="V", items=variables, probs=p_V)
+    grammar += construct_production(left="V", items=variables, probs=p_vars)
     return grammar
 
-def construct_grammar_rational (p_S = [0.4, 0.6], p_T = [0.4, 0.6], p_V = [1], p_R = [0.6, 0.4], p_F = [1],
+def construct_grammar_rational (p_S = [0.4, 0.6], p_T = [0.4, 0.6], p_vars = [1], p_R = [0.6, 0.4], p_F = [1],
                                   functions = ["'exp'"], variables = ["'x'"]):
     grammar = construct_production(left="S", items=["'(' E ')' '/' '(' E ')'"], probs=[1])
     grammar += construct_production(left="E", items=["E '+' R", "R"], probs=p_S)
     grammar += construct_production(left="R", items=["T", "'C' '*' F '(' T ')'"], probs=p_R)
     grammar += construct_production(left="T", items=["T '*' V", "'C'"], probs=p_T)
     grammar += construct_production(left="F", items=functions, probs=p_F)
-    grammar += construct_production(left="V", items=variables, probs=p_V)
+    grammar += construct_production(left="V", items=variables, probs=p_vars)
     return grammar
 
 def construct_grammar_universal (p_sum=[0.2, 0.2, 0.6], p_mul = [0.2, 0.2, 0.6], p_rec = [0.2, 0.4, 0.4], 
