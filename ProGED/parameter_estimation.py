@@ -5,14 +5,19 @@ Created on Thu Oct 22 09:12:29 2020
 @author: Jure
 """
 
+import os
+import sys
+import time
+
 import numpy as np
 from scipy.optimize import differential_evolution, minimize
 from scipy.interpolate import interp1d
-from scipy.integrate import solve_ivp
+from scipy.integrate import solve_ivp, odeint
 import sympy as sp
 # import sympy.core as sp
 # from nltk import PCFG
 
+import examples.mute_so as mt
 # from model import Model
 from model_box import ModelBox
 # from generate import generate_models
@@ -96,14 +101,34 @@ def ode (models_list, params_matrix, T, X_data, y0):
     X = interp1d(T, X_data, axis=0, kind='cubic', fill_value="extrapolate")  # N-D
     lamb_exprs = [
         sp.lambdify(model.sym_vars, model.full_expr(*params), "numpy")
+        # todo: model.lambdify(params=params, args="numpy")
         for model, params in zip(models_list, params_matrix)
     ]
-    def dy_dt(t, y):  # \frac{dy}{dt} ; # y = [y1,y2,y3,...] # ( shape= (n,) )
+    def dy_dt(t, y):
+        """Represents  \frac{dy}{dt}.
+
+        y -- [y1,y2,y3,...] i.e. ( shape= (n,) ) """
+
         # N-D:
         b = np.concatenate((y, X(t))) # =[y,X(t)] =[y,X1(t),X2(t),...]
-        return np.array([lamb_expr(*b) for lamb_expr in lamb_exprs])  # older version with *b.T
-    Yode = solve_ivp(dy_dt, (T[0], T[-1]), y0, t_eval=T, atol=0)
-    return Yode.y
+        # Older version with *b.T:
+        return np.array([lamb_expr(*b) for lamb_expr in lamb_exprs])
+    # Older (default RK45) method:
+    # Yode = solve_ivp(dy_dt, (T[0], T[-1]), y0, t_eval=T, atol=0)  
+    # Set min_step via prescribing maximum number of steps:
+    # max_steps = 10**6  # On laptop, this would need less than 3 seconds.
+    max_steps = T.shape[0]*10**3  # Set to |timepoints|*1000.
+    # Convert max_steps to min_steps:
+    min_step_from_max_steps = abs(T[-1] - T[0])/max_steps
+    # The minimal min_step to avoid min step error in LSODA:
+    min_step_error = 10**(-15)
+    min_step = max(min_step_from_max_steps, min_step_error)  # Force them both.
+    rtol = 10**(-4)
+    atol = 10**(-6)
+    # Yode = solve_ivp(dy_dt, (T[0], T[-1]), y0, t_eval=T, method="LSODA", rtol=rtol, atol=atol, min_step=min_step).y
+    # Alternative LSODA using odeint (may be faster?):
+    Yode = odeint(dy_dt, y0, T, rtol=rtol, atol=atol, tfirst=True, hmin=min_step).T 
+    return Yode
 
 def model_ode_error (model, params, T, X, Y):
     """Defines mean squared error of solution to differential equation
@@ -115,18 +140,36 @@ def model_ode_error (model, params, T, X, Y):
         - Y are columns of features that are derived via ode fitting.
     """
     model_list = [model]; params_matrix = [params] # 12multi conversion (temporary)
+    dummy = 10**9
     try:
-        odeY = ode(model_list, params_matrix, T, X, y0=Y[0]) # spremeni v Y[:1]
+        # Next few lines strongly suppress any warnning messages 
+        # produced by LSODA solver, called by ode() function.
+        tee = sys.stdout
+        std = tee.stdout
+        # print(sys.stdout, type(sys.stdout))
+        sys.stdout = std
+        with open(os.devnull, 'w') as f, mt.stdout_redirected(f):
+            odeY = ode(model_list, params_matrix, T, X, y0=Y[0])  # change to Y[:1]
+        sys.stdout = tee
+        odeY = odeY.T  # solve_ivp() returns in oposite (DxN) shape.
+        if not odeY.shape == Y.shape:
+            # print("The ODE solver did not found ys at all times -> returning dummy error.")
+            return dummy
+        try:
+            res = np.mean((Y-odeY)**2)
+            if np.isnan(res) or np.isinf(res) or not np.isreal(res):
+#                print(model.expr, model.params, model.sym_params, model.sym_vars)
+                return dummy
+            return res
+        except Exception as error:
+            print("Programmer1: Params at error:", params, f"and {type(error)} with message:", error)
+            return dummy
+
     except Exception as error:
-        print("error inside ode() of model_ode_error.")
-        print("params at error:", params, "Error message:", error)
-        odeY = ode(model_list, params_matrix, T, X, y0=Y[0]) # spremeni v Y[:1]
-    odeY = odeY.T  # solve_ivp() returns in oposite (DxN) shape.
-    res = np.mean((Y-odeY)**2)
-    if np.isnan(res) or np.isinf(res) or not np.isreal(res):
-#        print(model.expr, model.params, model.sym_params, model.sym_vars)
-        return 10**9
-    return res
+        print("Programmer: Excerpted an error inside ode() of model_ode_error.")
+        print("Programmer: Params at error:", params, f"and {type(error)} with message:", error)
+        print("Returning dummy error. All is well.")
+        return dummy
 
 def model_error_general (model, params, X, Y, T="algebraic"):
     """Calculate error of model with given parameters in general with
@@ -163,13 +206,23 @@ def DE_fit (model, X, Y, p0, T="algebraic", **kwargs):
     """Calls scipy.optimize.differential_evolution. 
     Exists to make passing arguments to the objective function easier."""
     
-    bounds = [[-10**1, 10**1] for i in range(len(p0))]
+    bounds = [[-3*10**1, 3*10**1] for i in range(len(p0))]
+
+    start = time.perf_counter()
+    def diff_evol_timeout(x=0, convergence=0):
+        now = time.perf_counter()
+        if (now-start) > 5:
+            print("Time out!!!")
+            return True
+        else:
+            return False
+
     if isinstance(T, str):
         return differential_evolution(optimization_wrapper, bounds, args = [model, X, Y],
                                     maxiter=10**2, popsize=10)
     else:
         return differential_evolution(optimization_wrapper_ODE, bounds, args = [model, X, Y, T],
-                                    maxiter=10**2, popsize=10)
+                                    callback=diff_evol_timeout, maxiter=10**2, popsize=10)
 
 def min_fit (model, X, Y):
     """Calls scipy.optimize.minimize. Exists to make passing arguments to the objective function easier."""
@@ -188,6 +241,7 @@ def find_parameters (model, X, Y, T="algebraic"):
 #        popt, pcov = model.params, 0
 #    opt_params = popt; othr = pcov
 
+    # here insert an if (alg vs diff. enacbe)
     res = DE_fit(model, X, Y, p0=model.params, T=T)
 
 #    res = min_fit (model, X, Y)
@@ -222,6 +276,11 @@ class ParameterEstimator:
         except Exception as error:
             print(f"Excepted an error: {error}!! \nModel:", model)
             model.set_estimated({}, valid=False)
+        # todo: optional kwargs: verbosity>1: print next line:
+        print(f"model: {str(model.get_full_expr()):<70}; "
+                + f"p: {model.p:<23}; "
+                + f"error: {model.get_error()}")
+
         return model
     
 def fit_models (models, X, Y, T="algebraic", pool_map = map, verbosity=0):

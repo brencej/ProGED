@@ -1,9 +1,15 @@
 # %% # 0.) import modules and set a random seed
+import sys
 import numpy as np
+sys.path += [".", ".."]
 from ode_examples import example_tB_data  # import datasets T, X and Y
 from parameter_estimation import fit_models
 from generate import generate_models
 from generators.grammar import GeneratorGrammar
+from tee_so import Tee
+random = str(np.random.random())
+print(random)
+Tee("logfile_demo_" + random + ".txt")
 np.random.seed(2)
 
 # 1.) construct dataset

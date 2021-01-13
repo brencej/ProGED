@@ -105,7 +105,16 @@ if __name__ == "__main__":
     np.random.seed(0)
     from nltk import PCFG
     grammar = grammar_from_template("universal", {"variables":["'phi'", "'theta'", "'r'"], "p_vars":[0.2,0.4,0.4]})
+    # Testing some grammar generation:
+    grammar1 = grammar_from_template("trigonometric", {})
+    # Grammar template without variables argument (proudces error):
+    # grammar2 = grammar_from_template("trigonometric", {"variables":["'phi'", "'theta'", "'r'"]})
+    grammar3 = grammar_from_template("function", {"variables":["'phi'", "'theta'", "'r'"]})
+    grammar4 = grammar_from_template("trigonometric", {"probs1":[0.8,0.2], "probs2":[0.4,0.4,0.2]  })
+    grammar5 = grammar_from_template("function", {"functions":["'sin'", "'cos'"], "probs":[0.5,0.5]})
+    for i, grammar_ in enumerate([grammar, grammar1, grammar3, grammar4, grammar5]):
+        print(f"grammar {i}: {grammar_}")
     print(grammar)
     for i in range(5):
         print(grammar.generate_one())
-    print(construct_production("s",[],[]))
+    print("test", construct_production("s", [], []))
