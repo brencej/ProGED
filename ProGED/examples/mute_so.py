@@ -23,12 +23,12 @@ def stdout_redirected(to=os.devnull, stdout=None):
     # print(stdout, type(stdout))
     if stdout is None:
        stdout = sys.stdout
-    # print("se ok")
+    # print("still ok")
     # print(stdout, type(stdout))
     # print(sys.stdout, type(sys.stdout))
 
     stdout_fd = fileno(stdout)
-    # print("po fileno(stdout)")
+    # print("after fileno(stdout)")
     # copy stdout_fd before it is overwritten
     #NOTE: `copied` is inheritable on Windows when duplicating a standard stream
     with os.fdopen(os.dup(stdout_fd), 'wb') as copied: 

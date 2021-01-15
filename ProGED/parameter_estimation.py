@@ -142,15 +142,18 @@ def model_ode_error (model, params, T, X, Y):
     model_list = [model]; params_matrix = [params] # 12multi conversion (temporary)
     dummy = 10**9
     try:
-        # Next few lines strongly suppress any warnning messages 
-        # produced by LSODA solver, called by ode() function.
-        tee = sys.stdout
-        std = tee.stdout
-        # print(sys.stdout, type(sys.stdout))
-        sys.stdout = std
+        # Variable is_tee is set to True when used with lorenz.py.
+        is_tee = False
+        if is_tee:
+            # Next few lines strongly suppress any warnning messages 
+            # produced by LSODA solver, called by ode() function.
+            tee = sys.stdout
+            std = tee.stdout
+            sys.stdout = std
         with open(os.devnull, 'w') as f, mt.stdout_redirected(f):
             odeY = ode(model_list, params_matrix, T, X, y0=Y[0])  # change to Y[:1]
-        sys.stdout = tee
+        if is_tee:
+            sys.stdout = tee
         odeY = odeY.T  # solve_ivp() returns in oposite (DxN) shape.
         if not odeY.shape == Y.shape:
             # print("The ODE solver did not found ys at all times -> returning dummy error.")

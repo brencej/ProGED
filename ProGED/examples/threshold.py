@@ -9,7 +9,6 @@ import sys
 from tee_this import create_log
 
 # Command line arguments:
-# print(sys.argv, len(sys.argv))
 file_name = sys.argv[1] 
 equation_name = sys.argv[2]
 
@@ -20,9 +19,11 @@ model_box = re.findall("ModelBox: (\d+) models", string)
 fitted_models = str(model_box[0])
 print(fitted_models, "Number of fitted models")
 
+# Crop only the final results out of the output file.
 print_models = re.findall("Final score:\n[^w]*", string)
-# print(print_models)
 
+# Relevant threshold for each equation discovery, i.e. error of 
+# data generating model to compare against.
 equation_dict = {
 "dx_calm" : """
 %  model: -1.3009139792956*x + 1.29951581073809*y 
@@ -49,18 +50,15 @@ model: -0.834781594777948*x*z - 15.0440585292989*x - 1.01069280464677*y      ; p
 """}
 key_line = equation_dict[equation_name]  # = e.g. dx_calm
 print("Key line, i.e. line of most interest in output of Eq Disco:", key_line)
+# Obtain the threshold:
 error_per_partes = re.findall("error:.(([\d\.]+)(e(\-\d\d))*)", key_line)
 if not len(error_per_partes):
     print("ERROR IN KEYLINE!!!")
-# print(error_per_partes, "error_per_partes")
 error_str, coef, _, exp = error_per_partes[0]  # = 2.5822654126803468, e-11, -11
 error = float(error_str)
 threshold = error
-# print(error)
-# print(error_per_partes)
 
-
-# Do threshold on the key_line (our watched equation):
+# Do threshold filter via the key_line (our watched equation):
 lines = re.findall("model:.*error:.[\d\.e\-]+", print_models[0])
 filtered_lines = [line for line in lines if float(re.findall("error:.([\d\.e\-]+)", line)[0]) <= threshold]
 if len(filtered_lines) == 0:
