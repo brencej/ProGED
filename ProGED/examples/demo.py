@@ -9,7 +9,7 @@ from generators.grammar import GeneratorGrammar
 from tee_so import Tee
 random = str(np.random.random())
 print(random)
-Tee("logfile_demo_" + random + ".txt")
+# Tee("logfile_demo_" + random + ".txt")
 np.random.seed(2)
 
 # 1.) construct dataset
