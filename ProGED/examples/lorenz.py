@@ -35,9 +35,9 @@ aquation = (aux[:1], aux[1:])
 random = str(np.random.random())
 print("Filename id: " + log_nickname + random)
 try:
-        log_object = te.Tee("examples/log_lorenz_" + log_nickname + random + ".txt")
+    log_object = te.Tee("examples/log_lorenz_" + log_nickname + random + ".txt")
 except FileNotFoundError:
-        log_object = te.Tee("log_lorenz_" + log_nickname + random + ".txt")
+    log_object = te.Tee("log_lorenz_" + log_nickname + random + ".txt")
 
 # # 1.) Data construction (simulation of Lorenz):
 
@@ -73,7 +73,7 @@ rtol=10**(-6)
 Yode = solve_ivp(dy_dt, (T[0], T[-1]), y0, method="LSODA", min_step=min_step, t_eval=T, rtol=rtol, atol=0).y
 # Yode = odeint(dy_dt, y0, T, rtol=rtol, atol=0, tfirst=True, printmessg=0, hmin=min_step).T 
 
-# Plot simulated data:
+# # Plot simulated data:
 # plt.xlabel("T [time]")
 # plt.ylabel("solutions [ys(t)]")
 # plt.plot(T, Yode[0], label="solution x")
@@ -94,13 +94,12 @@ from generators.grammar_construction import grammar_from_template  # Grammar's
 from parameter_estimation import fit_models
 
 def eq_disco_demo (data, lhs_variables: list = [1],
-                  # ["stolpec 1"], # in case of header string reference
+                  # ["column 1"], # in case of header string reference
                     rhs_variables: list = [2, 3],
                     dimensions: list = [0]):
     # header = ["column for x", "column for y", "column for z"]
     header = ["x", "y", "z"]
     T = data[:, dimensions]
-    # print(T.shape, "T")
     T = T.T[0]  # Temporary line since T is for still 1-D array.
     Y = data[:, lhs_variables]
     X = data[:, rhs_variables]
@@ -122,13 +121,8 @@ def eq_disco_demo (data, lhs_variables: list = [1],
     print(samples_cardinality, "=samples cardinality")
     models = generate_models(grammar, symbols, 
                             strategy_parameters={"N":samples_cardinality})
-    # with open(os.devnull, 'w') as f, te.stdout_redirected(f):
-    fit_models(models, X, Y, T)
-    # Print results:
-    # try:
-    #         log_object = te.Tee("examples/log_lorenz_" + log_nickname + random + ".txt")
-    # except FileNotFoundError:
-    #         log_object = te.Tee("log_lorenz_" + log_nickname + random + ".txt")
+    fit_models(models, X, Y, T, timeout=5, max_steps=10**6,
+                lower_upper_bounds=(-30,30))
     print(models)
     print("\nFinal score:")
     for m in models:
@@ -142,6 +136,7 @@ def eq_disco_demo (data, lhs_variables: list = [1],
 # eq_disco_demo(data, lhs_variables=[3], rhs_variables=[1,2])
 # eq_disco_demo(data, lhs_variables=[1], rhs_variables=[2,3])
 
+# Run eqation discovery from command line:
 eq_disco_demo(data, lhs_variables=aquation[0], rhs_variables=aquation[1])
 finnish = time.perf_counter()
 print(f"Finnished in {round(finnish-start, 2)} seconds")

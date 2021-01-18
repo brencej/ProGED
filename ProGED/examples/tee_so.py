@@ -34,7 +34,8 @@ class TeeFileOnly(object):
     def flush(self):
         self.file.flush()
 
-# To mute also file descriptors, i.e. lower level writes, see mute_so.py.
+# For muting also file descriptors, i.e. lower level writes, see mute_so.py.
+# Here is only naive solution:
 class Mute(object):
     def __init__(self):
         self.stdout = sys.stdout
