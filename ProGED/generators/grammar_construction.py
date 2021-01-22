@@ -29,12 +29,15 @@ def construct_right_distribution (items=[], probs=[]):
         S += " | " + construct_right(right=items[i], prob=p[i])
     return S
 
-def construct_grammar_trigonometric (probs1 = [0.8,0.2], probs2=[0.4,0.4,0.2]):
-    functions = ["'sin'", "'cos'", "'tan'"]
-    grammar = construct_production(left="S", items=["T1"+"'('"+"'x'"+"')'",
-                                                    "T1"+" "+"T2"+"'('"+"'x'"+"')'"], probs=probs1)
+def construct_grammar_trigonometric (probs1 = [0.8,0.2], probs2=[0.4,0.4,0.2], 
+                                     variables = ["'x'", "'y'"], p_vars = [0.5, 0.5],
+                                     functions = ["'sin'", "'cos'", "'tan'"]):
+    
+    grammar = construct_production(left="S", items=["T1" + "'('" + "V" + "')'",
+                                                    "T1" + " " + "T2" + "'('" + "V" + "')'"], probs=probs1)
     grammar += construct_production(left="T1", items=functions, probs=probs2)
     grammar += construct_production(left="T2", items=["'h'"], probs=[1])
+    grammar += construct_production(left = "V", items=variables, probs=p_vars)
     return grammar
     
 def construct_grammar_function (functions=["'sin'", "'cos'"], probs=[0.5,0.5], string=True):
