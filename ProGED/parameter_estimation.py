@@ -39,7 +39,7 @@ Methods:
     fit_models: Performs parameter estimation on given models. Main interface to the module.
 """
 
-def model_error (model, params, X, Y):
+def model_error (params, model, X, Y, *residue):
     """Defines mean squared error as the error metric."""
     testY = model.evaluate(X, *params)
     res = np.mean((Y-testY)**2)
@@ -57,7 +57,7 @@ def model_constant_error (model, params, X, Y):
 
 EQUATION_TYPES = ("algebraic", "differential")
 
-def model_error_general (model, params, X, Y, T, **estimation_strategy):
+def model_error_general (params, model, X, Y, T, **estimation_settings):
     """Calculate error of model with given parameters in general with
     type of error given.
 
@@ -65,22 +65,22 @@ def model_error_general (model, params, X, Y, T, **estimation_strategy):
     - X are columns without features that are derived.
     - Y are columns of features that are derived via ode fitting.
     - T is column of times at which samples in X and Y happen.
-    - estimation_strategy: look description of fit_models()
+    - estimation_settings: look description of fit_models()
     """
-    equation_type = estimation_strategy["equation_type"]
+    equation_type = estimation_settings["equation_type"]
     if equation_type == "algebraic":
-        return model_error(model, params, X, Y)
-    if equation_type == "differential":
+        return model_error(params, model, X, Y)
+    elif equation_type == "differential":
         # Model_ode_error might use estimation[verbosity] agrument for
         # ode solver's settings and suppresing its warnnings:
-        return model_ode_error(model, params, T, X, Y, **estimation_strategy)
+        return model_ode_error(params, model, X, Y, T, estimation_settings)
     else:
         types_string = "\", \"".join(EQUATION_TYPES)
         raise ValueError("Variable equation_type has unsupported value "
                 f"\"{equation_type}\", while list of possible values: "
                 f"\"{types_string}\".")
 
-def ode (models_list, params_matrix, T, X_data, y0, **estimation_strategy):
+def ode (models_list, params_matrix, T, X_data, y0, **estimation_settings):
     """Solve system of ODEs defined by equations in models_list.
 
     Raise error if input is incompatible.
@@ -142,8 +142,8 @@ def ode (models_list, params_matrix, T, X_data, y0, **estimation_strategy):
     # Older (default RK45) method:
     # Yode = solve_ivp(dy_dt, (T[0], T[-1]), y0, t_eval=T, atol=0)  
     # Set min_step via prescribing maximum number of steps:
-    if "max_ode_steps" in estimation_strategy:
-        max_steps = estimation_strategy["max_ode_steps"]
+    if "max_ode_steps" in estimation_settings:
+        max_steps = estimation_settings["max_ode_steps"]
     else:
         # max_steps = 10**6  # On laptop, this would need less than 3 seconds.
         max_steps = T.shape[0]*10**3  # Set to |timepoints|*1000.
@@ -159,7 +159,7 @@ def ode (models_list, params_matrix, T, X_data, y0, **estimation_strategy):
     Yode = odeint(dy_dt, y0, T, rtol=rtol, atol=atol, tfirst=True, hmin=min_step).T 
     return Yode
 
-def model_ode_error (model, params, T, X, Y, **estimation_strategy):
+def model_ode_error (params, model, X, Y, T, estimation_settings):
     """Defines mean squared error of solution to differential equation
     as the error metric.
 
@@ -186,7 +186,7 @@ def model_ode_error (model, params, T, X, Y, **estimation_strategy):
         # Next line works only when sys.stdout is real. Thats why above.
         with open(os.devnull, 'w') as f, mt.stdout_redirected(f):
             odeY = ode(model_list, params_matrix, T, X, y0=Y[0],
-                        **estimation_strategy)  # change to Y[:1]
+                        **estimation_settings)  # change to Y[:1]
         if change_std2tee: 
             sys.stdout = tee_object  # Change it back to fake stdout (tee).
 
@@ -210,38 +210,26 @@ def model_ode_error (model, params, T, X, Y, **estimation_strategy):
         print("Returning dummy error. All is well.")
         return dummy
 
-def optimization_wrapper (params, *args):
-    """Calls the appropriate error function. The choice of error function is made here.
-    
-    TODO:
-        We need to pass information on the choice of error function from fit_models all the way to here,
-            and implement a library framework, similarly to grammars and generation strategies."""
-    
-    model, X, Y, T, estimation_strategy = args
-    return model_error_general(model, params, X, Y, T, **estimation_strategy)
-
-def DE_fit (model, X, Y, T, p0, **estimation_strategy):
+def DE_fit (model, X, Y, T, p0, **estimation_settings):
     """Calls scipy.optimize.differential_evolution. 
     Exists to make passing arguments to the objective function easier."""
     
     # bounds = [[-3*10**1, 3*10**1] for i in range(len(p0))]
-    lower_bound, upper_bound = (estimation_strategy["lower_upper_bounds"][i] for i in (0, 1))
+    lower_bound, upper_bound = (estimation_settings["lower_upper_bounds"][i] for i in (0, 1))
     bounds = [[lower_bound, upper_bound] for i in range(len(p0))]
 
     start = time.perf_counter()
     def diff_evol_timeout(x=0, convergence=0):
         now = time.perf_counter()
-        if (now-start) > estimation_strategy["timeout"]:
+        if (now-start) > estimation_settings["timeout"]:
             print("Time out!!!")
             return True
         else:
             return False
     
-    # Alternativa:
-    # differential_evolution(estimation_strategy["wrapper"], ...)
     return differential_evolution(
-        optimization_wrapper, bounds,
-        args = [model, X, Y, T, estimation_strategy],
+        estimation_settings["objective_function"], bounds,
+        args=[model, X, Y, T, estimation_settings],
         callback=diff_evol_timeout, maxiter=10**2, popsize=10)
 
 def min_fit (model, X, Y):
@@ -249,7 +237,7 @@ def min_fit (model, X, Y):
     
     return minimize(optimization_wrapper, model.params, args = (model, X, Y))
 
-def find_parameters (model, X, Y, T, **estimation_strategy):
+def find_parameters (model, X, Y, T, **estimation_settings):
     """Calls the appropriate fitting function. 
     
     TODO: 
@@ -261,14 +249,18 @@ def find_parameters (model, X, Y, T, **estimation_strategy):
 #        popt, pcov = model.params, 0
 #    opt_params = popt; othr = pcov
 
-    # here insert an if (alg vs diff. enacbe)
-    res = DE_fit(model, X, Y, T, p0=model.params, **estimation_strategy)
-    # Lahko bi tle dal
-    # if algebraic: DE_fit(..., wrapper=wraper_algebraic)
-    # elseif diff: DE_fit(..., wrapper=wraper_differential)
+    equation_type = estimation_settings["equation_type"]
+    if equation_type == "algebraic":
+        estimation_settings["objective_function"] = model_error
+    elif equation_type == "differential":
+        estimation_settings["objective_function"] = model_ode_error
+    else:
+        types_string = "\", \"".join(EQUATION_TYPES)
+        raise ValueError("Variable equation_type has unsupported value "
+                f"\"{equation_type}\", while list of possible values: "
+                f"\"{types_string}\".")
 
-    # kjer bi blo v def DE_fit:
-    # differential_evolution(estimation_strategy["wrapper"], ...)
+    res = DE_fit(model, X, Y, T, p0=model.params, **estimation_settings)
 
 
 #    res = min_fit (model, X, Y)
@@ -285,14 +277,14 @@ class ParameterEstimator:
             add inputs to make requirements flexible
             add verbosity input
         Input:
-            estimation_strategy: Dictionary with multiple parameters
+            estimation_settings: Dictionary with multiple parameters
                 that determine estimation process more specifically.
     """
-    def __init__(self, X, Y, T, **estimation_strategy):
+    def __init__(self, X, Y, T, **estimation_settings):
         self.X = X
         self.Y = Y
         self.T = T
-        self.estimation_strategy = estimation_strategy
+        self.estimation_settings = estimation_settings
         
     def fit_one (self, model):
         print("Estimating model " + str(model.expr))
@@ -301,11 +293,11 @@ class ParameterEstimator:
                 pass
             elif len(model.params) < 1:
                 model.set_estimated({"x":[], "fun":model_error_general(
-                    model, [], self.X, self.Y, self.T,
-                    **self.estimation_strategy)})
+                    [], model, self.X, self.Y, self.T,
+                    **self.estimation_settings)})
             else:
                 res = find_parameters(model, self.X, self.Y, self.T,
-                                     **self.estimation_strategy)
+                                     **self.estimation_settings)
                 model.set_estimated(res)
         except Exception as error:
             print((f"Excepted an error: Of type {type(error)} and message:"
@@ -348,15 +340,15 @@ def fit_models (models, X, Y, T=None, pool_map=map, verbosity=0,
             e.g. in solving ODEs.
         max_ode_steps: As an example of above, it can be passed through **additional
             argument. Maximal number of steps used in one run of LSODA solver.
-        estimation_strategy: Dictionary where majority of optional arguments is stored.
+        estimation_settings: Dictionary where majority of optional arguments is stored.
     """
     if not isinstance(T, type(None)):
         equation_type = "differential"
-    estimation_strategy = {
+    estimation_settings = {
         "verbosity": verbosity, "equation_type": equation_type,
         "timeout": timeout, "lower_upper_bounds": lower_upper_bounds}
-    estimation_strategy = {**estimation_strategy, **additional}
-    estimator = ParameterEstimator(X, Y, T, **estimation_strategy)
+    estimation_settings = {**estimation_settings, **additional}
+    estimator = ParameterEstimator(X, Y, T, **estimation_settings)
     return ModelBox(dict(zip(models.keys(), list(pool_map(estimator.fit_one, models.values())))))
 
 
