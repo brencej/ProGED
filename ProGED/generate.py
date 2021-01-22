@@ -34,7 +34,7 @@ Methods:
 """
 
 
-def generate_models(model_generator, symbols, strategy = "monte-carlo", strategy_parameters = {"N":5}, verbosity=0):
+def generate_models(model_generator, symbols, strategy = "monte-carlo", strategy_settings = {"N":5}, verbosity=0):
     """Generate models using given generator and specified strategy.
     
     generate_models is intended as an interface to the generation methods defined in the module.
@@ -56,13 +56,13 @@ def generate_models(model_generator, symbols, strategy = "monte-carlo", strategy
     """
     if isinstance(strategy, str):
         if strategy in STRATEGY_LIBRARY:
-            return STRATEGY_LIBRARY[strategy](model_generator, symbols, verbosity=verbosity,  **strategy_parameters)
+            return STRATEGY_LIBRARY[strategy](model_generator, symbols, verbosity=verbosity,  **strategy_settings)
         else:
             raise KeyError ("Strategy name not found in library.\n"\
                             "Input: " + strategy)
                 
     elif isinstance(strategy, lambda x: x):
-        return strategy(model_generator, symbols, **strategy_parameters)
+        return strategy(model_generator, symbols, **strategy_settings)
     
     else:
         raise TypeError ("Unknown strategy type. Expecting: string or callable.\n"\
@@ -126,7 +126,7 @@ if __name__ == "__main__":
     symbols = {"x":['x', 'y'], "start":"S", "const":"C"}
     N = 10
     
-    models = generate_models(generator, symbols, strategy_parameters = {"N":10})
+    models = generate_models(generator, symbols, strategy_settings = {"N":10})
     
     print(models)
                         

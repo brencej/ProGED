@@ -8,9 +8,9 @@ Created on Thu Oct 22 10:07:25 2020
 import numpy as np
 from generators.grammar import GeneratorGrammar
 
-def grammar_from_template (template_name, grammar_parameters):
+def grammar_from_template (template_name, generator_settings):
     if template_name in GRAMMAR_LIBRARY:
-        grammar_str = GRAMMAR_LIBRARY[template_name](**grammar_parameters)
+        grammar_str = GRAMMAR_LIBRARY[template_name](**generator_settings)
         return GeneratorGrammar(grammar_str)
 
 def construct_right (right = "a", prob = 1):

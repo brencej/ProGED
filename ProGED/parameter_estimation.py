@@ -373,7 +373,7 @@ if __name__ == "__main__":
     symbols = {"x":['x', 'y'], "start":"S", "const":"C"}
     N = 10
     
-    models = generate_models(grammar, symbols, strategy_parameters = {"N":10})
+    models = generate_models(grammar, symbols, strategy_settings = {"N":10})
     
     models = fit_models(models, X, y, equation_type="algebraic")
     print(models)
