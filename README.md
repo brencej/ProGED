@@ -25,6 +25,13 @@ You can install the package directly from the git repository:
 pip install git+https://github.com/brencej/ProGED.
 ```
 
+# Automated testing
+To check whether the installation works, run automated tests by calling
+```
+cd ProGED/tests/
+py.test
+```
+
 # Usage guide and examples
 ## Simple use
 First, generate data for a simple 1-dimensional problem:
