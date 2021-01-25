@@ -107,16 +107,20 @@ def test_model_box():
 def test_parameter_estimation():
     np.random.seed(1)
     def f(x):
-        return 2.0 * (x + 0.3)
-    X = np.linspace(-1, 1, 20)
-    Y = f(X)
+        return 2.0 * (x[:,0] + 0.3)
+    X = np.linspace(-1, 1, 20).reshape(-1,1)
+    Y = f(X).reshape(-1,1)
+    data = np.hstack((X, Y))
+    
     grammar = GeneratorGrammar("""S -> S '+' T [0.4] | T [0.6]
                               T -> 'C' [0.6] | T "*" V [0.4]
                               V -> 'x' [0.5] | 'y' [0.5]""")
     symbols = {"x":['x'], "start":"S", "const":"C"}
     N = 2
+    
     models = generate_models(grammar, symbols, strategy_settings = {"N":N})
-    models = fit_models(models, X, Y, equation_type="algebraic")
+    models = fit_models(models, data, target_variable_index = -1, equation_type="algebraic")
+    
     assert np.abs(models[0].get_error() - 0.36) < 1e-6
     assert np.abs(models[1].get_error() - 1.4736842) < 1e-6
     
@@ -126,39 +130,43 @@ def test_parameter_estimation_2D():
         return 2.0 * (x[:,0]*x[:,1] + 0.3)
     
     r = np.linspace(-1, 1, 4)
-    X = np.array([[[x,y] for x in r] for y in r]).reshape(16,2)
-    Y = f(X)
+    X = np.array([[[x,y] for x in r] for y in r]).reshape(-1,2)
+    Y = f(X).reshape(-1,1)
+    data = np.hstack((X, Y))
     
     grammar = GeneratorGrammar("""S -> S '+' T [0.4] | T [0.6]
                               T -> 'C' [0.6] | T "*" V [0.4]
                               V -> 'x' [0.5] | 'y' [0.5]""")
     symbols = {"x":['x', 'y'], "start":"S", "const":"C"}
     N = 2
+    
     models = generate_models(grammar, symbols, strategy_settings = {"N":N})
-    models = fit_models(models, X, Y, equation_type="algebraic")
+    models = fit_models(models, data, target_variable_index = -1, equation_type="algebraic")
+    
     assert np.abs(models[0].get_error() - 0.36) < 1e-6
     assert np.abs(models[1].get_error() - 1.5945679) < 1e-6
 
 def test_equation_discoverer():
     np.random.seed(0)
     def f(x):
-        return 2.0 * (x + 0.3)
+        return 2.0 * (x[:,0] + 0.3)
 	
-    X = np.linspace(-1, 1, 20)
-    Y = f(X)
-    X = X.reshape(-1,1)
-    Y = Y.reshape(-1,1)
+    X = np.linspace(-1, 1, 20).reshape(-1,1)
+    Y = f(X).reshape(-1,1)
+    data = np.hstack((X,Y))
         
-    ED = EqDisco(dataX = X,
-                 dataY = Y,
+    ED = EqDisco(data = data,
+                 task = None,
+                 target_variable_index = -1,
                  sample_size = 2,
                  verbosity = 1)
     
     ED.generate_models()
     ED.fit_models()
     
-    assert np.abs(ED.models[0].get_error() - 2.2021052) < 1e-6
-    assert np.abs(ED.models[1].get_error() - 1.8336842) < 1e-6
+    #print(ED.models[0].get_error())
+    assert np.abs(ED.models[0].get_error() - 0.72842105) < 1e-6
+    assert np.abs(ED.models[1].get_error() - 0.59163899) < 1e-6
     
 # if __name__ == "__main__":
 #     test_grammar_general()

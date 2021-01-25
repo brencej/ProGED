@@ -55,7 +55,7 @@ def model_constant_error (model, params, X, Y):
     testY = model.evaluate(X, *params)
     return np.std(testY)#/np.linalg.norm(params)
 
-EQUATION_TYPES = ("algebraic", "differential")
+TASK_TYPES = ("algebraic", "differential")
 
 def model_error_general (params, model, X, Y, T, **estimation_settings):
     """Calculate error of model with given parameters in general with
@@ -67,17 +67,17 @@ def model_error_general (params, model, X, Y, T, **estimation_settings):
     - T is column of times at which samples in X and Y happen.
     - estimation_settings: look description of fit_models()
     """
-    equation_type = estimation_settings["equation_type"]
-    if equation_type == "algebraic":
+    task_type = estimation_settings["task_type"]
+    if task_type == "algebraic":
         return model_error(params, model, X, Y)
-    elif equation_type == "differential":
+    elif task_type == "differential":
         # Model_ode_error might use estimation[verbosity] agrument for
         # ode solver's settings and suppresing its warnnings:
         return model_ode_error(params, model, X, Y, T, estimation_settings)
     else:
-        types_string = "\", \"".join(EQUATION_TYPES)
-        raise ValueError("Variable equation_type has unsupported value "
-                f"\"{equation_type}\", while list of possible values: "
+        types_string = "\", \"".join(TASK_TYPES)
+        raise ValueError("Variable task_type has unsupported value "
+                f"\"{task_type}\", while list of possible values: "
                 f"\"{types_string}\".")
 
 def ode (models_list, params_matrix, T, X_data, y0, **estimation_settings):
@@ -249,15 +249,15 @@ def find_parameters (model, X, Y, T, **estimation_settings):
 #        popt, pcov = model.params, 0
 #    opt_params = popt; othr = pcov
 
-    equation_type = estimation_settings["equation_type"]
-    if equation_type == "algebraic":
+    task_type = estimation_settings["task_type"]
+    if task_type == "algebraic":
         estimation_settings["objective_function"] = model_error
-    elif equation_type == "differential":
+    elif task_type == "differential":
         estimation_settings["objective_function"] = model_ode_error
     else:
-        types_string = "\", \"".join(EQUATION_TYPES)
-        raise ValueError("Variable equation_type has unsupported value "
-                f"\"{equation_type}\", while list of possible values: "
+        types_string = "\", \"".join(TASK_TYPES)
+        raise ValueError("Variable task_type has unsupported value "
+                f"\"{task_type}\", while list of possible values: "
                 f"\"{types_string}\".")
 
     res = DE_fit(model, X, Y, T, p0=model.params, **estimation_settings)
@@ -280,10 +280,18 @@ class ParameterEstimator:
             estimation_settings: Dictionary with multiple parameters
                 that determine estimation process more specifically.
     """
-    def __init__(self, X, Y, T, **estimation_settings):
-        self.X = X
-        self.Y = Y
-        self.T = T
+    def __init__(self, data, target_variable_index, time_index, **estimation_settings):
+        #data = np.atleast_2d(data)
+        var_mask = np.ones(data.shape[-1], bool)
+        var_mask[target_variable_index] = False
+        if estimation_settings["task_type"] == "differential":
+            var_mask[time_index] = False
+            self.T = data[:, time_index]
+        else:
+            self.T = None
+            
+        self.X = data[:, var_mask]
+        self.Y = data[:, target_variable_index]
         self.estimation_settings = estimation_settings
         
     def fit_one (self, model):
@@ -310,8 +318,8 @@ class ParameterEstimator:
 
         return model
     
-def fit_models (models, X, Y, T=None, pool_map=map, verbosity=0,
-                equation_type="algebraic", timeout=np.inf, 
+def fit_models (models, data, target_variable_index, time_index = None, pool_map=map, verbosity=0,
+                task_type="algebraic", timeout=np.inf, 
                 lower_upper_bounds=(-30, 30), **additional):
     """Performs parameter estimation on given models. Main interface to the module.
     
@@ -321,16 +329,15 @@ def fit_models (models, X, Y, T=None, pool_map=map, verbosity=0,
         models (ModelBox): Instance of ModelBox, containing the models to be fitted. 
         X (numpy.array): Input data of shape N x M, where N is the number of samples 
             and M is the number of variables.
-        Y (numpy.array): Output data of shape N x D, where N is the number of samples
-            and D is the number of output variables.
-        T (numpy.array): Times array, used for solving differential equations, where
-            form required is noted inside the definition of ode() function.
+        target_variable_index (int): Index of column in data that belongs to the target variable.
+        time_index (int): Index of column in data that belongs to measurement of time. 
+                Required for differential equations, None otherwise.
         pool_map (function): Map function for parallelization. Example use with 8 workers:
                 from multiprocessing import Pool
                 pool = Pool(8)
-                fit_models (models, X, Y, pool_map = pool.map)
+                fit_models (models, data, -1, pool_map = pool.map)
         verbosity (int): Level of printout desired. 0: none, 1: info, 2+: debug.
-        equation_type: Type of equations, e.g. "algebraic" or "differential", that
+        task_type: Type of equations, e.g. "algebraic" or "differential", that
             equation discovery algorithm tries to discover.
         timeout: Maximal time consumed for whole minimization optimization process,
             e.g. for differential evolution, that is performed for each model.
@@ -342,13 +349,14 @@ def fit_models (models, X, Y, T=None, pool_map=map, verbosity=0,
             argument. Maximal number of steps used in one run of LSODA solver.
         estimation_settings: Dictionary where majority of optional arguments is stored.
     """
-    if not isinstance(T, type(None)):
-        equation_type = "differential"
+    if not isinstance(time_index, type(None)):
+        task_type = "differential"
+        
     estimation_settings = {
-        "verbosity": verbosity, "equation_type": equation_type,
+        "verbosity": verbosity, "task_type": task_type,
         "timeout": timeout, "lower_upper_bounds": lower_upper_bounds}
     estimation_settings = {**estimation_settings, **additional}
-    estimator = ParameterEstimator(X, Y, T, **estimation_settings)
+    estimator = ParameterEstimator(data, target_variable_index, time_index, **estimation_settings)
     return ModelBox(dict(zip(models.keys(), list(pool_map(estimator.fit_one, models.values())))))
 
 
@@ -375,6 +383,6 @@ if __name__ == "__main__":
     
     models = generate_models(grammar, symbols, strategy_settings = {"N":10})
     
-    models = fit_models(models, X, y, equation_type="algebraic")
+    models = fit_models(models, X, y, task_type="algebraic")
     print(models)
 
