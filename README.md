@@ -41,15 +41,14 @@ import numpy as np
 def f(x):
     return 2.0 * (x + 0.3)
 	
-X = np.linspace(-1, 1, 20)
-Y = f(X)
+X = np.linspace(-1, 1, 20).reshape(-1,1)
+Y = f(X).reshape(-1,1)
 ```
 ProGED provides an interface for common usage through the class EqDisco:
 ```python3
 from ProGED import EqDisco
 
-ED = EqDisco(dataX = X,
-             dataY = Y,
+ED = EqDisco(data,
              sample_size = 5,
              verbosity = 1)
 ```

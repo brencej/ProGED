@@ -18,15 +18,16 @@ class EDTask:
         """Initialize an equation discovery task specification.
         
         Arguments:
-            dataX (numpy array): Input data of shape N x M, where N is the number of samples 
+            data (numpy array): Input data of shape N x M, where N is the number of samples 
                 and M is the number of variables.
-            dataY (numpy array): Output data of shape N x D, where N is the number of samples
-                and D is the number of output variables.
+            target_variable_index (int): Index of column in data that belongs to the target variable.
+            time_index (int): Index of column in data that belongs to measurement of time. 
+                Required for differential equations, None otherwise.
             variable_names (list of strings): Names of input variables.
-            output_variables (list of strings): Names of output variables.
             success_threshold (float): Maximum allowed error for considering a model to be correct.
             task_type (string): Type of ED task. Currently implemented:
                 algebraic
+                differential
         """
         
         self.variable_mask = np.ones(data.shape[-1], bool)

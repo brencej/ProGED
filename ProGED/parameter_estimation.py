@@ -329,14 +329,13 @@ def fit_models (models, data, target_variable_index, time_index = None, pool_map
         models (ModelBox): Instance of ModelBox, containing the models to be fitted. 
         X (numpy.array): Input data of shape N x M, where N is the number of samples 
             and M is the number of variables.
-        Y (numpy.array): Output data of shape N x D, where N is the number of samples
-            and D is the number of output variables.
-        T (numpy.array): Times array, used for solving differential equations, where
-            form required is noted inside the definition of ode() function.
+        target_variable_index (int): Index of column in data that belongs to the target variable.
+        time_index (int): Index of column in data that belongs to measurement of time. 
+                Required for differential equations, None otherwise.
         pool_map (function): Map function for parallelization. Example use with 8 workers:
                 from multiprocessing import Pool
                 pool = Pool(8)
-                fit_models (models, X, Y, pool_map = pool.map)
+                fit_models (models, data, -1, pool_map = pool.map)
         verbosity (int): Level of printout desired. 0: none, 1: info, 2+: debug.
         task_type: Type of equations, e.g. "algebraic" or "differential", that
             equation discovery algorithm tries to discover.
