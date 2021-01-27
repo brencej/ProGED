@@ -1,3 +1,11 @@
+# TODO
+- finish docstrings for everything - especially equation discoverer
+- more detailed documentation and example uses - especially differential equations
+- implement storing and loading models
+- example scripts for distributed computation
+- implement results processing
+- implement processed results reporting (some sort of dashboard)
+
 **Pro**babilistic **G**rammar-based **E**quation **D**iscovery
 
 ProGED discovers physical laws in data, expressed in the form of equations. 
