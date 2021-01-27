@@ -119,7 +119,7 @@ def test_parameter_estimation():
     N = 2
     
     models = generate_models(grammar, symbols, strategy_settings = {"N":N})
-    models = fit_models(models, data, target_variable_index = -1, equation_type="algebraic")
+    models = fit_models(models, data, target_variable_index = -1, task_type="algebraic")
     
     assert np.abs(models[0].get_error() - 0.36) < 1e-6
     assert np.abs(models[1].get_error() - 1.4736842) < 1e-6
@@ -141,7 +141,7 @@ def test_parameter_estimation_2D():
     N = 2
     
     models = generate_models(grammar, symbols, strategy_settings = {"N":N})
-    models = fit_models(models, data, target_variable_index = -1, equation_type="algebraic")
+    models = fit_models(models, data, target_variable_index = -1, task_type="algebraic")
     
     assert np.abs(models[0].get_error() - 0.36) < 1e-6
     assert np.abs(models[1].get_error() - 1.5945679) < 1e-6

@@ -102,17 +102,19 @@ def ode (models_list, params_matrix, T, X_data, y0, **estimation_settings):
                 and isinstance(params_matrix[0], (list, np.ndarray)))
             and X_data.ndim == 2
             and y0.ndim == 1):
-        print(type(params_matrix[0]))
-        print(isinstance(models_list, list),
+        message = str(type(params_matrix[0])) + "\n"
+        info = (isinstance(models_list, list),
             isinstance(params_matrix, list),
             len(params_matrix)>0,
             isinstance(params_matrix[0], (list, np.ndarray)),
             X_data.ndim == 2,
             y0.ndim == 1 )
+        print(message, info)
         print("Programmer's defined error: Input arguments are not"
                         +" in required form!")
-        raise TypeError("Programmer's defined error: Input arguments are not"
-                        +" in required form!")
+        raise TypeError(f"Programmer's defined error: Input arguments are not"
+                        +f" in required form!"
+                        +f"\n{message, info}")
     elif not T.shape[0] == X_data.shape[0]:
         print("Number of samples in T and X does not match.")
         raise IndexError("Number of samples in T and X does not match.")
@@ -291,7 +293,7 @@ class ParameterEstimator:
             self.T = None
             
         self.X = data[:, var_mask]
-        self.Y = data[:, target_variable_index]
+        self.Y = data[:, [target_variable_index]]
         self.estimation_settings = estimation_settings
         
     def fit_one (self, model):
@@ -319,7 +321,7 @@ class ParameterEstimator:
         return model
     
 def fit_models (models, data, target_variable_index, time_index = None, pool_map=map, verbosity=0,
-                task_type="algebraic", timeout=np.inf, 
+                task_type=None, timeout=np.inf, 
                 lower_upper_bounds=(-30, 30), **additional):
     """Performs parameter estimation on given models. Main interface to the module.
     
@@ -349,8 +351,8 @@ def fit_models (models, data, target_variable_index, time_index = None, pool_map
             argument. Maximal number of steps used in one run of LSODA solver.
         estimation_settings: Dictionary where majority of optional arguments is stored.
     """
-    if not isinstance(time_index, type(None)):
-        task_type = "differential"
+    # if not isinstance(time_index, type(None)):
+    #     task_type = "differential"
         
     estimation_settings = {
         "verbosity": verbosity, "task_type": task_type,
@@ -373,7 +375,9 @@ if __name__ == "__main__":
         return 3*x[:,0]*x[:,1]**2 + 0.5
     
     X = lhs(2, 10)*5
-    y = testf(X)
+    X = X.reshape(-1, 2)
+    y = testf(X).reshape(-1,1)
+    data = np.hstack((X,y))
     
     grammar = GeneratorGrammar("""S -> S '+' T [0.4] | T [0.6]
                               T -> 'C' [0.6] | T "*" V [0.4]
@@ -383,6 +387,6 @@ if __name__ == "__main__":
     
     models = generate_models(grammar, symbols, strategy_settings = {"N":10})
     
-    models = fit_models(models, X, y, task_type="algebraic")
+    models = fit_models(models, data, target_variable_index=-1, task_type="algebraic")
     print(models)
 
