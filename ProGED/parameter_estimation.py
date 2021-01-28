@@ -86,13 +86,15 @@ def ode (models_list, params_matrix, T, X_data, y0, **estimation_settings):
     Raise error if input is incompatible.
         Input:
     models_list -- list (not dictionary) of models that e.g.
-    generate_models() generates.
+        generate_models() generates.
     params_matrix -- list of lists or ndarrays of parameters for
-    corresponding models.
+        corresponding models.
     y0 -- array (1-dim) of initial value of vector function y(t)
-    i.e. y0 = y(T[0]) = [y1(T[0]), y2(T[0]), y3(T[0]),...].
+        i.e. y0 = y(T[0]) = [y1(T[0]), y2(T[0]), y3(T[0]),...].
     X_data -- 2-dim array (matrix) i.e. X = [X[0,:], X[1,:],...].
     T -- (1-dim) array, i.e. of shape (N,)
+    max_ode_steps -- maximal number of steps inside ODE solver to
+        determine the minimal step size inside ODE solver.
         Output:
     Solution of ODE evaluated at times T.
     """
@@ -187,14 +189,16 @@ def model_ode_error (params, model, X, Y, T, estimation_settings):
             change_std2tee = True  # Remember to change it back.
         # Next line works only when sys.stdout is real. Thats why above.
         with open(os.devnull, 'w') as f, mt.stdout_redirected(f):
-            odeY = ode(model_list, params_matrix, T, X, y0=Y[0],
-                        **estimation_settings)  # change to Y[:1]
+            odeY = ode(model_list, params_matrix, T, X, y0=Y[:1],
+                        **estimation_settings)  # Y[:1] if _ or Y[0] if |
         if change_std2tee: 
             sys.stdout = tee_object  # Change it back to fake stdout (tee).
 
-        odeY = odeY.T  # solve_ivp() returns in oposite (DxN) shape.
+        # odeY = odeY.T  # solve_ivp() returns in _ oposite (DxN) shape.
+        odeY = odeY[0]  # If Y is landscape, i.e. _.
         if not odeY.shape == Y.shape:
             # print("The ODE solver did not found ys at all times -> returning dummy error.")
+            # print(odeY.shape, Y.shape)
             return dummy
         try:
             res = np.mean((Y-odeY)**2)
@@ -293,7 +297,7 @@ class ParameterEstimator:
             self.T = None
             
         self.X = data[:, var_mask]
-        self.Y = data[:, [target_variable_index]]
+        self.Y = data[:, target_variable_index]
         self.estimation_settings = estimation_settings
         
     def fit_one (self, model):
