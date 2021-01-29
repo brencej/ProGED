@@ -318,9 +318,10 @@ class ParameterEstimator:
                     f"{error}!! \nModel:"), model)
             model.set_estimated({}, valid=False)
         # todo: optional kwargs: verbosity>1: print next line:
-        print(f"model: {str(model.get_full_expr()):<70}; "
-                + f"p: {model.p:<23}; "
-                + f"error: {model.get_error()}")
+        if self.estimation_settings["verbosity"] > 0:
+            print(f"model: {str(model.get_full_expr()):<70}; "
+                    + f"p: {model.p:<23}; "
+                    + f"error: {model.get_error()}")
 
         return model
     

@@ -21,10 +21,9 @@ grammar = GeneratorGrammar("""S -> S '+' T [0.4] | T [0.6]
                             T -> V [0.6] | 'C' "*" V [0.4]
                             V -> 'x' [0.5] | 'y' [0.5]""")
 symbols = {"x":['y', 'x'], "start":"S", "const":"C"}
-models = generate_models(grammar, symbols, strategy_settings={"N":10})
+models = generate_models(grammar, symbols, strategy_settings={"N":20})
 
 # 3.) discover the right equation
-# fit_models(models, X, Y, T)
 data = np.hstack((T.reshape(-1,1), X, Y))
 models = fit_models(models, data, target_variable_index=-1, time_index=0, task_type="differential")
 
