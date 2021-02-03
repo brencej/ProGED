@@ -7,6 +7,7 @@ from parameter_estimation import fit_models
 from generators.base_generator import BaseExpressionGenerator
 from generators.grammar_construction import grammar_from_template
 from task import EDTask
+from postprocessing import models_statistics
 
 """
 User-facing module for straightforward equation discovery tasks. 
@@ -182,11 +183,21 @@ class EqDisco:
                                  verbosity=self.verbosity,
                                  estimation_settings = estimation_settings)
         return self.models
+    
+    def get_results (self, N=3):
+        return self.models.retrieve_best_models(N)
+    
+    def get_stats (self):
+        return models_statistics(self.models, 
+                                 self.task.data, 
+                                 self.task.target_variable_index,
+                                 self.task.success_thr
+                                 )
         
     
 if __name__ == "__main__":
     print("--- equation_discoverer.py test --- ")
-    np.random.seed(4)
+    #np.random.seed(4)
     
     def f(x):
         return 2.0 * (x + 0.3)
@@ -200,8 +211,14 @@ if __name__ == "__main__":
     ED = EqDisco(task = None,
                  data = data,
                  target_variable_index = -1,
-                 sample_size = 5,
-                 verbosity = 1)
+                 sample_size = 20,
+                 verbosity = 0)
     
-    print(ED.generate_models())
-    print(ED.fit_models())
+    #print(ED.generate_models())
+    #print(ED.fit_models())
+    
+    ED.generate_models()
+    ED.fit_models()
+    print(ED.get_results())
+    print("-----------------------\n")
+    print(ED.get_stats())
