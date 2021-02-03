@@ -1,15 +1,6 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Wed Oct 21 14:05:57 2020
 
-@author: Jure
-"""
-
-# from nltk.grammar import Nonterminal
-# from nltk import PCFG  # moved to bottom
 import numpy as np
-# import sympy as sp  # Intentionally commented to avoid warning, look next line.
-# May be a better call to avoid warnning in Sympy version >= 1.6.2.:
 import sympy.core as sp
 from sympy.simplify import simplify as sympy_simplify
 

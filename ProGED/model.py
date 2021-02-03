@@ -1,12 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Wed Oct 21 11:25:27 2020
 
-@author: Jure
-"""
-
-# from nltk.grammar import Nonterminal
-# from nltk import PCFG
 import numpy as np
 import sympy as sp
 
