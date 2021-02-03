@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Thu Oct 22 12:00:39 2020
-
-@author: Jure
-"""
 
 import numpy as np
 from nltk import PCFG

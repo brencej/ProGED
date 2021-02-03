@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Jan 22 15:37:52 2021
-
-@author: Jure
-"""
 
 import numpy as np
 from nltk import Nonterminal, PCFG

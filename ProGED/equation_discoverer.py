@@ -1,20 +1,10 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Thu Oct 22 14:43:01 2020
-
-@author: Jure
-"""
 
 import numpy as np
-# import sympy as sp
-# from nltk import PCFG
 
-# from model import Model
-# from model_box import ModelBox
 from generate import generate_models
 from parameter_estimation import fit_models
 from generators.base_generator import BaseExpressionGenerator
-# from generators.grammar import GeneratorGrammar
 from generators.grammar_construction import grammar_from_template
 from task import EDTask
 

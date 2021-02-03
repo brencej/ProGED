@@ -1,11 +1,7 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Thu Oct 22 10:07:25 2020
-
-@author: Jure
-"""
 
 import numpy as np
+
 from generators.grammar import GeneratorGrammar
 
 def grammar_from_template (template_name, generator_settings):
