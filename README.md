@@ -39,6 +39,10 @@ To check whether the installation works, run automated tests by calling
 cd ProGED/tests/
 py.test
 ```
+or alternatively,
+```
+python3 -m pytest
+```
 
 # Usage guide and examples
 ## Simple use
@@ -51,6 +55,7 @@ def f(x):
 	
 X = np.linspace(-1, 1, 20).reshape(-1,1)
 Y = f(X).reshape(-1,1)
+data = np.hstack((X,Y))
 ```
 ProGED provides an interface for common usage through the class EqDisco:
 ```python3

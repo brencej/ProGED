@@ -7,6 +7,8 @@ TODO:
 
 import numpy as np
 
+TASK_TYPES = ("algebraic", "differential")
+
 class EDTask:
     def __init__(self, 
                  data = None, 

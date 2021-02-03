@@ -48,7 +48,7 @@ def generate_models(model_generator, symbols, strategy = "monte-carlo", strategy
                 "x": list of strings, representing variable symbols (list of strings)
         strategy (str): Name of strategy, as defined in STRATEGY_LIBRARY. 
             Currently only the Monte-Carlo method is implemented.
-        strategy_parameters (dict): Dictionary of keywords to be passed to the generator function.
+        strategy_settings (dict): Dictionary of keywords to be passed to the generator function.
         verbosity (int): Level of printout desired. 0: none, 1: info, 2+: debug.
         
     Returns:
