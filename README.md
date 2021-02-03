@@ -9,7 +9,7 @@ The output of ProGED is a list of equations, ordered according to the likelihood
 - algebraic equations
 - 1st order ordinary differential equations
 - construct a grammar from a template or write a custom grammar
-- intuitive and flexible paramterization of parsimony principle
+- intuitive and flexible parametrization of parsimony principle
 
 Details in https://arxiv.org/abs/2012.00428.
 
