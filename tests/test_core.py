@@ -6,13 +6,13 @@ from nltk import Nonterminal, PCFG
 import sys
 sys.path.append("../ProGED/")
 
-from equation_discoverer import EqDisco
-from generators.grammar import GeneratorGrammar
-from generators.grammar_construction import grammar_from_template
-from generate import generate_models
-from model import Model
-from model_box import ModelBox
-from parameter_estimation import fit_models
+from ProGED.equation_discoverer import EqDisco
+from ProGED.generators.grammar import GeneratorGrammar
+from ProGED.generators.grammar_construction import grammar_from_template
+from ProGED.generate import generate_models
+from ProGED.model import Model
+from ProGED.model_box import ModelBox
+from ProGED.parameter_estimation import fit_models
 
 def test_grammar_general():
     np.random.seed(0)

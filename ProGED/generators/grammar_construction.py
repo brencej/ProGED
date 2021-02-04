@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from generators.grammar import GeneratorGrammar
+from ProGED.generators.grammar import GeneratorGrammar
 
 def grammar_from_template (template_name, generator_settings):
     if template_name in GRAMMAR_LIBRARY:
