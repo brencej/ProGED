@@ -168,6 +168,6 @@ and an appropriate generator_settings dict to construct a GeneratorGrammar of th
 |strategy_settings (dict)| Arguments to be passed to the chosen sampling strategy function. See documentation for the specific strategy for available options.For Monte-Carlo sampling, the most important option is: N (int): total number of candidate equations to generate-|
 |sample_size (int)| Total number of candidate equations to sample when using Monte-Carlo. Irrelevant when strategy_settings is provided. Default: 10.|
 |estimation_settings (dict)| Arguments to be passed to the system for parameter estimation. See documentation for ProGED.fit_models for details and available options. Optional.|
-|verbosity (int): Level of printout desired. 0: none, 1:info, 2+ | debug. |
+|verbosity (int) | Level of printout desired. 0: none, 1:info, 2+: debug. |
 
 
