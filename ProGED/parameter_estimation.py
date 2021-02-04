@@ -9,16 +9,12 @@ from scipy.optimize import differential_evolution, minimize
 from scipy.interpolate import interp1d
 from scipy.integrate import solve_ivp, odeint
 import sympy as sp
-# import sympy.core as sp
-# from nltk import PCFG
 
 import examples.mute_so as mt
 from _io import TextIOWrapper as stdout_type
-# from model import Model
-from model_box import ModelBox
-from task import TASK_TYPES
-# from generate import generate_models
-# from generators.grammar import GeneratorGrammar
+
+from ProGED.model_box import ModelBox
+from ProGED.task import TASK_TYPES
 
 import warnings
 warnings.filterwarnings("ignore", message="divide by zero encountered in divide")

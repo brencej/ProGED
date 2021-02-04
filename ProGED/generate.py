@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from model_box import ModelBox
+from ProGED.model_box import ModelBox
 
 
 """Functions for generating models using a given generator. 

@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 
-from model_box import ModelBox
+from ProGED.model_box import ModelBox
 
 """
 Functions for the postprocessing of equation discovery results.

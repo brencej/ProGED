@@ -4,7 +4,7 @@ import numpy as np
 import sympy.core as sp
 from sympy.simplify import simplify as sympy_simplify
 
-from model import Model
+from ProGED.model import Model
 
 """Implements ModelBox, an class that stores and manages a collection of Model instances."""
 

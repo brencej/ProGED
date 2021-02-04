@@ -2,12 +2,12 @@
 
 import numpy as np
 
-from generate import generate_models
-from parameter_estimation import fit_models
-from generators.base_generator import BaseExpressionGenerator
-from generators.grammar_construction import grammar_from_template
-from task import EDTask
-from postprocessing import models_statistics
+from ProGED.generate import generate_models
+from ProGED.parameter_estimation import fit_models
+from ProGED.generators.base_generator import BaseExpressionGenerator
+from ProGED.generators.grammar_construction import grammar_from_template
+from ProGED.task import EDTask
+from ProGED.postprocessing import models_statistics
 
 """
 User-facing module for straightforward equation discovery tasks. 
