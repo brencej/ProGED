@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="ProGED", # Replace with your own username
-    version="0.8.3",
+    version="0.8.4",
     author="Jure Brence, Boštjan Gec",
     author_email="jure.brence@ijs.si",
     description="Probabilistic grammar-based equation discovery",
