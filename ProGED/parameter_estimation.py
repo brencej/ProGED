@@ -10,7 +10,7 @@ from scipy.interpolate import interp1d
 from scipy.integrate import solve_ivp, odeint
 import sympy as sp
 
-import examples.mute_so as mt
+import ProGED.examples.mute_so as mt
 from _io import TextIOWrapper as stdout_type
 
 from ProGED.model_box import ModelBox
