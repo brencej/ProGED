@@ -56,11 +56,20 @@ ED = EqDisco(data,
              sample_size = 5,
              verbosity = 1)
 ```
-The algorithm has two steps: generating the models and fiting the models:
+The algorithm has two main steps: generating the models and fiting the models:
 ```python3
 print(ED.generate_models())
 print(ED.fit_models())
 ```
+Retrieve the best performing models by:
+```python3
+print(ED.get_results())
+```
+Some basic statistics on the sample of models can be computed by:
+```python3
+print(ED.get_stats())
+```
+See the paper referenced below for more details.
 
 # Citation
 ```

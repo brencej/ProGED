@@ -133,6 +133,25 @@ class ModelBox:
         expr = self.simplify_constants(expr, c, x)[2][0][1]
         expr, symbols_params = self.enumerate_constants(expr, symbols)
         return expr, symbols_params
+    
+    def retrieve_best_models (self, N = 3):
+        """Returns the top N models, according to their error.
+        
+        Arguments:
+            N (int): The number of models to return. Default: 3.
+            
+        Returns:
+            ModelBox containing only the top N models.
+        """
+        
+        models_keys = list(self.models_dict.keys())
+        errors = [self.models_dict[m].get_error() for m in self.models_dict]
+        sortind = np.argsort(errors)
+        models2 = [self.__getitem__(int(n)) for n in sortind[:N]]
+        keys2 = [models_keys[n] for n in sortind[:N]]
+        
+        return ModelBox(dict(zip(keys2, models2)))
+        
 
     def __str__(self):
         txt = "ModelBox: " + str(len(self.models_dict)) + " models"
