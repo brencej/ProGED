@@ -3,6 +3,7 @@
 import numpy as np
 import sympy.core as sp
 from sympy.simplify import simplify as sympy_simplify
+from sympy import symbols as sympy_symbols
 
 from ProGED.model import Model
 
@@ -127,8 +128,8 @@ class ModelBox:
             expr -- Sympy expression object in canonical form.
             symbols_params -- Tuple of enumerated constants.
         """
-        x = [sp.symbols(s.strip("'")) for s in symbols["x"]]
-        c = sp.symbols(symbols["const"].strip("'"))
+        x = [sympy_symbols(s.strip("'")) for s in symbols["x"]]
+        c = sympy_symbols(symbols["const"].strip("'"))
         expr = sp.sympify(expr_str)
         expr = self.simplify_constants(expr, c, x)[2][0][1]
         expr, symbols_params = self.enumerate_constants(expr, symbols)
