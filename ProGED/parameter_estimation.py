@@ -36,14 +36,12 @@ def model_error (params, model, X, Y, *residue):
     testY = model.evaluate(X, *params)
     res = np.mean((Y-testY)**2)
     if np.isnan(res) or np.isinf(res) or not np.isreal(res):
-#    #    print(model.expr, model.params, model.sym_params, model.sym_vars)
         return 10**9
     return res
 
 # def model_constant_error (model, params, X, Y):
 #     """Alternative to model_error, intended to allow the discovery of physical constants.
 #     Work in progress."""
-    
 #     testY = model.evaluate(X, *params)
 #     return np.std(testY)#/np.linalg.norm(params)
 
@@ -194,7 +192,6 @@ def model_ode_error (params, model, X, Y, T, estimation_settings):
         try:
             res = np.mean((Y-odeY)**2)
             if np.isnan(res) or np.isinf(res) or not np.isreal(res):
-# #                print(model.expr, model.params, model.sym_params, model.sym_vars)
                 return dummy
             return res
         except Exception as error:
