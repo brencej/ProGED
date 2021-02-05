@@ -4,7 +4,6 @@ import numpy as np
 from nltk import Nonterminal, PCFG
 
 import sys
-sys.path.append("../ProGED/")
 
 from ProGED.equation_discoverer import EqDisco
 from ProGED.generators.grammar import GeneratorGrammar
@@ -202,14 +201,9 @@ def test_equation_discoverer_ODE():
     ED.generate_models()
     ED.fit_models()
 
-    # print("\n", ED.models, "\n\nFinal score:")
-    # for m in ED.models:
-    #     print(f"model: {str(m.get_full_expr()):<30}; error: {m.get_error():<15}")
     def assert_line(models, i, expr, error, tol=1e-9, n=100):
         assert str(models[i].get_full_expr())[:n] == expr[:n]
         assert abs(models[i].get_error() - error) < tol
-    # model: y                             ; error: 0.058235586316492984
-    # model: 0.400259511712702*x + y       ; error: 2.1263385622753895e-09
     assert_line(ED.models, 0, "y", 0.058235586316492984)
     assert_line(ED.models, 1, "0.4002359511712702*x + y", 2.1263385622753895e-09, n=6)
 

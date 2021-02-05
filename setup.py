@@ -11,7 +11,7 @@ setuptools.setup(
     description="Probabilistic grammar-based equation discovery",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/brencej/PCFGproject",
+    url="https://github.com/brencej/ProGED",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",

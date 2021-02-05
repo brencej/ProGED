@@ -36,16 +36,16 @@ def model_error (params, model, X, Y, *residue):
     testY = model.evaluate(X, *params)
     res = np.mean((Y-testY)**2)
     if np.isnan(res) or np.isinf(res) or not np.isreal(res):
-#        print(model.expr, model.params, model.sym_params, model.sym_vars)
+#    #    print(model.expr, model.params, model.sym_params, model.sym_vars)
         return 10**9
     return res
 
-def model_constant_error (model, params, X, Y):
-    """Alternative to model_error, intended to allow the discovery of physical constants.
-    Work in progress."""
+# def model_constant_error (model, params, X, Y):
+#     """Alternative to model_error, intended to allow the discovery of physical constants.
+#     Work in progress."""
     
-    testY = model.evaluate(X, *params)
-    return np.std(testY)#/np.linalg.norm(params)
+#     testY = model.evaluate(X, *params)
+#     return np.std(testY)#/np.linalg.norm(params)
 
 
 def model_error_general (params, model, X, Y, T, **estimation_settings):
@@ -194,7 +194,7 @@ def model_ode_error (params, model, X, Y, T, estimation_settings):
         try:
             res = np.mean((Y-odeY)**2)
             if np.isnan(res) or np.isinf(res) or not np.isreal(res):
-#                print(model.expr, model.params, model.sym_params, model.sym_vars)
+# #                print(model.expr, model.params, model.sym_params, model.sym_vars)
                 return dummy
             return res
         except Exception as error:
@@ -211,7 +211,6 @@ def DE_fit (model, X, Y, T, p0, **estimation_settings):
     """Calls scipy.optimize.differential_evolution. 
     Exists to make passing arguments to the objective function easier."""
     
-    # bounds = [[-3*10**1, 3*10**1] for i in range(len(p0))]
     lower_bound, upper_bound = (estimation_settings["lower_upper_bounds"][i] for i in (0, 1))
     bounds = [[lower_bound, upper_bound] for i in range(len(p0))]
 
@@ -225,7 +224,8 @@ def DE_fit (model, X, Y, T, p0, **estimation_settings):
             return False
     
     return differential_evolution(
-        estimation_settings["objective_function"], bounds,
+        estimation_settings["objective_function"],
+        bounds,
         args=[model, X, Y, T, estimation_settings],
         callback=diff_evol_timeout, maxiter=10**2, popsize=10)
 
@@ -309,7 +309,7 @@ class ParameterEstimator:
             print((f"Excepted an error: Of type {type(error)} and message:"
                     f"{error}!! \nModel:"), model)
             model.set_estimated({}, valid=False)
-        # todo: optional kwargs: verbosity>1: print next line:
+
         if self.estimation_settings["verbosity"] > 0:
             print(f"model: {str(model.get_full_expr()):<70}; "
                     + f"p: {model.p:<23}; "
@@ -336,17 +336,19 @@ def fit_models (models, data, target_variable_index, time_index = None, pool_map
                 pool = Pool(8)
                 fit_models (models, data, -1, pool_map = pool.map)
         verbosity (int): Level of printout desired. 0: none, 1: info, 2+: debug.
-        task_type: Type of equations, e.g. "algebraic" or "differential", that
+        task_type (str): Type of equations, e.g. "algebraic" or "differential", that
             equation discovery algorithm tries to discover.
-        timeout: Maximal time consumed for whole minimization optimization process,
-            e.g. for differential evolution, that is performed for each model.
-        lower_upper_bounds: Pair, i.e. tuple of lower and upper bound used to
-            specify the boundaries of optimization, e.g. of differential evolution.
-        additional: Other parameters used in lower level parts of discovery,
-            e.g. in solving ODEs.
-        max_ode_steps: As an example of above, it can be passed through **additional
-            argument. Maximal number of steps used in one run of LSODA solver.
-        estimation_settings: Dictionary where majority of optional arguments is stored.
+        estimation_settings (dict): Dictionary where majority of optional arguments is stored
+                and where additional optional arguments can be passed to lower level parts of 
+                equation discovery.
+            arguments to pass via estimation_settings dictionary:
+                timeout (float): Maximum time in seconds consumed for whole 
+                    minimization optimization process, e.g. for differential evolution, that 
+                    is performed for each model.
+                lower_upper_bounds (tuple[float]): Pair, i.e. tuple of lower and upper
+                    bound used to specify the boundaries of optimization, e.g. of 
+                    differential evolution.
+                max_ode_steps (int): Maximum number of steps used in one run of LSODA solver.
     """
     if not estimation_settings:
         estimation_settings = {"task_type": task_type, "verbosity": verbosity,
