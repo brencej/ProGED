@@ -10,7 +10,7 @@ from ProGED.task import EDTask
 from ProGED.postprocessing import models_statistics
 
 """
-User-facing module for straightforward equation discovery tasks. 
+User-friendly module for straightforward equation discovery tasks. 
 
 Modules:
     EqDisco: Interface for streamlined probabilistic grammar-based equation discovery.
