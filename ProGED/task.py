@@ -10,7 +10,7 @@ TASK_TYPES = ("algebraic", "differential")
 class EDTask:
     def __init__(self, 
                  data = None, 
-                 target_variable_index = None, 
+                 target_variable_index = -1, 
                  time_index = None,
                  variable_names = None,
                  success_threshold = 1e-8, 
@@ -42,7 +42,7 @@ class EDTask:
         self.variable_mask[target_variable_index] = False
         
         if not variable_names:
-            self.var_names = np.array([chr(97+i) for i in range(data.shape[-1])])
+            self.var_names = np.array([chr(ord("a")+i) for i in range(data.shape[-1])])
         else:
             self.var_names = np.array(variable_names)
 
