@@ -37,7 +37,7 @@ class EqDisco:
         data (numpy.array): Input data of shape N x M, where N is the number of samples 
             and M is the number of variables. Not required if 'task' is provided.
         target_variable_index (int):  Index of column in data that belongs to the target variable.
-            Not required if 'task' is provided.
+            Not required if 'task' is provided. Default -1 (last column).
         time_index (int): Index of column in data that belongs to measurement of time. 
             Required for differential equations, None otherwise. Not required if 'task' is provided.
         variable_names (list of strings): Names of input variables. If not provided, names will be auto-generated. 
@@ -107,7 +107,7 @@ class EqDisco:
     def __init__ (self, 
                   task = None,  
                   data = None, 
-                  target_variable_index = 0, 
+                  target_variable_index = -1, 
                   time_index = None, 
                   variable_names = None, 
                   task_type = "algebraic",
@@ -197,7 +197,7 @@ class EqDisco:
     
 if __name__ == "__main__":
     print("--- equation_discoverer.py test --- ")
-    #np.random.seed(4)
+    np.random.seed(1)
     
     def f(x):
         return 2.0 * (x + 0.3)
@@ -211,8 +211,8 @@ if __name__ == "__main__":
     ED = EqDisco(task = None,
                  data = data,
                  target_variable_index = -1,
-                 sample_size = 20,
-                 verbosity = 0)
+                 sample_size = 100,
+                 verbosity = 1)
     
     #print(ED.generate_models())
     #print(ED.fit_models())
