@@ -80,7 +80,7 @@ class EqDisco:
             Returns:
                 ProGED.ModelBox of generated models
                 
-        fit_models (estimation_settings = None, pool_map = map): Estimates parameters for each of the 
+        fit_models (estimation_settings = {}, pool_map = map): Estimates parameters for each of the 
             generated models. 
             
             Arguments:
@@ -118,7 +118,7 @@ class EqDisco:
                   strategy = "monte-carlo", 
                   strategy_settings = None, 
                   sample_size = 10,
-                  estimation_settings = None,
+                  estimation_settings = {},
                   success_threshold = 1e-8,
                   verbosity = 1):        
         
@@ -174,7 +174,7 @@ class EqDisco:
         self.models = generate_models(self.generator, self.task.symbols, self.strategy, strategy_settings, verbosity=self.verbosity)
         return self.models
     
-    def fit_models (self, estimation_settings = None, pool_map = map):
+    def fit_models (self, estimation_settings = {}, pool_map = map):
         if not estimation_settings:
             estimation_settings = self.estimation_settings
         self.models = fit_models(self.models, self.task.data, self.task.target_variable_index, 

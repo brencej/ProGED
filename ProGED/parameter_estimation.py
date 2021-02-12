@@ -208,7 +208,8 @@ def DE_fit (model, X, Y, T, p0, **estimation_settings):
     """Calls scipy.optimize.differential_evolution. 
     Exists to make passing arguments to the objective function easier."""
     
-    lower_bound, upper_bound = (estimation_settings["lower_upper_bounds"][i] for i in (0, 1))
+    lower_bound, upper_bound = (estimation_settings["lower_upper_bounds"][i]+1e-30 for i in (0, 1))
+    # Added 1e-30 in previous line to avoid bug in python/scipy/sympy? on windows.
     bounds = [[lower_bound, upper_bound] for i in range(len(p0))]
 
     start = time.perf_counter()
@@ -316,7 +317,7 @@ class ParameterEstimator:
     
 def fit_models (models, data, target_variable_index, time_index = None, pool_map=map, verbosity=0,
                 task_type="algebraic",
-                estimation_settings = None):
+                estimation_settings = {}):
     """Performs parameter estimation on given models. Main interface to the module.
     
     Supports parallelization by passing it a pooled map callable.
@@ -347,10 +348,10 @@ def fit_models (models, data, target_variable_index, time_index = None, pool_map
                     differential evolution.
                 max_ode_steps (int): Maximum number of steps used in one run of LSODA solver.
     """
-    if not estimation_settings:
-        estimation_settings = {"task_type": task_type, "verbosity": verbosity,
-                                   "timeout": np.inf, "lower_upper_bounds": (-30,30)}
-    
+    estimation_settings_preset = {"task_type": task_type, "verbosity": verbosity,
+                                "timeout": np.inf, "lower_upper_bounds": (-30,30)}
+    estimation_settings_preset.update(estimation_settings)
+    estimation_settings = estimation_settings_preset
     estimator = ParameterEstimator(data, target_variable_index, time_index, estimation_settings)
     
     return ModelBox(dict(zip(models.keys(), list(pool_map(estimator.fit_one, models.values())))))

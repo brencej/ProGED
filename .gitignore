@@ -2,3 +2,4 @@
 # .gitignore
 __pycache__/
 # */__pycache__/
+ProGED.egg-info/
