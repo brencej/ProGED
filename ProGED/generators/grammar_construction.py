@@ -101,7 +101,7 @@ def string_to_unit (unit_string, unit_symbols=["m", "s", "kg", "T", "V"]):
     u += [int(split[1])]
     return u
 
-def units_dict (variables, units, dimensionless = [0,0,0,0,0]):
+def units_dict (variables, units, dimensionless = [0,0,0,0,0], target_variable_unit = [0,0,0,0,0]):
     dictunits = {}
     for i in range(len(variables)):
         unit_string = unit_to_string(units[i])
@@ -110,7 +110,11 @@ def units_dict (variables, units, dimensionless = [0,0,0,0,0]):
         else:
             dictunits[unit_string] = [variables[i]]
     if unit_to_string(dimensionless) not in dictunits:
-        dictunits[unit_to_string(dimensionless)] = ["'C'"]
+        dictunits[unit_to_string(dimensionless)] = []
+    #if unit_to_string(unit_to_string(units[target_variable_unit_index])) not in dictunits:
+    #    dictunits[unit_to_string(units[target_variable_unit_index])] = []
+    if unit_to_string(target_variable_unit) not in dictunits:
+        dictunits[unit_to_string(target_variable_unit)] = []
     return dictunits
 
 def unit_conversions(units_dict, order=1):
@@ -198,7 +202,7 @@ def construct_grammar_universal_dim (variables=["'U'", "'d'", "'k'"],
                                      target_variable_unit_index = -1,
                                      dimensionless = [0,0,0,0,0]):
     target_variable_unit = units[target_variable_unit_index]
-    dictunits = units_dict(variables, units)
+    dictunits = units_dict(variables, units, dimensionless = dimensionless, target_variable_unit = target_variable_unit)
     conversions, unique_units = unit_conversions(dictunits)
     strunits = [unit_to_string(unit) for unit in unique_units]
     
