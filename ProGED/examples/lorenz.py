@@ -10,7 +10,7 @@ import time
 import os
 import sys  # To import from parent directory.
 
-import tee_so as te # Log using manually copied class from a forum.
+import ProGED.examples.tee_so as te  # Log using manually copied class from a forum.
 
 import numpy as np
 # import matplotlib.pyplot as plt
@@ -22,45 +22,70 @@ from scipy.integrate import solve_ivp, odeint
 start = time.perf_counter()
 # # # Input: # # # 
 eqation = "123"  # Code for eq_disco([1], [2,3]).
-samples_size = 5 
+# sample_size = 5
+sample_size = 30  # It finds the equation at 30.
 log_nickname = ""
 isTee = False
+# is_chaotic_wiki = "cw"
+# is_chaotic_wiki = "c0"  # chaotic but not wiki
+is_chaotic_wiki = "__"  # For hyperopt: not chaotic, not wiki.
 if len(sys.argv) >= 2:
-    samples_size = int(sys.argv[1])
+    sample_size = int(sys.argv[1])
 if len(sys.argv) >= 3:
     isTee = True
     log_nickname = sys.argv[2]
 if len(sys.argv) >= 4:
     eqation = sys.argv[3]
+if len(sys.argv) >= 5:
+    is_chaotic_wiki = sys.argv[4]
 aux = [int(i) for i in eqation]
 aquation = (aux[:1], aux[1:])
 random = str(np.random.random())
-print("Filename id: " + log_nickname + random)
 if isTee:
+    print("Filename id: " + log_nickname + random)
     try:
         log_object = te.Tee("examples/log_lorenz_" + log_nickname + random + ".txt")
     except FileNotFoundError:
         log_object = te.Tee("log_lorenz_" + log_nickname + random + ".txt")
+if len(is_chaotic_wiki) != 2:
+    # print("Wrong cmd argument for chaotic/calm wiki/my diff. eq. configuration")
+    print("Wrong 5th chaotic+wiki cmd argument: should be of length 2, e.g. cw or 0w.")
+else:
+    c, w = is_chaotic_wiki[0], is_chaotic_wiki[1]
+    is_chaotic = True if c == "c" else False
+    is_wiki = True if w == "w" else False
+
+# Log signature.
+print(f"Settings of this execution:\n"
+      f"equation: {eqation} aka. target index\n"
+      f"sample_size: {sample_size}\n"
+      f"is_chaotic: {is_chaotic}\n"
+      f"is_wiki: {is_wiki}\n"
+     )
+
 
 # # 1.) Data construction (simulation of Lorenz):
 
 np.random.seed(0)
 T = np.linspace(0.48, 0.85, 1000)  # Times currently run at.
-# T = np.linspace(0, 40, 4000)  # Chaotic Lorenz times noted on Wiki.
+if is_wiki:
+    T = np.linspace(0, 40, 4000)  # Chaotic Lorenz times noted on Wiki.
 # # Lorenz's sode:
 # dx/dt = \sigma * (y-x)
 # dy/dt = x*(\rho-z) - y
 # dz/dt = x*y - \beta*z
 # non-chaotic configuration:
-# sigma = 1.3  # 1 # 0 
-# rho = -15  # 1 # 0
-# beta = 3.4  # 1 # 0
+sigma = 1.3  # 1 # 0
+rho = -15  # 1 # 0
+beta = 3.4  # 1 # 0
 # Chaotic configuration:
-sigma = 10  # 1 # 0 
-rho = 28  # 1 # 0
-beta = 8/3  # 1 # 0
+if is_chaotic:
+    sigma = 10  # 1 # 0
+    rho = 28  # 1 # 0
+    beta = 8/3  # 1 # 0
 y0 = [0.1, 0.4, 0.5]  # Lorenz initial values run at.
-# y0 = [1, 1, 1]  # Chaotic Lorenz initial values noted on Wiki.
+if is_wiki:
+    y0 = [1, 1, 1]  # Chaotic Lorenz initial values noted on Wiki.
 def dy_dt(t, ys):  # \frac{dy}{dt} ; # y = [y1,y2,y3,...] # ( shape= (n,) )
     # \dot{y} = y^. = [y1^., y2^., y3^., ...]
     x, y, z = ys
@@ -89,53 +114,57 @@ data = np.concatenate((T[:, np.newaxis], Yode.T), axis=1)  # Embed Time column i
 
 # # # # 2.) Discover one ode at a time.
 
-sys.path += ['.','..']
-from generate import generate_models
-# from generators.grammar import GeneratorGrammar
-from generators.grammar_construction import grammar_from_template  # Grammar's
-#nonterminals will depend on given dataset.
-from parameter_estimation import fit_models
+# sys.path += ['.','..']
+from hyperopt import hp
+from ProGED.equation_discoverer import EqDisco
+from ProGED.parameter_estimation import DE_fit, hyperopt_fit #, DE_fit_metamodel
 
-def eq_disco_demo (data, lhs_variables: list = [1],
-                  # ["column 1"], # in case of header string reference
-                    rhs_variables: list = [2, 3]):
-    # header = ["column for x", "column for y", "column for z"]
-    header = ["x", "y", "z"]
-    variables = ["'"+header[i-1]+"'" for i in lhs_variables] # [1,3] -> ["x1", "x3"]
-    variables += ["'"+header[i-1]+"'" for i in rhs_variables]
-    print(variables)
-    symbols = {"x": variables, "start":"S", "const":"C"}
-    # start eq. disco.:
-    grammar = grammar_from_template("polynomial", {
-        "variables": variables,
-        "p_S": [0.4, 0.6],
-        "p_T": [0.4, 0.6],
-        "p_vars": [0.33, 0.33, 0.34],
-        "p_R": [1, 0],
-        "p_F": [],
-        "functions": []
-    })
-    print(grammar)
-    print(samples_size, "= samples size")
-    models = generate_models(grammar, symbols, 
-                            strategy_settings={"N":samples_size})
-    fit_models(models, data, target_variable_index=-1, time_index=0,
-                timeout=5, max_ode_steps=10**6, task_type="differential",
-                lower_upper_bounds=(-30, 30))
-    print(models)
-    print("\nFinal score:")
-    for m in models:
-        if m.get_error() < 10**(-3) or True:
-            print(f"model: {str(m.get_full_expr()):<70}; "
-                    + f"p: {m.p:<23}; "
-                + f"error: {m.get_error()}")
-    return 1
 
-# eq_disco_demo(data, lhs_variables=[2], rhs_variables=[1,3])
-# eq_disco_demo(data, lhs_variables=[3], rhs_variables=[1,2])
-# eq_disco_demo(data, lhs_variables=[1], rhs_variables=[2,3])
+np.random.seed(0)
 
-# Run eqation discovery from command line:
-eq_disco_demo(data, lhs_variables=aquation[0], rhs_variables=aquation[1])
+ED = EqDisco(data = data,
+             task = None,
+             task_type = "differential",
+             time_index = 0,
+             target_variable_index = aquation[0][0],  # aquation = [123] -> target = 1 -> ([t,x,y,z]->x)
+             variable_names=["t", "x", "y", "z"],
+             generator = "grammar",
+             generator_template_name = "polynomial",
+             generator_settings={
+                 # "variables": ["'x'", "'y'"],
+                 "p_S": [0.4, 0.6],
+                 "p_T": [0.4, 0.6],
+                 "p_vars": [0.33, 0.33, 0.34],
+                 "p_R": [1, 0],
+                 "p_F": [],
+                 "functions": [],
+             },
+             sample_size = sample_size,
+             verbosity = 4)
+
+ED.generate_models()
+ED.fit_models(
+    estimation_settings={
+        "timeout": 115,
+        "max_ode_steps": 10**6,
+        # "lower_upper_bounds": (-30, 30),
+        "lower_upper_bounds": (-11, 11),
+        # "optimizer": DE_fit,
+        "optimizer": hyperopt_fit,
+        # "optimizer": DE_fit_metamodel,
+        ## "hyperopt_space_fn": hp.uniform,  # Works at nocw (non chaotic and non-wiki).
+        "hyperopt_max_evals": 150,
+        # "hyperopt_space_fn": hp.qnormal,
+        # "hyperopt_space_kwargs": {"mu": 0, "sigma": 1, "q": 1/30},
+        "verbosity": 1,
+        })
+
+print(ED.models)
+print("\nFinal score:")
+for m in ED.models:
+    if m.get_error() < 10**(-3) or True:
+        print(f"model: {str(m.get_full_expr()):<70}; "
+                + f"p: {m.p:<23}; "
+            + f"error: {m.get_error()}")
 finnish = time.perf_counter()
 print(f"Finnished in {round(finnish-start, 2)} seconds")
