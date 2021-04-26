@@ -1,0 +1,37 @@
+fibonacci:
+ a_n := a_{n-1} + a_{n-2}
+ima red rekurzije enak 2.
+zato potrebujemo 3 stolpce (za clene an, an-1 in an-2)
+npr:
+# 0 1 1
+# 1 1 2
+# 1 2 3
+# 2 3 5
+# 3 5 8
+# 5 8 13 
+#  ...
+
+Na to tabelo pozenemo fit_models, kjer je napaka modela
+izracunana tako, da parametre predhodno zaokrozimo.
+
+
+*** Se ena varianta: ***
+zaporedje a_n := 1+2+3+...+n = a_{n-1}+n
+vsebuje tudi clen $n$, torej dodamo se stolpec
+# 0
+# 1
+# 2
+# 3
+# 4 
+# ...
+
+da dobimo:
+# 0 0 1 1
+# 1 1 1 2
+# 2 1 2 3
+# 3 2 3 5
+# 4 3 5 8
+# 5 5 8 13 
+# 6 8 13 21
+#  ...
+in nato kot prej uporabimo zaokrozevanje v fit_models

@@ -23,5 +23,9 @@ setuptools.setup(
                         "pandas", 
                         "scipy", 
                         "sympy", 
-                        "nltk"]
+                        "nltk",
+                        # "sklearn",
+                        "hyperopt",
+                        "pytest",
+                       ]
 )

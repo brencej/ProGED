@@ -9,20 +9,30 @@ from scipy.optimize import differential_evolution, minimize
 from scipy.interpolate import interp1d
 from scipy.integrate import solve_ivp, odeint
 import sympy as sp
+# from sklearn import ensemble #, tree  # Left for gitch_doctor metamodel
 
 import ProGED.mute_so as mt
 from _io import TextIOWrapper as stdout_type
+from ProGED.examples.tee_so import Tee
 
 from ProGED.model_box import ModelBox
 from ProGED.task import TASK_TYPES
+# from ProGED.optimizers import DE_fit, DE_fit_metamodel, hyperopt_fit, min_fit
+
+# glitch-doctor downloaded from github:
+# from ProGED.glitch_doctor.metamodel import Metamodel
+# import ProGED.glitch_doctor.metamodel.Metamodel
+# import ProGED.glitch_doctor.model.Model
 
 import warnings
 warnings.filterwarnings("ignore", message="divide by zero encountered in divide")
 warnings.filterwarnings("ignore", message="divide by zero encountered in true_divide")
 warnings.filterwarnings("ignore", message="invalid value encountered in power")
 warnings.filterwarnings("ignore", message="invalid value encountered in sqrt")
+warnings.filterwarnings("ignore", message="invalid value encountered in double_scalars")
 warnings.filterwarnings("ignore", message="overflow encountered in exp")
 warnings.filterwarnings("ignore", message="overflow encountered in square")
+warnings.filterwarnings("ignore", message="overflow encountered in double_scalars")
 
 
 """Methods for estimating model parameters. Currently implemented: differential evolution.
@@ -31,13 +41,28 @@ Methods:
     fit_models: Performs parameter estimation on given models. Main interface to the module.
 """
 
-def model_error (params, model, X, Y, *residue):
+DUMMY = 10**9
+
+def model_error (params, model, X, Y, _T=None, estimation_settings=None):
     """Defines mean squared error as the error metric."""
-    testY = model.evaluate(X, *params)
-    res = np.mean((Y-testY)**2)
-    if np.isnan(res) or np.isinf(res) or not np.isreal(res):
-        return 10**9
-    return res
+    try:
+        verbosity = estimation_settings['verbosity']
+
+        testY = model.evaluate(X, *params)
+        res = np.mean((Y-testY)**2)
+        if np.isnan(res) or np.isinf(res) or not np.isreal(res):
+            if verbosity >= 3:
+                print("isnan(res), ... ")
+                print("isnan, isinf, isreal =", np.isnan(res), np.isinf(res), not np.isreal(res))
+                print(model.expr, model.params, model.sym_params, model.sym_vars)
+            return DUMMY
+        if verbosity >= 3:
+            print("Function model_error did not encounter any errors, the output *square error/loss* is legit.")
+        return res
+    except Exception as error:
+        print("Programmer1 model_error: Params at error:", params, f"and {type(error)} with message:", error)
+        print(f"Programmer1 is returning DUMMY:{DUMMY}")
+        return DUMMY
 
 # def model_constant_error (model, params, X, Y):
 #     """Alternative to model_error, intended to allow the discovery of physical constants.
@@ -58,7 +83,11 @@ def model_error_general (params, model, X, Y, T, **estimation_settings):
     """
     task_type = estimation_settings["task_type"]
     if task_type == "algebraic":
-        return model_error(params, model, X, Y)
+        return model_error(params, model, X, Y, _T=None,
+                            estimation_settings=estimation_settings)
+    elif task_type == "oeis":
+        return model_error(params, model, X, Y, _T=None,
+                            estimation_settings=estimation_settings)
     elif task_type == "differential":
         # Model_ode_error might use estimation[verbosity] agrument for
         # ode solver's settings and suppresing its warnnings:
@@ -119,8 +148,8 @@ def ode (models_list, params_matrix, T, X_data, y0, **estimation_settings):
                         + " does not match.")
     X = interp1d(T, X_data, axis=0, kind='cubic', fill_value="extrapolate")  # N-D
     lamb_exprs = [
-        sp.lambdify(model.sym_vars, model.full_expr(*params), "numpy")
-        # todo: model.lambdify(params=params, args="numpy")
+        # sp.lambdify(model.sym_vars, model.full_expr(*params), "numpy")
+        model.lambdify(*params)
         for model, params in zip(models_list, params_matrix)
     ]
     def dy_dt(t, y):
@@ -162,13 +191,12 @@ def model_ode_error (params, model, X, Y, T, estimation_settings):
         - Y are columns of features that are derived via ode fitting.
     """
     model_list = [model]; params_matrix = [params] # 12multi conversion (temporary)
-    dummy = 10**9
     try:
         # Next few lines strongly suppress any warnning messages 
         # produced by LSODA solver, called by ode() function.
         # Suppression further complicates if making log files (Tee):
         change_std2tee = False  # Normaly no need for this mess.
-        if not isinstance(sys.stdout, stdout_type):
+        if isinstance(sys.stdout, Tee):
             # In this case the real standard output (sys.stdout) is not
             # saved in original location sys.stdout. We have to obtain
             # it inside of Tee object (look module tee_so).
@@ -176,40 +204,218 @@ def model_ode_error (params, model, X, Y, T, estimation_settings):
             std_output = tee_object.stdout  # Obtain sys.stdout.
             sys.stdout = std_output  # Change fake stdout to real stdout.
             change_std2tee = True  # Remember to change it back.
+        def run_ode():
+            return ode(model_list, params_matrix, T, X, y0=Y[:1],
+                       **estimation_settings)  # Y[:1] if _ or Y[0] if |
         # Next line works only when sys.stdout is real. Thats why above.
-        with open(os.devnull, 'w') as f, mt.stdout_redirected(f):
-            odeY = ode(model_list, params_matrix, T, X, y0=Y[:1],
-                        **estimation_settings)  # Y[:1] if _ or Y[0] if |
+        if isinstance(sys.stdout, stdout_type):
+            with open(os.devnull, 'w') as f, mt.stdout_redirected(f):
+                try:
+                    odeY = run_ode()
+                except Exception as error:
+                    print("Inside ode(), previnting tee/IO error. Params at error:",
+                            params, f"and {type(error)} with message:", error)
+        else:
+            odeY = run_ode()
         if change_std2tee: 
             sys.stdout = tee_object  # Change it back to fake stdout (tee).
 
         # odeY = odeY.T  # solve_ivp() returns in _ oposite (DxN) shape.
         odeY = odeY[0]  # If Y is landscape, i.e. _.
         if not odeY.shape == Y.shape:
-            # print("The ODE solver did not found ys at all times -> returning dummy error.")
-            # print(odeY.shape, Y.shape)
-            return dummy
+            if estimation_settings["verbosity"] >= 3:
+                print("The ODE solver did not found ys at all times -> returning dummy error.")
+            if estimation_settings["verbosity"] >= 4:
+                print(odeY.shape, Y.shape)
+            return DUMMY
         try:
             res = np.mean((Y-odeY)**2)
+            if estimation_settings["verbosity"] >= 4:
+                print("succesfully returning now inside model_ode_error")
             if np.isnan(res) or np.isinf(res) or not np.isreal(res):
-                return dummy
+# #                print(model.expr, model.params, model.sym_params, model.sym_vars)
+                return DUMMY
             return res
         except Exception as error:
-            print("Programmer1: Params at error:", params, f"and {type(error)} with message:", error)
-            return dummy
+            print("Programmer1 ode() mean(Y-odeY): Params at error:", params, f"and {type(error)} with message:", error)
+            return DUMMY
 
     except Exception as error:
-        print("Programmer: Excerpted an error inside ode() of model_ode_error.")
+        print("Programmer of model_ode_error: Excepted an error inside ode() of model_ode_error.")
         print("Programmer: Params at error:", params, f"and {type(error)} with message:", error)
         print("Returning dummy error. All is well.")
-        return dummy
+        return DUMMY
+
+def model_oeis_error (params, model, X, Y, _T, estimation_settings):
+    """Defines mean squared error as the error metric."""
+    if estimation_settings["verbosity"] >= 5:
+        print(params, "print: params before rounding")
+    try:
+        params = np.round(params)
+        if estimation_settings["verbosity"] >= 4:
+            print(params, "print: params after round")
+        testY = model.evaluate(X, *params)
+        res = np.mean((Y-testY)**2)
+        if np.isnan(res) or np.isinf(res) or not np.isreal(res):
+            if estimation_settings["verbosity"] >= 2:
+                print("isnan(res), ... ")
+                print(model.expr, model.params, model.sym_params, model.sym_vars)
+            return DUMMY
+        return res
+    except Exception as error:
+        print("Programmer1 model_oeis_error: Params at error:", params, f"and {type(error)} with message:", error)
+        return DUMMY
+
+def hyperopt_fit (model, X, Y, T, p0, **estimation_settings):
+    """Calls Hyperopt.
+    Exists to make passing arguments to the objective function easier.
+
+    Arguments:
+        model, X, Y, T, p0, estimation_settings: Just like other
+            optimizers, see DE_fit.
+        estimation_settings (dict): Optional. Arguments to be passed
+                to the parameter estimation. See the documentation of
+                ProGED.fit_models for details about more generally
+                available options (keys).
+            Options specific for hyperopt_fit only (See Hyperopt's
+                    documentation for more details.):
+                hyperopt_algo (function): The search algorithom used by Hyperopt.
+                    See 'algo' argument in hyperopt.fmin.
+                hyperopt_max_evals (int): The maximum number of
+                    evaluations of the objective function.
+                    See 'max_evals' argument in hyperopt.fmin.
+                hyperopt_space_fn (function): Function used in
+                    search space expression.
+                    Read below for more info.
+                hyperopt_space_args (hyperopt.pyll.base.Apply):
+                    Arguments used in conjunction with
+                    hyperopt_space_fn function call when specifying
+                    the search space.
+                hyperopt_space_kwargs (hyperopt.pyll.base.Apply): Same
+                    as hyperopt_space_args except that it is dictionary
+                    for optional arguments.
+
+    In context to ProGED, I currently see possible personal
+    configuration in one dimension only. This is because user cannot
+    predict how many and which parameters will the random generator
+    generate.
+    
+    One-dimensional configuration of search space is here specified
+    by function called in the stochastic space parameter expression
+    and by this expression's (also optional) arguments as described at:
+    https://github.com/hyperopt/hyperopt/wiki/FMin#21-parameter-expressions
+    at 0b49cde7c0.
+    The function is specified via the `hyperopt_space_fn` setting and
+    (optional) arguments are similarly specified via
+    the `hyperopt_space_(kw)args` settings. As a result, this is
+    called:
+        hyperopt_space_fn('label_i-th_dim', *hyperopt_space_args,
+                        **hyperopt_space_kwargs)
+    to produce the 1-D search space which is then copied a few times
+    into a n-dim list with distinct labels to avoid hyperopt error.
+        E.g. if passing settings:
+      estimation_settings["hyperopt_space_fn"]=hp.randint and
+      estimation_settings["hyperopt_space_args"]=(lower_bound, upper_bound)
+    in case of p0=(2.45, 6.543, 6.5),
+    the search space will be:
+    [hp.randint('C0', upper_bound),
+     hp.randint('C1', upper_bound),
+     hp.randint('C2', upper_bound)], since p0 is 3-D.
+    
+    When omitting arguments in stochastic expression, it defaults
+    to arguments=(lower_bound, upper_bound), which are allways
+    present inside of estimation_settings input. This default
+    behaviour is prone to errors in combination of unknown space
+    functions.
+
+    List of space functions behaving well without specifying arguments:
+        - hp.randint
+        - hp.uniform (default)
+        - hp.loguniform
+
+    Defaults:
+        If search space function or arguments are unspecified, then
+        the 1-D space:
+            hp.uniform('Ci', lower_bound, upper_bound)
+        is used.
+    """
+
+    from hyperopt import hp, fmin, rand, pyll, Trials
+    import hyperopt.pyll.stochastic
+    verbosity = estimation_settings["verbosity"]
+    lu_bounds = estimation_settings["lower_upper_bounds"]
+    lower_bound, upper_bound = lu_bounds[0]+1e-30, lu_bounds[1]+1e-30
+
+    space_fn = estimation_settings.get("hyperopt_space_fn", hp.uniform)
+    if space_fn not in {hp.randint, hp.uniform, hp.loguniform}:
+        if verbosity >= 1:
+            print(
+                f"hyperopt_fit programmer's raised printed notice: "
+                f"Input estimation_settings[\"hyperopt_space_fn\"]={space_fn} "
+                f"should be used carefully, since it is not recognized as the"
+                f" member of the default configuration of the form"
+                f" space_fn('label', low, high).\n"
+                f"Therefore make sure the function is compatible with search"
+                f" space arguments ( hyperopt_space_(kw)args ).\n"
+                f"In doubt use one of:\n  - hp.randint\n  - hp.uniform\n"
+                f"  - hp.loguniform")
+
+    # User can specify one dimensional search space, which is then replicated.
+    args = estimation_settings.get("hyperopt_space_args", ())
+    kwargs = estimation_settings.get("hyperopt_space_kwargs", {})
+    if args != () or kwargs != {}:
+        space = [space_fn('C'+str(i), *args, **kwargs) for i in range(len(p0))]
+    else:
+        space = [space_fn('C'+str(i), lower_bound, upper_bound) for i in range(len(p0))]
+
+    def objective(params):
+        # First way for solution:
+        params = [float(i) for i in params]  # Use float instead of np.int32.
+        return estimation_settings["objective_function"](
+            params, model, X, Y, T, estimation_settings)
+    # Use user's hyperopt specifications or use the default ones:
+    algo = estimation_settings.get("hyperopt_algo", rand.suggest)
+    max_evals = estimation_settings.get("hyperopt_max_evals", 500)
+    timeout = estimation_settings["timeout"]
+
+    # My testing code. Delete this block:
+    # if str(model.expr) == "C0*exp(C1*n)":
+    #     estimation_settings["timeout"] = estimation_settings["timeout_privilege"]
+    #     max_evals = max_evals*10
+    #     print("This model is privileged.")
+
+    if verbosity >= 3:
+        print(f"Hyperopt will run with specs:\n"
+              f"  - search space:\n" + "".join([str(i)+"\n" for i in space])
+              # + f"  - algorithm: {algo}\n"
+              + f"  - timeout: {timeout}\n  - max_evals: {max_evals}")
+        print("A few points generated from the space specified:")
+        for i in range(10):
+            print(hyperopt.pyll.stochastic.sample(space))
+
+    trials = Trials()
+    best = fmin(
+        fn=objective,
+        space=space,
+        algo=algo,
+        trials=trials,
+        timeout=timeout,
+        max_evals=max_evals,
+        rstate=np.random,
+        verbose=(verbosity >= 1),
+        )
+    params = list(best.values())
+    result = {"x": params, "fun": min(trials.losses())}
+    if verbosity >= 3:
+        print(result)
+    return result
 
 def DE_fit (model, X, Y, T, p0, **estimation_settings):
     """Calls scipy.optimize.differential_evolution. 
     Exists to make passing arguments to the objective function easier."""
     
-    lower_bound, upper_bound = (estimation_settings["lower_upper_bounds"][i]+1e-30 for i in (0, 1))
-    # Added 1e-30 in previous line to avoid bug in python/scipy/sympy? on windows.
+    lu_bounds = estimation_settings["lower_upper_bounds"]
+    lower_bound, upper_bound = lu_bounds[0]+1e-30, lu_bounds[1]+1e-30
     bounds = [[lower_bound, upper_bound] for i in range(len(p0))]
 
     start = time.perf_counter()
@@ -221,6 +427,8 @@ def DE_fit (model, X, Y, T, p0, **estimation_settings):
         else:
             return False
     
+    if estimation_settings["verbosity"] >= 4:
+        print("inside DE_fit")
     return differential_evolution(
         estimation_settings["objective_function"],
         bounds,
@@ -249,13 +457,22 @@ def find_parameters (model, X, Y, T, **estimation_settings):
         estimation_settings["objective_function"] = model_error
     elif task_type == "differential":
         estimation_settings["objective_function"] = model_ode_error
+#     elif task_type == "differential_surrogate":
+#         estimation_settings["objective_function"] = meta_model_ode_error
+    elif task_type == "oeis":
+        # model.params = np.round(model.params)
+        estimation_settings["objective_function"] = model_oeis_error
+    elif task_type == "oeis_recursive_error":
+        estimation_settings["objective_function"] = model_oeis_recursive_error
     else:
         types_string = "\", \"".join(TASK_TYPES)
         raise ValueError("Variable task_type has unsupported value "
                 f"\"{task_type}\", while list of possible values: "
                 f"\"{types_string}\".")
 
-    res = DE_fit(model, X, Y, T, p0=model.params, **estimation_settings)
+    res = estimation_settings["optimizer"](
+        model, X, Y, T, p0=model.params, **estimation_settings)
+    # res = DE_fit(model, X, Y, T, p0=model.params, **estimation_settings)
 
 
 #    res = min_fit (model, X, Y)
@@ -303,8 +520,10 @@ class ParameterEstimator:
                 res = find_parameters(model, self.X, self.Y, self.T,
                                      **self.estimation_settings)
                 model.set_estimated(res)
+                if self.estimation_settings["verbosity"] >= 3:
+                    print(res, type(res["x"]), type(res["x"][0]))
         except Exception as error:
-            print((f"Excepted an error: Of type {type(error)} and message:"
+            print((f"Excepted an error inside fit_one: Of type {type(error)} and message:"
                     f"{error}!! \nModel:"), model)
             model.set_estimated({}, valid=False)
 
@@ -315,9 +534,16 @@ class ParameterEstimator:
 
         return model
     
-def fit_models (models, data, target_variable_index, time_index = None, pool_map=map, verbosity=0,
-                task_type="algebraic",
-                estimation_settings = {}):
+def fit_models (
+    models,
+    data,
+    target_variable_index,
+    time_index=None,
+    pool_map=map,
+    verbosity=0,
+    task_type="algebraic",
+    estimation_settings={}
+    ):
     """Performs parameter estimation on given models. Main interface to the module.
     
     Supports parallelization by passing it a pooled map callable.
@@ -348,8 +574,13 @@ def fit_models (models, data, target_variable_index, time_index = None, pool_map
                     differential evolution.
                 max_ode_steps (int): Maximum number of steps used in one run of LSODA solver.
     """
-    estimation_settings_preset = {"task_type": task_type, "verbosity": verbosity,
-                                "timeout": np.inf, "lower_upper_bounds": (-30,30)}
+    estimation_settings_preset = {
+        "task_type": task_type,
+        "verbosity": verbosity,
+        "timeout": np.inf,
+        "lower_upper_bounds": (-30,30),
+        "optimizer": DE_fit,
+        }
     estimation_settings_preset.update(estimation_settings)
     estimation_settings = estimation_settings_preset
     estimator = ParameterEstimator(data, target_variable_index, time_index, estimation_settings)

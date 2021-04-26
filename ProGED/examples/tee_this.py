@@ -3,10 +3,10 @@ which uses arguments from command line for the name of log files that it
 produces.
 """
 import random as rand
-import sys  # To import from parent directory.
+import sys  # For cmd-line arguments.
 
 # from IPython.utils.io import Tee  # Log results using 3th package.
-from tee_so import Tee  # Log using manually copied class from a forum.
+from ProGED.examples.tee_so import Tee  # Log using manually copied class from a forum.
 
 # # 0.) Log output to log_<nickname><random>.log file
 
