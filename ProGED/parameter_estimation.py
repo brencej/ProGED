@@ -41,7 +41,6 @@ Methods:
     fit_models: Performs parameter estimation on given models. Main interface to the module.
 """
 
-DUMMY = 10**9
 
 def model_error (params, model, X, Y, _T=None, estimation_settings=None):
     """Defines mean squared error as the error metric."""
@@ -52,17 +51,22 @@ def model_error (params, model, X, Y, _T=None, estimation_settings=None):
         res = np.mean((Y-testY)**2)
         if np.isnan(res) or np.isinf(res) or not np.isreal(res):
             if verbosity >= 3:
-                print("isnan(res), ... ")
-                print("isnan, isinf, isreal =", np.isnan(res), np.isinf(res), not np.isreal(res))
+                print("isnan, isinf, isreal =", np.isnan(res), 
+                        np.isinf(res), not np.isreal(res))
                 print(model.expr, model.params, model.sym_params, model.sym_vars)
-            return DUMMY
+            return estimation_settings['default_error']
         if verbosity >= 3:
-            print("Function model_error did not encounter any errors, the output *square error/loss* is legit.")
+            print("Function model_error did not encounter any "
+                "errors, the output *square error/loss* is legit.")
         return res
     except Exception as error:
-        print("Programmer1 model_error: Params at error:", params, f"and {type(error)} with message:", error)
-        print(f"Programmer1 is returning DUMMY:{DUMMY}")
-        return DUMMY
+        if verbosity >= 2:
+            print("model_error: Params at error:", params,
+                  f"and {type(error)} with message:", error)
+        if verbosity >= 1:
+            print(f"Program is returning default_error:"
+                    f"{estimation_settings['default_error']}")
+        return estimation_settings['default_error']
 
 # def model_constant_error (model, params, X, Y):
 #     """Alternative to model_error, intended to allow the discovery of physical constants.
@@ -82,15 +86,10 @@ def model_error_general (params, model, X, Y, T, **estimation_settings):
     - estimation_settings: look description of fit_models()
     """
     task_type = estimation_settings["task_type"]
-    if task_type == "algebraic":
-        return model_error(params, model, X, Y, _T=None,
-                            estimation_settings=estimation_settings)
-    elif task_type == "oeis":
+    if task_type in ("algebraic", "integer-algebraic"):
         return model_error(params, model, X, Y, _T=None,
                             estimation_settings=estimation_settings)
     elif task_type == "differential":
-        # Model_ode_error might use estimation[verbosity] agrument for
-        # ode solver's settings and suppresing its warnnings:
         return model_ode_error(params, model, X, Y, T, estimation_settings)
     else:
         types_string = "\", \"".join(TASK_TYPES)
@@ -130,9 +129,9 @@ def ode (models_list, params_matrix, T, X_data, y0, **estimation_settings):
             X_data.ndim == 2,
             y0.ndim == 1 )
         print(message, info)
-        print("Programmer's defined error: Input arguments are not"
-                        +" in required form!")
-        raise TypeError(f"Programmer's defined error: Input arguments are not"
+        print("Function ode's defined error: Input arguments are not"
+                        +" in the required form!")
+        raise TypeError(f"Function ode's defined error: Input arguments are not"
                         +f" in required form!"
                         +f"\n{message, info}")
     elif not T.shape[0] == X_data.shape[0]:
@@ -213,7 +212,8 @@ def model_ode_error (params, model, X, Y, T, estimation_settings):
                 try:
                     odeY = run_ode()
                 except Exception as error:
-                    print("Inside ode(), previnting tee/IO error. Params at error:",
+                    if estimation_settings["verbosity"] >= 1:
+                        print("Inside ode(), preventing tee/IO error. Params at error:",
                             params, f"and {type(error)} with message:", error)
         else:
             odeY = run_ode()
@@ -224,47 +224,31 @@ def model_ode_error (params, model, X, Y, T, estimation_settings):
         odeY = odeY[0]  # If Y is landscape, i.e. _.
         if not odeY.shape == Y.shape:
             if estimation_settings["verbosity"] >= 3:
-                print("The ODE solver did not found ys at all times -> returning dummy error.")
+                print("The ODE solver did not found ys at all times -> returning default error.")
             if estimation_settings["verbosity"] >= 4:
                 print(odeY.shape, Y.shape)
-            return DUMMY
+            return estimation_settings['default_error']
         try:
             res = np.mean((Y-odeY)**2)
             if estimation_settings["verbosity"] >= 4:
                 print("succesfully returning now inside model_ode_error")
             if np.isnan(res) or np.isinf(res) or not np.isreal(res):
 # #                print(model.expr, model.params, model.sym_params, model.sym_vars)
-                return DUMMY
+                return estimation_settings['default_error']
             return res
         except Exception as error:
-            print("Programmer1 ode() mean(Y-odeY): Params at error:", params, f"and {type(error)} with message:", error)
-            return DUMMY
+            if estimation_settings["verbosity"] >= 1:
+                print("Error in ode() in mean(Y-odeY): Params at error:", 
+                    params, f"and {type(error)} with message:", error)
+            return estimation_settings['default_error']
 
     except Exception as error:
-        print("Programmer of model_ode_error: Excepted an error inside ode() of model_ode_error.")
-        print("Programmer: Params at error:", params, f"and {type(error)} with message:", error)
-        print("Returning dummy error. All is well.")
-        return DUMMY
-
-def model_oeis_error (params, model, X, Y, _T, estimation_settings):
-    """Defines mean squared error as the error metric."""
-    if estimation_settings["verbosity"] >= 5:
-        print(params, "print: params before rounding")
-    try:
-        params = np.round(params)
-        if estimation_settings["verbosity"] >= 4:
-            print(params, "print: params after round")
-        testY = model.evaluate(X, *params)
-        res = np.mean((Y-testY)**2)
-        if np.isnan(res) or np.isinf(res) or not np.isreal(res):
-            if estimation_settings["verbosity"] >= 2:
-                print("isnan(res), ... ")
-                print(model.expr, model.params, model.sym_params, model.sym_vars)
-            return DUMMY
-        return res
-    except Exception as error:
-        print("Programmer1 model_oeis_error: Params at error:", params, f"and {type(error)} with message:", error)
-        return DUMMY
+        if estimation_settings["verbosity"] >= 1:
+            print("Excepted an error inside ode() of model_ode_error.")
+            print("Params at error:", params, 
+                    f"and {type(error)} with message:", error)
+            print("Returning default error. All is well.")
+        return estimation_settings['default_error']
 
 def hyperopt_fit (model, X, Y, T, p0, **estimation_settings):
     """Calls Hyperopt.
@@ -279,21 +263,24 @@ def hyperopt_fit (model, X, Y, T, p0, **estimation_settings):
                 available options (keys).
             Options specific for hyperopt_fit only (See Hyperopt's
                     documentation for more details.):
-                hyperopt_algo (function): The search algorithom used by Hyperopt.
-                    See 'algo' argument in hyperopt.fmin.
+                hyperopt_algo (function): The search algorithom used
+                    by Hyperopt. See 'algo' argument in hyperopt.fmin.
+                    Defult: rand.suggest.
                 hyperopt_max_evals (int): The maximum number of
                     evaluations of the objective function.
                     See 'max_evals' argument in hyperopt.fmin.
+                    Default: 500.
                 hyperopt_space_fn (function): Function used in
                     search space expression.
-                    Read below for more info.
+                    Read below for more info. Default: hp.uniform.
                 hyperopt_space_args (hyperopt.pyll.base.Apply):
                     Arguments used in conjunction with
                     hyperopt_space_fn function call when specifying
-                    the search space.
+                    the search space. 
+                    Default: (lower_bound, upper_bound).
                 hyperopt_space_kwargs (hyperopt.pyll.base.Apply): Same
                     as hyperopt_space_args except that it is dictionary
-                    for optional arguments.
+                    for optional arguments. Default: {}.
 
     In context to ProGED, I currently see possible personal
     configuration in one dimension only. This is because user cannot
@@ -350,7 +337,7 @@ def hyperopt_fit (model, X, Y, T, p0, **estimation_settings):
     if space_fn not in {hp.randint, hp.uniform, hp.loguniform}:
         if verbosity >= 1:
             print(
-                f"hyperopt_fit programmer's raised printed notice: "
+                f"hyperopt_fit's warnings: "
                 f"Input estimation_settings[\"hyperopt_space_fn\"]={space_fn} "
                 f"should be used carefully, since it is not recognized as the"
                 f" member of the default configuration of the form"
@@ -422,7 +409,8 @@ def DE_fit (model, X, Y, T, p0, **estimation_settings):
     def diff_evol_timeout(x=0, convergence=0):
         now = time.perf_counter()
         if (now-start) > estimation_settings["timeout"]:
-            print("Time out!!!")
+            if estimation_settings['verbosity'] >= 1:
+                print("Time out!!!")
             return True
         else:
             return False
@@ -439,6 +427,8 @@ def min_fit (model, X, Y):
     """Calls scipy.optimize.minimize. Exists to make passing arguments to the objective function easier."""
     
     return minimize(optimization_wrapper, model.params, args = (model, X, Y))
+
+OPTIMIZER_LIBRARY = {"differential_evolution": DE_fit, "hyperopt": hyperopt_fit, "minimize": min_fit}
 
 def find_parameters (model, X, Y, T, **estimation_settings):
     """Calls the appropriate fitting function. 
@@ -459,18 +449,19 @@ def find_parameters (model, X, Y, T, **estimation_settings):
         estimation_settings["objective_function"] = model_ode_error
 #     elif task_type == "differential_surrogate":
 #         estimation_settings["objective_function"] = meta_model_ode_error
-    elif task_type == "oeis":
-        # model.params = np.round(model.params)
-        estimation_settings["objective_function"] = model_oeis_error
-    elif task_type == "oeis_recursive_error":
-        estimation_settings["objective_function"] = model_oeis_recursive_error
+    elif task_type == "integer-algebraic":
+        estimation_settings["objective_function"] = (
+            lambda params, model, X, Y, _T, estimation_settings:
+                model_error(np.round(params), model, X, Y, _T=None,
+                            estimation_settings=estimation_settings))
     else:
         types_string = "\", \"".join(TASK_TYPES)
         raise ValueError("Variable task_type has unsupported value "
                 f"\"{task_type}\", while list of possible values: "
                 f"\"{types_string}\".")
 
-    res = estimation_settings["optimizer"](
+
+    res = OPTIMIZER_LIBRARY[estimation_settings['optimizer']](
         model, X, Y, T, p0=model.params, **estimation_settings)
     # res = DE_fit(model, X, Y, T, p0=model.params, **estimation_settings)
 
@@ -523,8 +514,9 @@ class ParameterEstimator:
                 if self.estimation_settings["verbosity"] >= 3:
                     print(res, type(res["x"]), type(res["x"][0]))
         except Exception as error:
-            print((f"Excepted an error inside fit_one: Of type {type(error)} and message:"
-                    f"{error}!! \nModel:"), model)
+            if self.estimation_settings["verbosity"] >= 1:
+                print((f"Excepted an error inside fit_one: Of type "
+                        f"{type(error)} and message:{error}!! \nModel:"), model)
             model.set_estimated({}, valid=False)
 
         if self.estimation_settings["verbosity"] > 0:
@@ -579,7 +571,8 @@ def fit_models (
         "verbosity": verbosity,
         "timeout": np.inf,
         "lower_upper_bounds": (-30,30),
-        "optimizer": DE_fit,
+        "optimizer": 'differential_evolution',
+        "default_error": 10**9,
         }
     estimation_settings_preset.update(estimation_settings)
     estimation_settings = estimation_settings_preset

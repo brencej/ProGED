@@ -149,9 +149,8 @@ ED.fit_models(
         "max_ode_steps": 10**6,
         # "lower_upper_bounds": (-30, 30),
         "lower_upper_bounds": (-11, 11),
-        # "optimizer": DE_fit,
-        "optimizer": hyperopt_fit,
-        # "optimizer": DE_fit_metamodel,
+        "optimizer": 'differential_evolution',
+        # "optimizer": 'hyperopt',
         ## "hyperopt_space_fn": hp.uniform,  # Works at nocw (non chaotic and non-wiki).
         "hyperopt_max_evals": 150,
         # "hyperopt_space_fn": hp.qnormal,

@@ -9,7 +9,7 @@ from ProGED.parameter_estimation import fit_models
 from ProGED.generate import generate_models
 from ProGED.generators.grammar import GeneratorGrammar
 from ProGED.examples.tee_so import Tee
-from ProGED.parameter_estimation import DE_fit, hyperopt_fit  #, DE_fit_metamodel
+from ProGED.parameter_estimation import DE_fit, DE_fit_metamodel, hyperopt_fit
 
 # 0.1) save output into randomly named logfile:
 random = str(np.random.random())
@@ -32,11 +32,11 @@ models = generate_models(grammar, symbols, strategy_settings={"N":4})
 # 3.) discover the right equation
 data = np.hstack((T.reshape(-1,1), X, Y))
 models = fit_models(models, data, target_variable_index=-1, time_index=0, task_type="differential",
-                    # estimation_settings={"optimizer": DE_fit_metamodel, "verbosity": 4}
-                    # estimation_settings={"optimizer": DE_fit, "verbosity": 1}
+                    # estimation_settings={"optimizer": 'metamodel', "verbosity": 4}
+                    # estimation_settings={"optimizer": 'differential_evolution', "verbosity": 1}
                     # hyperopt:
                     estimation_settings={
-                        "optimizer": hyperopt_fit,
+                        "optimizer": 'hyperopt',
                         # "hyperopt_space_fn": hp.quniform,
                         "hyperopt_space_fn": hp.qnormal,
                         # "hyperopt_space_args": (-13, 13, 1/100),  # 1/100 ... ne razlikuje 0.123 in 0.124
