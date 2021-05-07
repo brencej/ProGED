@@ -6,7 +6,7 @@ equation based on their error and threshold.
 import re
 import sys
 
-from tee_this import create_log
+from ProGED.examples.tee_this import create_log
 
 # Command line arguments:
 file_name = sys.argv[1] 
