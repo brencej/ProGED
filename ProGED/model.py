@@ -144,7 +144,7 @@ class Model:
     def set_params(self, params):
         self.params=params
         
-    def lambdify (self, params="Default", arg="numpy"):
+    def lambdify (self, *params, arg="numpy"):
         """Produce a callable function from the symbolic expression and the parameter values.
         
         This function is required for the evaluate function. It relies on sympy.lambdify, which in turn 
@@ -159,16 +159,17 @@ class Model:
         Returns:
             callable function that takes variable values as inputs and return the model value.
         """
-        if isinstance(params, str):
+        if not params:
             params = self.params
-        self.lamb_expr = sp.lambdify(self.sym_vars, self.expr.subs(list(zip(self.sym_params, params))), arg)
-        print(self.lamb_expr, "self.lamb_expr")
-        test = self.lamb_expr(np.array([1,2,3, 4]))
-        print(test, "test")
-        if type(test) != type(np.array([])):
-            print("inside if, i.e. bool=True")
-            self.lamb_expr = lambda inp: [test for i in range(len(inp))]
-        return self.lamb_expr
+        return sp.lambdify(self.sym_vars, self.full_expr(*params), "numpy")
+        # self.lamb_expr = sp.lambdify(self.sym_vars, self.expr.subs(list(zip(self.sym_params, params))), arg)
+        # print(self.lamb_expr, "self.lamb_expr")
+        # test = self.lamb_expr(np.array([1,2,3, 4]))
+        # print(test, "test")
+        # if type(test) != type(np.array([])):
+        #     print("inside if, i.e. bool=True")
+        #     self.lamb_expr = lambda inp: [test for i in range(len(inp))]
+        # return self.lamb_expr
 
     def evaluate (self, points, *args):
         """Evaluate the model for given variable and parameter values.

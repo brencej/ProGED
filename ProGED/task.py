@@ -33,7 +33,7 @@ class EDTask:
         self.variable_mask = np.ones(data.shape[-1], bool)
         
         if task_type == "differential":
-            if isinstance(time_index, type(None)):
+            if time_index is None:
                 raise TypeError ("Missing temporal data. Temporal data is required for differential equation task type."\
                                  "Specify index of temporal data column as time_index.")
             self.variable_mask[time_index] = False

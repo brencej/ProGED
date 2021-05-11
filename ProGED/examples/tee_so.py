@@ -6,7 +6,7 @@ import sys
 
 class Tee(object):
     def __init__(self, name, mode="w"):
-        self.file = open(name, mode)
+        self.file = open(name, mode, encoding='utf-8')
         self.stdout = sys.stdout
         sys.stdout = self
     def __del__(self):
@@ -22,7 +22,7 @@ class Tee(object):
 
 class TeeFileOnly(object):
     def __init__(self, name, mode="w"):
-        self.file = open(name, mode)
+        self.file = open(name, mode, encoding='utf-8')
         self.stdout = sys.stdout
         sys.stdout = self
     def __del__(self):
