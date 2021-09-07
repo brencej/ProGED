@@ -76,15 +76,44 @@ class ModelBox:
         Returns:
             Sympy object with enumerated constants
             list of enumerated constants"""
+        if isinstance(symbols["const"], list):
+            csym = symbols["const"]
+        elif isinstance(symbols["const"], str):
+            csym = [symbols["const"]]
+            
         poly2 = np.array(list(str(expr)), dtype='<U16')
-        constind = np.where(poly2 == symbols["const"].strip("'"))[0]
-        """ Rename all constants: c -> cn, where n is the power of the associated term"""
-        constants = [symbols["const"].strip("'")+str(i) for i in range(len(constind))]
-        poly2[constind] = constants
+        for c in csym:
+            constind = np.where(poly2 == symbols["const"].strip("'"))[0]
+            """ Rename all constants: c -> cn, where n is the power of the associated term"""
+            constants = [symbols["const"].strip("'")+str(i) for i in range(len(constind))]
+            poly2[constind] = constants
         """ Return the sympy object """
         return sp.sympify("".join(poly2)), tuple(constants)
     
-    def simplify_constants (self, eq, c, var):
+    def enumerate_constants_2(self, expr, symbols):
+        """ Enumerates the constants in a Sympy expression. 
+        Example: C*x**2 + C*x + C -> C0*x**2 + C1*x + C2
+        Input:
+            expr - Sympy expression object
+            symbols - dict of symbols used in the grammar. Required keys: "const", which must be a single character, such as "'C'".
+        Returns:
+            Sympy object with enumerated constants
+            list of enumerated constants"""
+        if isinstance(symbols["const"], list):
+            csym = symbols["const"]
+        elif isinstance(symbols["const"], str):
+            csym = [symbols["const"]]
+            
+        poly2 = np.array(list(str(expr)), dtype='<U16')
+        for c in csym:
+            constind = np.where(poly2 == symbols["const"].strip("'"))[0]
+            """ Rename all constants: c -> cn, where n is the power of the associated term"""
+            constants = [symbols["const"].strip("'")+str(i) for i in range(len(constind))]
+            poly2[constind] = constants
+
+        return "".join(poly2), tuple(constants)
+    
+    def simplify_constants_2 (self, eq, c, var):
         if len(eq.args) == 0:
             return eq in var, eq is c, [(eq,eq)]
         else:
@@ -118,7 +147,46 @@ class ModelBox:
                             args += [eq.args[i]]
                 return True in has_var, True in has_c, [(eq, eq.func(*args))]
             
-    def string_to_canonic_expression (self, expr_str, symbols={"x":["'x'"], "const":"'C'", "start":"S", "A":"A"}):
+    def simplify_constants (self, eq, c, var):
+        if len(eq.args) == 0:
+            if eq in var:
+                return True, False, [(eq, eq)]
+            elif str(eq)[0] == str(c):
+                return False, True, [(eq, eq)]
+            else:
+                return False, False, [(eq, eq)]
+        else:
+            has_var, has_c, subs = [], [], []
+            for a in eq.args:
+                a_rec = self.simplify_constants (a, c, var)
+                has_var += [a_rec[0]]; has_c += [a_rec[1]]; subs += [a_rec[2]]
+            if sum(has_var) == 0 and True in has_c:
+                return False, True, [(eq, c)]
+            else:          
+                args = []
+                if isinstance(eq, (sp.add.Add, sp.mul.Mul)):
+                    has_free_c = False
+                    if True in [has_c[i] and not has_var[i] for i in range(len(has_c))]:
+                        has_free_c = True
+                        
+                    for i in range(len(has_var)):
+                        if has_var[i] or (not has_free_c and not has_c[i]):
+                            if len(subs[i]) > 0:
+                                args += [eq.args[i].subs(subs[i])]
+                            else:
+                                args += [eq.args[i]]
+                    if has_free_c:
+                        args += [c]
+                    
+                else:
+                    for i in range(len(has_var)):
+                        if len(subs[i]) > 0:
+                            args += [eq.args[i].subs(subs[i])]
+                        else:
+                            args += [eq.args[i]]
+                return True in has_var, True in has_c, [(eq, eq.func(*args))]
+            
+    def string_to_canonic_expression_2 (self, expr_str, symbols={"x":["'x'"], "const":"'C'", "start":"S", "A":"A"}):
         """Convert the string into the canonical Sympy expression.
 
         Input:
@@ -132,6 +200,27 @@ class ModelBox:
         c = sympy_symbols(symbols["const"].strip("'"))
         expr = sp.sympify(expr_str)
         expr = self.simplify_constants(expr, c, x)[2][0][1]
+        expr, symbols_params = self.enumerate_constants(expr, symbols)
+        return expr, symbols_params
+    
+    def string_to_canonic_expression (self, expr_str, symbols={"x":["'x'"], "const":"'C'", "start":"S", "A":"A"}):
+        """Convert the string into the canonical Sympy expression.
+
+        Input:
+            expr_str -- String expression e.g. joined sample string
+                generated from grammar.
+        Output:
+            expr -- Sympy expression object in canonical form.
+            symbols_params -- Tuple of enumerated constants.
+        """
+        x = [sympy_symbols(s.strip("'")) for s in symbols["x"]]
+        c = sympy_symbols(symbols["const"].strip("'"))
+        
+        expr = self.enumerate_constants(expr_str, symbols)[0]
+        expr = self.simplify_constants(expr, c, x)[2][0][1]
+        expr = self.enumerate_constants(expr, symbols)[0]
+        expr = self.simplify_constants(expr, c, x)[2][0][1]
+        
         expr, symbols_params = self.enumerate_constants(expr, symbols)
         return expr, symbols_params
     

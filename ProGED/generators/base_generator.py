@@ -18,3 +18,7 @@ class BaseExpressionGenerator:
         """Generates a single expression string."""
         return "x"
     
+class ProGEDMaxAttemptError (Exception):
+    """Custom exception, indicating that the maximum number of tries for 
+    generating a valid expression has been exceeded."""
+    pass

@@ -115,6 +115,10 @@ def units_dict (variables, units, dimensionless = [0,0,0,0,0], target_variable_u
     #    dictunits[unit_to_string(units[target_variable_unit_index])] = []
     if unit_to_string(target_variable_unit) not in dictunits:
         dictunits[unit_to_string(target_variable_unit)] = []
+        
+    for unit in units:
+        if unit_to_string(unit) not in dictunits:
+            dictunits[unit_to_string(unit)] = []
     return dictunits
 
 def unit_conversions(units_dict, order=1):
@@ -144,6 +148,23 @@ def probs_uniform(items, A=1):
         return [A/len(items)]*len(items)
     else:
         return []
+    
+def extend_units(units):
+    ext_units = list(units)
+    for unit in units:
+        for i in range(len(unit)):
+            for j in range(abs(unit[i])):
+                u = [0]*i + [int(unit[i]/abs(unit[i])*(abs(unit[i])-j))] + unit[min([i+1, len(unit)]):]
+                if u not in ext_units:
+                    ext_units += [u]
+                    
+    for i in range(len(units[0])):
+        if np.sum(np.abs(units)[:,i]) > 0:
+            u = [0]*i + [1] + [0]*(len(units[0]) - i - 1)
+            if u not in ext_units:
+                ext_units += [u]
+        
+    return ext_units
     
 def construct_grammar_universal_dim_direct (variables=["'U'", "'d'", "'k'", "'A'"],
                                      p_recursion=[0.1, 0.9], # recurse vs terminate
@@ -200,8 +221,16 @@ def construct_grammar_universal_dim (variables=["'U'", "'d'", "'k'"],
                                      functions=["sin", "cos", "sqrt", "exp"], p_functs=[0.6, 0.1, 0.1, 0.1, 0.1],
                                      units = [[2,-2,1,0,0], [1,0,0,0,0], [-1,0,0,0,0], [2,-2,1,0,0]], 
                                      target_variable_unit_index = -1,
-                                     dimensionless = [0,0,0,0,0]):
-    target_variable_unit = units[target_variable_unit_index]
+                                     dimensionless = [0,0,0,0,0],
+                                     extended_units = None):
+    target_variable_unit = list(units[target_variable_unit_index])
+    
+    if isinstance(extended_units, list):
+        units += extended_units
+    elif isinstance(extended_units, bool):
+        if extended_units == True:
+            units = extend_units(units)
+    
     dictunits = units_dict(variables, units, dimensionless = dimensionless, target_variable_unit = target_variable_unit)
     conversions, unique_units = unit_conversions(dictunits)
     strunits = [unit_to_string(unit) for unit in unique_units]
@@ -226,16 +255,25 @@ def construct_grammar_universal_dim (variables=["'U'", "'d'", "'k'"],
         
         if strunits[i] == unit_to_string(dimensionless):
             right_recur = ["F"]
+            right_const = ["'C'"]
         else:
             right_recur = ["'('" + "E_" + strunits[i] + "')'"]
+            #right_recur = ["E_" + strunits[i]]
+            right_const = ["C_" + strunits[i]]
         right_var = dictunits[unit_to_string(unique_units[i])]
-        right_const = ["'C'"]
         probs_vars = probs_uniform(dictunits[strunits[i]], A=p_rec[1])
+        probs_rec = [p_rec[0]] + probs_vars + [p_rec[2]]
+        # if len(probs_vars) > 0:
+        #     right_const = ["'C'"]
+        # else:
+        #     #probs_rec = [1.0]
+        #     right_const = ["'1'"]
         grammar += construct_production(left="T_" + strunits[i], 
                                         items = right_recur + right_var + right_const,
-                                        probs = [p_rec[0]] + probs_vars + [p_rec[2]])
+                                        probs = probs_rec)
         
-        if strunits[i] == unit_to_string(dimensionless):
+        
+        if strunits[i] == unit_to_string(dimensionless):            
             right_F = ["'('" + "E_" + strunits[i] + "')'"] + ["'"+f+"('" + "E_"+strunits[i] + "')'" for f in functions]
             grammar += construct_production(left = "F", 
                                             items=right_F,
