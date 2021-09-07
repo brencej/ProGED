@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from ProGED.model_box import ModelBox
+from ProGED.generators.base_generator import ProGEDMaxAttemptError
 
 
 """Functions for generating models using a given generator. 
@@ -84,24 +85,27 @@ def monte_carlo_sampling (model_generator, symbols, N=5, max_repeat = 10, verbos
     for n in range(N):
         good = False
         n = 0
-        while not good and n < max_repeat:
-            sample, p, code = model_generator.generate_one()
-            expr_str = "".join(sample)
-            
-            if verbosity > 1:
-                print("-> ", expr_str, p, code)
+        try:
+            while not good and n < max_repeat:
+                sample, p, code = model_generator.generate_one()
+                expr_str = "".join(sample)
                 
-            valid, expr = models.add_model(expr_str, symbols, model_generator, code=code, p=p)
-            
-            if verbosity > 1:
-                print("---> ", valid, expr)
+                if verbosity > 1:
+                    print("-> ", expr_str, p, code)
+                    
+                valid, expr = models.add_model(expr_str, symbols, model_generator, code=code, p=p)
                 
-            if valid:
-                good = True
+                if verbosity > 1:
+                    print("---> ", valid, expr)
+                    
+                if valid:
+                    good = True
+                n += 1
+    
+            if verbosity > 0 and len(models) > 0:
+                print(models[-1])
+        except ProGEDMaxAttemptError:
             n += 1
-        if verbosity > 0 and len(models) > 0:
-            print(models[-1])
-            
     return models
 
 STRATEGY_LIBRARY = {"monte-carlo": monte_carlo_sampling}

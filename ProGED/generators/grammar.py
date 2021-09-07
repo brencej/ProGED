@@ -4,13 +4,25 @@ import numpy as np
 from nltk import PCFG
 from nltk.grammar import Nonterminal, ProbabilisticProduction
 
-from ProGED.generators.base_generator import BaseExpressionGenerator
+from ProGED.generators.base_generator import BaseExpressionGenerator, ProGEDMaxAttemptError
+
+class ProGEDDepthError (Exception):
+    """ Custom exception, indicating that the custom recursion depth
+    limit was exceeded while generating an expression from a grammar."""
+    pass
+
+class ProGEDDeadEndError (Exception):
+    """Custom exception, indicating that a dead end nonterminal was reached 
+    while generating an expression from a grammar."""
+    pass
 
 class GeneratorGrammar (BaseExpressionGenerator):
-    def __init__ (self, grammar):
+    def __init__ (self, grammar, depth_limit = 100, repeat_limit = 100):
         self.generator_type = "PCFG"
         self.coverage_dict = {}
         self.count_dict = {}
+        self.depth_limit = depth_limit
+        self.repeat_limit = repeat_limit
     
         if isinstance(grammar, str):
             self.grammar = PCFG.fromstring(grammar)
@@ -23,9 +35,20 @@ class GeneratorGrammar (BaseExpressionGenerator):
                 
         self.start_symbol = self.grammar.start()
     
-    def generate_one (self):
-        return generate_sample(self.grammar, items=[self.start_symbol])
-    
+    def generate_one (self, depth_limit = None, repeat_limit = None):
+        if not depth_limit:
+            depth_limit = self.depth_limit
+        if not repeat_limit:
+            repeat_limit = self.repeat_limit
+        for n in range(repeat_limit):
+            try:
+                return generate_sample_alternative(self.grammar, start = self.start_symbol, depth = 0, 
+                                                   depth_limit = depth_limit)
+            except (ProGEDDepthError, ProGEDDeadEndError):
+                pass
+        else:
+            raise ProGEDMaxAttemptError("The maximum number of attempts to generate a valid expression has been exceeded.")
+            
     def code_to_expression (self, code):
         return code_to_sample(code, self.grammar, items=[self.start_symbol])
 
@@ -187,56 +210,38 @@ class GeneratorGrammar (BaseExpressionGenerator):
     
     
 
-def generate_sample_alternative(grammar, start):
-    """Alternative implementation of generate_sample. Just for example."""
+def generate_sample_alternative(grammar, start, depth = 0, depth_limit = 100):
+    """Samples PCFG once. 
+    Input:
+        grammar - PCFG object from NLTK library
+        start - the start symbol as a Nonterminal object. Default: [Nonterminal("S")]
+        depth - current recursion depth - should be set to 0 when starting a new generation process. Default: 0
+        depth_limit = maximum allowed recursion depth. Default: 100
+    Output:
+        frags - sampled string in list form. Call "".join(frags) to get string.
+        probab - parse tree probability
+        code - parse tree encoding. Use code_to_sample to recover the expression and productions.
+    """
+    if depth > depth_limit:
+        raise ProGEDDepthError("Recursion depth exceeded. Raise the depth_limit, lower the probability of recursion or except this error and repeat the sampling.")
     if not isinstance(start, Nonterminal):
         return [start], 1, ""
     else:
         prods = grammar.productions(lhs=start)
+        if len(prods) < 1:
+            raise ProGEDDeadEndError("A dead end nonterminal has been reached while generating an expression from a grammar. Either check the grammar for mistakes or except this error and repeat the sampling.")
         probs = [p.prob() for p in prods]
         prod_i = np.random.choice(list(range(len(prods))), p = probs)
         frags = []
         probab = probs[prod_i]
         code = str(prod_i)
         for symbol in prods[prod_i].rhs():
-            frag, p, h = generate_sample_alternative(grammar, symbol)
+            frag, p, h = generate_sample_alternative(grammar, symbol, depth = depth + 1)
             frags += frag
             probab *= p
             code += h
         return frags, probab, code
     
-def generate_sample(grammar, items=[Nonterminal("S")]):
-    """Samples PCFG once. 
-    Input:
-        grammar - PCFG object from NLTK library
-        items - list containing start symbol as Nonterminal object. Default: [Nonterminal("S")]
-    Output:
-        frags - sampled string in list form. Call "".join(frags) to get string.
-        probab - parse tree probability
-        code - parse tree encoding. Use code_to_sample to recover the expression and productions.
-    """
-#    print(items)
-    frags = []
-    probab = 1
-    code = ""
-    if len(items) == 1:
-        if isinstance(items[0], Nonterminal):
-            prods = grammar.productions(lhs=items[0])
-            probs = [p.prob() for p in prods]
-            prod_i = np.random.choice(list(range(len(prods))), p = probs)
-            frag, p, h = generate_sample(grammar, prods[prod_i].rhs())
-            frags += frag
-            probab *= p * probs[prod_i]
-            code += str(prod_i) + h
-        else:
-            frags += [items[0]]
-    else:
-        for item in items:
-            frag, p, h = generate_sample(grammar, [item])
-            frags += frag
-            probab *= p
-            code += h
-    return frags, probab, code
 
 def code_to_sample (code, grammar, items=[Nonterminal("S")]):
     """Reconstructs expression and productions from parse tree encoding.
@@ -268,12 +273,6 @@ def code_to_sample (code, grammar, items=[Nonterminal("S")]):
             productions += productions_child
     #print(frags, code0)
     return frags, productions, code0
-
-def sample_improper_grammar (grammar):
-    try:
-        return generate_sample(grammar)
-    except RecursionError:
-        return []
     
 if __name__ == "__main__":
     print("--- generators.grammar.py test ---")
