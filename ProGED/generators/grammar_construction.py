@@ -121,10 +121,10 @@ def units_dict (variables, units, dimensionless = [0,0,0,0,0], target_variable_u
             dictunits[unit_to_string(unit)] = []
     return dictunits
 
-def unit_conversions(units_dict, order=1):
+def unit_conversions(units_dict, order=1, unit_symbols = ["m", "s", "kg", "T", "V"]):
     conversions = {}
     #units = np.array([np.fromstring(unit.strip("[").strip("]").strip(), sep=",", dtype=int) for unit in list(units_dict.keys())])
-    units = np.array([string_to_unit(unit) for unit in list(units_dict.keys())])
+    units = np.array([string_to_unit(unit, unit_symbols = unit_symbols) for unit in list(units_dict.keys())])
     for i in range(len(units)):
         conversions_mul = []
         conversions_div = []
