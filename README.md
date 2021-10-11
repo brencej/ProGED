@@ -11,7 +11,7 @@ The output of ProGED is a list of equations, ordered according to the likelihood
 - construct a grammar from a template or write a custom grammar
 - intuitive and flexible parametrization of parsimony principle
 
-Details in https://arxiv.org/abs/2012.00428.
+Details in https://www.sciencedirect.com/science/article/pii/S0950705121003403.
 
 # Dependencies
 - numpy
@@ -73,13 +73,14 @@ See the paper referenced below for more details.
 
 # Citation
 ```
-@misc{brence2020ProGED,
-    title={Probabilistic Grammars for Equation Discovery},
-    author={Jure Brence and Ljupčo Todorovski and Sašo Džeroski},
-    year={2020},
-    eprint={2012.00428},
-    archivePrefix={arXiv},
-    primaryClass={cs.LG}
+@article{brence2021probabilistic,
+  title={Probabilistic grammars for equation discovery},
+  author={Brence, Jure and Todorovski, Ljup{\v{c}}o and D{\v{z}}eroski, Sa{\v{s}}o},
+  journal={Knowledge-Based Systems},
+  volume={224},
+  pages={107077},
+  year={2021},
+  publisher={Elsevier}
 }
 ```
 
