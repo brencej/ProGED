@@ -4,6 +4,7 @@ import numpy as np
 import sympy.core as sp
 from sympy.simplify import simplify as sympy_simplify
 from sympy import symbols as sympy_symbols
+import pickle
 
 from ProGED.model import Model
 
@@ -241,7 +242,67 @@ class ModelBox:
         keys2 = [models_keys[n] for n in sortind[:N]]
         
         return ModelBox(dict(zip(keys2, models2)))
+    
+    def split (self, n_batches = None, batch_size = None):
+        """Splits the ModelBox into a number of batches, each also a ModelBox.
+        Either the number of batcher or the batch size must be provided. 
+        If both are given, batch size is ignored.
         
+        The batching is performed by convering the dictionary into a list of tuples,
+        following default ordering. The list is split into sublists, which are converted
+        back into dictionaries and into ModelBoxes. 
+
+        Parameters
+        ----------
+        n_batches (int): The number of batches to create. 
+        batch_size (int): The size of each batch. Ignored if n_batches is not None.
+
+        Returns
+        -------
+        List of ModelBox instances.
+        """
+        if not n_batches and not batch_size:
+            raise ValueError("ModelBox.split requires either n_batches or batch_size argument.")
+        elif not batch_size:
+            batch_size = int(np.ceil(len(self) / n_batches))
+        elif not n_batches:
+            n_batches = int(np.ceil(len(self) / batch_size))
+            
+        return [ModelBox(dict(list(self.models_dict.items())[i*batch_size : min([(i+1)*batch_size, len(self.models_dict)])])) for i in range(min([n_batches, len(self.models_dict)]))]
+        
+    def dump (self, file_path):
+        """Stores the ModelBox to a file by invoking pickle.
+        
+        Parameters
+        ----------
+        file_path (string): The path and name of the file to be created.
+        
+        Returns
+        -------
+        None
+        """
+        with open(file_path, "wb") as file:
+                pickle.dump(self.models_dict, file)
+                
+    def load (self, file_path):
+        """Loads the contents of a ModelBox from a file, created by ModelBox.dump.
+        The loaded models are merged into the existing dictionary. In the case of clashes,
+        the loaded values override the existing ones. 
+        Invokes pickle.load.
+        
+        Parameters
+        ----------
+        file_path (string): The path and name of the file to load from.
+        
+        Returns
+        -------
+        None
+        """
+        with open(file_path, "rb") as file:
+            loaded_models = pickle.load(file)
+            
+        self.models_dict.update(loaded_models)
+                
 
     def __str__(self):
         txt = "ModelBox: " + str(len(self.models_dict)) + " models"

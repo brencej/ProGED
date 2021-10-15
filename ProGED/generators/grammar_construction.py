@@ -4,10 +4,10 @@ import numpy as np
 
 from ProGED.generators.grammar import GeneratorGrammar
 
-def grammar_from_template (template_name, generator_settings):
+def grammar_from_template (template_name, generator_settings, repeat_limit = 100, depth_limit = 100):
     if template_name in GRAMMAR_LIBRARY:
         grammar_str = GRAMMAR_LIBRARY[template_name](**generator_settings)
-        return GeneratorGrammar(grammar_str)
+        return GeneratorGrammar(grammar_str, repeat_limit = repeat_limit, depth_limit = depth_limit)
 
 def construct_right (right = "a", prob = 1):
     return right + " [" + str(prob) + "]"
@@ -121,10 +121,10 @@ def units_dict (variables, units, dimensionless = [0,0,0,0,0], target_variable_u
             dictunits[unit_to_string(unit)] = []
     return dictunits
 
-def unit_conversions(units_dict, order=1):
+def unit_conversions(units_dict, order=1, unit_symbols = ["m", "s", "kg", "T", "V"]):
     conversions = {}
     #units = np.array([np.fromstring(unit.strip("[").strip("]").strip(), sep=",", dtype=int) for unit in list(units_dict.keys())])
-    units = np.array([string_to_unit(unit) for unit in list(units_dict.keys())])
+    units = np.array([string_to_unit(unit, unit_symbols = unit_symbols) for unit in list(units_dict.keys())])
     for i in range(len(units)):
         conversions_mul = []
         conversions_div = []
@@ -215,6 +215,7 @@ def construct_grammar_universal_dim_direct (variables=["'U'", "'d'", "'k'", "'A'
     return grammar
 
 def construct_grammar_universal_dim (variables=["'U'", "'d'", "'k'"],
+                                     p_vars = [0.34, 0.33, 0.33],
                                      p_sum = [0.2, 0.2, 0.6],
                                      p_mul = [0.2, 0.2, 0.6],
                                      p_rec=[0.2, 0.4, 0.4], # recurse vs terminate
