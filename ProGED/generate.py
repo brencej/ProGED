@@ -59,7 +59,7 @@ def generate_models(model_generator, symbols, strategy = "monte-carlo", strategy
         raise TypeError ("Unknown strategy type. Expecting: string or callable.\n"\
                          "Input: " + str(type(strategy)))
 
-def monte_carlo_sampling (model_generator, symbols, N=5, max_repeat = 10, verbosity=0):
+def monte_carlo_sampling (model_generator, symbols, N=5, max_repeat = 10, max_total_repeats = None, verbosity=0):
     """Generate models using the Monte-Carlo approach to sampling.
     
     Randomly sample the stochastic generator until N models have been generated. 
@@ -75,6 +75,7 @@ def monte_carlo_sampling (model_generator, symbols, N=5, max_repeat = 10, verbos
                 "x": list of strings, representing variable symbols (list of strings)
         N (int): Number of (valid) models to sample.
         max_repeat (int): Number of allowed repeated attempts at sampling a single model.
+        max_total_repeats (int): Total allowed number of calls to generate_one. The default None is interpreted by setting limit, higher than N*max_repeat.
         verbosity (int): Level of printout desired. 0: none, 1: info, 2+: debug.
     
     Returns:
@@ -82,7 +83,11 @@ def monte_carlo_sampling (model_generator, symbols, N=5, max_repeat = 10, verbos
     """
     models = ModelBox()
     
-    for n in range(N):
+    if not max_total_repeats:
+        max_total_repeats = N*max_repeat
+    
+    current_total = 0
+    while len(models) < N and current_total < max_total_repeats:
         good = False
         n = 0
         try:
@@ -106,6 +111,9 @@ def monte_carlo_sampling (model_generator, symbols, N=5, max_repeat = 10, verbos
                 print(models[-1])
         except ProGEDMaxAttemptError:
             n += 1
+        
+        current_total += n
+        
     return models
 
 STRATEGY_LIBRARY = {"monte-carlo": monte_carlo_sampling}

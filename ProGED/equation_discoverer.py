@@ -118,6 +118,9 @@ class EqDisco:
                   strategy = "monte-carlo", 
                   strategy_settings = None, 
                   sample_size = 10,
+                  max_attempts = 1,
+                  repeat_limit = 100,
+                  depth_limit = 1000,
                   estimation_settings = {},
                   success_threshold = 1e-8,
                   verbosity = 1):        
@@ -146,7 +149,9 @@ class EqDisco:
         elif isinstance(generator, str):
             if generator in GENERATOR_LIBRARY:
                 self.generator = GENERATOR_LIBRARY[generator](generator_template_name, 
-                                                              generator_settings)
+                                                              generator_settings,
+                                                              repeat_limit = repeat_limit,
+                                                              depth_limit = depth_limit)
             else:
                 raise KeyError("Generator name not found. Supported generators:\n" + str(list(GENERATOR_LIBRARY.keys())))
         else:
@@ -156,7 +161,7 @@ class EqDisco:
             
         self.strategy = strategy
         if not strategy_settings:
-            self.strategy_settings = {"N": sample_size}
+            self.strategy_settings = {"N": sample_size, "max_repeat": max_attempts}
         else:
             self.strategy_settings = strategy_settings
             
