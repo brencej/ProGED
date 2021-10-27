@@ -185,6 +185,7 @@ class GeneratorGrammar (BaseExpressionGenerator):
         """
         coverages_dict = self.list_coverages(height, tol, min_height)
         if min(coverages_dict[A] for A in coverages_dict) < tol:  # input tol
+            print(A for A in coverages_dict if coverages_dict[A] < tol)
             raise ValueError("Not all coverages are positive, so"
                             + " renormalization cannot be performed since zero"
                             + " division.")
