@@ -185,6 +185,7 @@ class GeneratorGrammar (BaseExpressionGenerator):
         """
         coverages_dict = self.list_coverages(height, tol, min_height)
         if min(coverages_dict[A] for A in coverages_dict) < tol:  # input tol
+            print([A for A in coverages_dict if coverages_dict[A] < tol])
             raise ValueError("Not all coverages are positive, so"
                             + " renormalization cannot be performed since zero"
                             + " division.")
@@ -274,6 +275,25 @@ def code_to_sample (code, grammar, items=[Nonterminal("S")]):
     #print(frags, code0)
     return frags, productions, code0
     
+def code_to_sample_alternative(code, grammar, start_symbol=Nonterminal("S")):
+    """Alternative implementation of code_to_sample. Just for visualisation.
+        Note: tokens = frags (from code_to_sample)
+    """
+    if not isinstance(start_symbol, Nonterminal):
+        return [start_symbol], [], code
+    else:
+        tokens = []
+        productions = []
+        prods = grammar.productions(lhs=start_symbol)
+        prod = prods[int(code[0])]
+        productions += [prod]
+        code = code[1:]
+        for symbol in prod.rhs():
+            tokens_child, productions_child, code = code_to_sample_alternative(code, grammar, symbol)
+            tokens += tokens_child
+            productions += productions_child
+        return tokens, productions, code
+
 if __name__ == "__main__":
     print("--- generators.grammar.py test ---")
     np.random.seed(0)
@@ -368,6 +388,30 @@ if __name__ == "__main__":
             # print(gramm.count_coverage(gramm.start_symbol,i), f" = coverage(start,{i}) of height <= {i}")
             # t2=display_time(t1); t1=t2;
             b = gramm.count_coverage_external(gramm.start_symbol,i)
+
+            print(gramm)
+            try:
+                f, p, c = gramm.generate_one()
+                print((f, p, c))
+                print(code_to_sample(c, gramm.grammar, [gramm.start_symbol]))
+                a1 = code_to_sample(c, gramm.grammar, [gramm.start_symbol])
+                print(code_to_sample_alternative(c, gramm.grammar, gramm.start_symbol))
+                a2 = code_to_sample_alternative(c, gramm.grammar, gramm.start_symbol)
+                print(a1)
+                print(a2)
+                print([a1[i]==a2[i] for i in [0, 1, 2]])
+                print(a1==a2)
+                if a1 != a2: raise ValueError("alternative failed!!!!!")
+                if a1 != a2: print("alternative failed!!!!!")
+                else: print('alternative perfect')
+            except RecursionError:
+                print("recursion too much")
+                # raise ValueError("my recursion error hihi")
+            print("code_to_sample hihi", c, grammar.grammar, grammar.start_symbol, 'end hihi')
+            print("\n"*5)
+            print(" <----")
+            print("\n"*5)
+
             print(b, f" = coverage(start,{i}) of height <= {i}")
             t2=display_time(t1); t1=t2;
             c = gramm.list_coverages(i, tol=10**(-17), min_height=100,
