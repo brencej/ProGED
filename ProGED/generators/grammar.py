@@ -17,13 +17,14 @@ class ProGEDDeadEndError (Exception):
     pass
 
 class GeneratorGrammar (BaseExpressionGenerator):
-    def __init__ (self, grammar, depth_limit = 100, repeat_limit = 100):
+    def __init__ (self, grammar, depth_limit = 100, repeat_limit = 100, symbols = {}):
         self.generator_type = "PCFG"
         self.coverage_dict = {}
         self.count_dict = {}
         self.depth_limit = depth_limit
         self.repeat_limit = repeat_limit
-    
+        self.symbols = symbols
+        
         if isinstance(grammar, str):
             self.grammar = PCFG.fromstring(grammar)
         elif isinstance(grammar, type(PCFG.fromstring("S -> 'x' [1]"))):
