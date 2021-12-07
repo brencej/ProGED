@@ -4,6 +4,10 @@ import numpy as np
 
 from ProGED.generators.grammar import GeneratorGrammar
 
+import sympy as sp
+from diophantine import solve
+from itertools import product
+
 def grammar_from_template (template_name, generator_settings, repeat_limit = 100, depth_limit = 100):
     if template_name in GRAMMAR_LIBRARY:
         grammar_str = GRAMMAR_LIBRARY[template_name](**generator_settings)
@@ -165,6 +169,51 @@ def extend_units(units):
                 ext_units += [u]
         
     return ext_units
+
+def clumsy_solve(A: sp.Matrix, b: sp.Matrix):
+    """Fixes a bug in diophantine.solve by expanding the system of equations to force multiple solutions."""
+    try:  # First try to find 0 or infinite solutions.
+        x = solve(A, b)
+        return x
+    except NotImplementedError:
+        # Expand the system to get more than 1 solutions (infinite, 
+        # since nontrivial kernel). Then drop the last element of 
+        # the solution to get the solution of the original unexpanded 
+        # system.
+        A_inf = sp.Matrix.hstack(A, sp.Matrix.zeros(A.shape[0], 1))  # Expand system.
+        x = solve(A_inf, b)  # infinite solutions so no error ...
+        return [sp.Matrix(x[0][:-1])]  # Drop the last element of the vector.
+
+def extend_units_dio(units_list, target_variable_index):
+    """Extends the units to facilitate generation of expressions by grammar.
+    
+    A system of diophantine equations Ax=b is solved, where A is a matrix of provided units transposed,
+    b is the the target variable unit and x is a vector of integer weights. x represents the largest 
+    multiple of a unit that needs to be included to be able to derive expressions.  
+    """
+    target_unit = units_list[target_variable_index]
+    units = list(units_list)
+    units.pop(target_variable_index)
+
+    """Define and solve the system of diophantine equations."""
+    A = sp.Matrix(np.vstack(units)).T
+    b = sp.Matrix(target_unit)
+    solutions = clumsy_solve(A, b)
+
+    expanded_units = list(units)
+    for solution in solutions:
+        expanded_multipliers = []
+        """For each dimension, generate every integer multiplier up to the maxumal."""
+        for u in solution:
+            expanded_multipliers += [[ui for ui in range(0, u+1)]]
+        """Generate the cartesian product of the integer multipliers between all dimensions."""
+        expanded_combinations = product(*expanded_multipliers)
+        """Obtain units by computing sums of weighted units."""
+        for comb in expanded_combinations:
+            unit = list(np.dot(comb, units))
+            if unit not in expanded_units:
+                expanded_units += [unit]
+    return expanded_units
     
 def construct_grammar_universal_dim_direct (variables=["'U'", "'d'", "'k'", "'A'"],
                                      p_recursion=[0.1, 0.9], # recurse vs terminate
@@ -228,9 +277,14 @@ def construct_grammar_universal_dim (variables=["'U'", "'d'", "'k'"],
     
     if isinstance(extended_units, list):
         units += extended_units
-    elif isinstance(extended_units, bool):
-        if extended_units == True:
+    elif isinstance(extended_units, str):
+        if extended_units == "heuristic":
             units = extend_units(units)
+        elif extended_units == "diophantine":
+            units = extend_units_dio(units, target_variable_unit_index)
+            print(units)
+        else:
+            raise ValueError("Dimensional grammar construction: choice of unit extension not recognized. Supported inputs: None, list of units, 'heuristic' and 'diophantine'")
     
     dictunits = units_dict(variables, units, dimensionless = dimensionless, target_variable_unit = target_variable_unit)
     conversions, unique_units = unit_conversions(dictunits)
