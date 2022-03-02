@@ -36,7 +36,9 @@ class GeneratorGrammar (BaseExpressionGenerator):
                 
         self.start_symbol = self.grammar.start()
     
-    def generate_one (self, depth_limit = None, repeat_limit = None):
+    def generate_one (self, depth_limit = None, repeat_limit = None, seed = None):
+        if seed:
+            np.random.seed(seed)
         if not depth_limit:
             depth_limit = self.depth_limit
         if not repeat_limit:

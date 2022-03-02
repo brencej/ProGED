@@ -14,7 +14,7 @@ class BaseExpressionGenerator:
     def __init__ (self):
         self.generator_type = "base"
     
-    def generate_one (self):
+    def generate_one (self, seed = None):
         """Generates a single expression string."""
         return "x"
     
