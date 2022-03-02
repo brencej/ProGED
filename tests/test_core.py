@@ -179,13 +179,11 @@ def test_equation_discoverer():
     ED = EqDisco(data = data,
                  task = None,
                  target_variable_index = -1,
-                 sample_size = 2,
-                 verbosity = 1)
+                 sample_size = 5,
+                 verbosity = 0)
     
     ED.generate_models()
     ED.fit_models()
-    
-    #print(ED.models[0].get_error())
     assert np.abs(ED.models[0].get_error() - 0.72842105) < 1e-6
     assert np.abs(ED.models[1].get_error() - 0.59163899) < 1e-6
     
@@ -246,7 +244,7 @@ def test_equation_discoverer_hyperopt():
     return
 
 
-# if __name__ == "__main__":
+#if __name__ == "__main__":
 #     test_grammar_general()
 #     test_grammar_templates()
 #     test_generate_models()
@@ -254,6 +252,6 @@ def test_equation_discoverer_hyperopt():
 #     test_model_box()
 #     test_parameter_estimation()
 #     test_parameter_estimation_2D()    
-#     test_equation_discoverer()
+#    test_equation_discoverer()
 #     test_parameter_estimation_ODE()
 #     test_equation_discoverer_ODE()
