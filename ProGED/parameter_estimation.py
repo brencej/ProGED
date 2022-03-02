@@ -501,12 +501,11 @@ class ParameterEstimator:
         if self.estimation_settings["verbosity"] > 0:
             print("Estimating model " + str(model.expr))
         try:
-            if len(model.params) > 5:
+            if len(model.params) > self.estimation_settings["max_constants"]:
                 pass
             elif len(model.params) < 1:
-                model.set_estimated({"x":[], "fun":model_error_general(
-                    [], model, self.X, self.Y, self.T,
-                    **self.estimation_settings)})
+                model.set_estimated({"x":[], "fun": model_error_general(
+                    [], model, self.X, self.Y, self.T, **self.estimation_settings)})
             else:
                 res = find_parameters(model, self.X, self.Y, self.T,
                                      **self.estimation_settings)
@@ -557,7 +556,9 @@ def fit_models (
         estimation_settings (dict): Dictionary where majority of optional arguments is stored
                 and where additional optional arguments can be passed to lower level parts of 
                 equation discovery.
-            arguments to pass via estimation_settings dictionary:
+            arguments that can be passed via estimation_settings dictionary:
+                max_constants (int): Maximum number of free constants allowed. For the sake of computational
+                    efficiency, models exceeding this constraint are ignored. Default: 5.
                 timeout (float): Maximum time in seconds consumed for whole 
                     minimization optimization process, e.g. for differential evolution, that 
                     is performed for each model.
@@ -573,6 +574,7 @@ def fit_models (
         "lower_upper_bounds": (-30,30),
         "optimizer": 'differential_evolution',
         "default_error": 10**9,
+        "max_constants": 5
         }
     estimation_settings_preset.update(estimation_settings)
     estimation_settings = estimation_settings_preset

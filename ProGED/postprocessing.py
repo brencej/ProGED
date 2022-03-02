@@ -17,16 +17,16 @@ def models_statistics (models, data, target_variable_index = -1, success_thresho
     
     meanpred = np.mean(data[:, target_variable_index])
     baseerror = np.sum((data[:, target_variable_index] - meanpred)**2)
+    if baseerror < 1e-15:
+        raise ValueError("Variance of target variable is zero.")
     
     vmodels = {}
     logMSE = []
     RRMSE = []
     p_valid = []
     p_all = []
-    logscore = []
     lowest_rrmse = []
-    highest_score = []
-    successNsym = 0
+    #successNsym = 0
     successN6 = 0
     successN9 = 0
     successP9 = 0
@@ -53,20 +53,14 @@ def models_statistics (models, data, target_variable_index = -1, success_thresho
             logMSE += [np.log10(mse)]
             RRMSE += [np.sqrt(mse / baseerror)]
             p_valid += [models[m].p]
-            logscore += [np.log10(p_valid[-1])/10 - np.log10(RRMSE[-1])]
             
             if len(lowest_rrmse) > 0:
                 if RRMSE[-1] < lowest_rrmse[-1]:
                     lowest_rrmse += [RRMSE[-1]]
                 else:
                     lowest_rrmse += [lowest_rrmse[-1]]
-                if logscore[-1] > highest_score[-1]:
-                    highest_score += [logscore[-1]]
-                else:
-                    highest_score += [highest_score[-1]]
             else:
                 lowest_rrmse += [RRMSE[-1]]
-                highest_score += [logscore[-1]]
     
             if RRMSE[-1] < success_threshold:
                 p_good9 += p_valid[-1]
@@ -83,13 +77,12 @@ def models_statistics (models, data, target_variable_index = -1, success_thresho
             if RRMSE[-1] < 10**-6:
                 successN6 += 1
                     
-    MSDsortind = np.argsort(logMSE)
-    score_sortind = list(reversed(np.argsort(logscore)))
+    #MSDsortind = np.argsort(logMSE)
     P_valid = sum(p_valid)
     P_all = sum(p_all)
-    medianPgood = np.median(p_good9)
-    medianPbad = np.median(p_bad9)
-    medianPvalid = np.median(p_valid)
+    #medianPgood = np.median(p_good9)
+    #medianPbad = np.median(p_bad9)
+    #medianPvalid = np.median(p_valid)
      #logmedianPgood = np.median(np.log10(p[RRMSE < 10**-9]))
      #logmedianPbad = np.median(np.log10(p[RRMSE >= 10**-9]))
      

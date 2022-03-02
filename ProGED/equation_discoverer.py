@@ -42,6 +42,7 @@ class EqDisco:
             Required for differential equations, None otherwise. Not required if 'task' is provided.
         variable_names (list of strings): Names of input variables. If not provided, names will be auto-generated. 
             Not required if 'task' is provided.
+        constant_symbol (string): String to be used as symbol for constant parameter. Default: "C".
         task_type (string): Specifies type of equation being solved. See ProGED.task.TASK_TYPES for supported equation types. 
             Default: algebraic. Not required if 'task' is provided.
         success_threshold (float): Relative root mean squared error (RRMSE), 
@@ -110,6 +111,7 @@ class EqDisco:
                   target_variable_index = -1, 
                   time_index = None, 
                   variable_names = None, 
+                  constant_symbol = "C",
                   task_type = "algebraic",
                   generator = "grammar", 
                   generator_template_name = "universal", 
@@ -133,6 +135,7 @@ class EqDisco:
                                    target_variable_index = target_variable_index, 
                                    time_index = time_index, 
                                    variable_names = variable_names, 
+                                   constant_symbol = constant_symbol,
                                    success_threshold = success_threshold, 
                                    task_type = task_type)
                 
