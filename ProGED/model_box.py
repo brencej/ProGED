@@ -223,6 +223,7 @@ class ModelBox:
         expr = self.simplify_constants(expr, c, x)[2][0][1]
         
         expr, symbols_params = self.enumerate_constants(expr, symbols)
+        symbols_params = tuple(sorted(list([s.name for s in (expr.free_symbols - set(x))])))
         return expr, symbols_params
     
     def retrieve_best_models (self, N = 3):
