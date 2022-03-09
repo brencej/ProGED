@@ -86,7 +86,7 @@ class GeneratorHVAE(BaseExpressionGenerator):
                     prog_bar.update(batch_size)
 
                     iter_counter += 1
-                    if iter_counter < 2300:
+                    if iter_counter < 2400:
                         lmbda = (np.tanh((iter_counter - 4500) / 1000) + 1) / 2
 
                     if verbose and i == midpoint:
@@ -108,7 +108,7 @@ class GeneratorHVAE(BaseExpressionGenerator):
         inp = torch.normal(self.input_mean)
         tree = self.model.decode(inp, self.decoding_dict)
         tree.change_redundant_variables(self.variables, 'c')
-        return tree.to_list(with_precedence=True, precedence=self.precedence), 0, str(inp.numpy()).replace("\n", " ")
+        return tree.to_list(with_precedence=True, precedence=self.precedence), 0, str(inp.tolist())
 
     def generate_similar(self, ):
         pass
@@ -472,24 +472,28 @@ if __name__ == '__main__':
     num_points = 1000
     x = np.random.random(10000)*20 - 10
     y = x**2/8 - x + 12
-    estimated = 0.124999999496695 * x * (x - 8.00000003873915) + 12.0000000191275
     mat = np.stack([x, y]).T
-    eqs = []
-    with open("../examples/data/eqs_5_4k.txt", "r") as file:
-        for l in file:
-            eqs.append(l.strip().split(" "))
-    #
-    generator = GeneratorHVAE.train_and_init(eqs, ["x"], universal_symbols[:-2], epochs=20, model_path="../examples/parameters/params_HVAE.pt")
+
+    # eqs = []
+    # with open("../examples/data/eqs_5_4k.txt", "r") as file:
+    #     for l in file:
+    #         eqs.append(l.strip().split(" "))
+
+    # generator = GeneratorHVAE.train_and_init(eqs, ["x"], universal_symbols[:-2], epochs=20, model_path="../examples/parameters/params_HVAE.pt")
     # for i in range(5):
     #     print(generator.generate_one())
+
+    # import json
+    # with open("res.txt", "r") as file:
+    #     results = json.load(file)
+    #     code = json.loads(results[0]["code"])
 
     generator = GeneratorHVAE("../examples/parameters/params_HVAE.pt", ["x"], universal_symbols[:-2])
-    # for i in range(5):
-    #     print(generator.generate_one())
 
-    ed = EqDisco(data=mat, variable_names=["x", "y"], generator=generator, sample_size=1000, constant_symbol="c")
+    ed = EqDisco(data=mat, variable_names=["x", "y"], generator=generator, sample_size=50, constant_symbol="c")
     ed.generate_models()
     print(ed.models)
     ed.fit_models(estimation_settings={"max_constants": 5})
     print(ed.get_results())
-    # ed.write_results("estimated.txt")
+    ed.write_results("res.txt")
+

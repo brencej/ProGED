@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import json
 
 import numpy as np
 
@@ -199,8 +200,23 @@ class EqDisco:
         return models_statistics(self.models, 
                                  self.task.data, 
                                  self.task.target_variable_index,
-                                 self.task.success_thr
-                                 )
+                                 self.task.success_thr)
+
+    def write_results(self, filename):
+        res = []
+        models = self.models.models_dict
+        for eq in models.keys():
+            model = models[eq]
+            for tree in model.trees.keys():
+                try:
+                    res.append({"eq": eq, "error": model.get_error(), "p": model.p, "code": tree})
+                except Exception as error:
+                    print(f"Failed to write results for equation {eq}.")
+        res = sorted(res, key=lambda x: x["error"])
+        with open(filename, 'w') as file:
+            json.dump(res, file)
+
+
         
     
 if __name__ == "__main__":
