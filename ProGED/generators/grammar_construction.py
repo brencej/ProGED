@@ -8,9 +8,11 @@ import sympy as sp
 from diophantine import solve
 from itertools import product
 
-def grammar_from_template (template_name, generator_settings, repeat_limit = 100, depth_limit = 100):
+def grammar_from_template (template_name, generator_settings, repeat_limit = 100, depth_limit = 100, string = False):
     if template_name in GRAMMAR_LIBRARY:
         grammar_str = GRAMMAR_LIBRARY[template_name](**generator_settings)
+        if string:
+            return grammar_str
         return GeneratorGrammar(grammar_str, repeat_limit = repeat_limit, depth_limit = depth_limit)
 
 def construct_right (right = "a", prob = 1):
@@ -215,54 +217,6 @@ def extend_units_dio(units_list, target_variable_index):
                 expanded_units += [unit]
     return expanded_units
     
-def construct_grammar_universal_dim_direct (variables=["'U'", "'d'", "'k'", "'A'"],
-                                     p_recursion=[0.1, 0.9], # recurse vs terminate
-                                     p_operations=[0.2, 0.3, 0.4, 0.1], # sum, sub, mul, div
-                                     p_constant=[0.2, 0.8], # constant vs variable
-                                     functions=["sin", "cos", "sqrt", "exp"], p_functs=[0.6, 0.1, 0.1, 0.1, 0.1],
-                                     units = [[2,-2,1,0,0], [1,0,0,0,0], [-1,0,0,0,0], [0,0,0,0,0], [2,-2,1,0,0]], 
-                                     target_variable_unit_index = -1,
-                                     dimensionless = [0,0,0,0,0]):
-    target_variable_unit = units[target_variable_unit_index]
-    dictunits = units_dict(variables, units)
-    conversions, unique_units = unit_conversions(dictunits)
-    strunits = [unit_to_string(unit) for unit in unique_units]
-    
-    grammar = construct_production(left="S", items=[unit_to_string(target_variable_unit)], probs=[1.0])
-    for i in range(len(unique_units)):
-        if strunits[i] == unit_to_string(dimensionless):
-            grammar += construct_production(left=strunits[i], 
-                                            items=["F"] + ["'"+f+"(' F ')'" for f in functions],
-                                            probs=p_functs)
-            left_item = "F"
-        else:
-            left_item = strunits[i]
-            
-        right_sum = ["'('" + strunits[i] + "')'" + "'+'" + "'('" + strunits[i] + "')'"]
-        right_sub = ["'('" + strunits[i] + "')'" + "'-'" + "'('" + strunits[i] + "')'"]
-        right_mul = ["'('" + strunits[conv[0]] + "')'" + "'*'" + "'('" + strunits[conv[1]] + "')'" for conv in conversions[str(i)+"*"]]
-        right_div = ["'('" + strunits[conv[0]] + "')'" + "'/'" + "'('" + strunits[conv[1]] + "')'" for conv in conversions[str(i)+"/"]]
-        right_var = dictunits[unit_to_string(unique_units[i])]
-        right_const = ["'C'"]
-        right_recur = right_sum + right_sub + right_mul + right_div 
-        right_terminal = right_const + right_var
-        right = right_recur + right_terminal
-        
-        probs_mul = probs_uniform(right_mul, A=p_operations[2])
-        probs_div = probs_uniform(right_div, A=p_operations[3])
-        probs_recur = np.hstack([p_operations[:2], probs_mul, probs_div])
-        probs_vars = probs_uniform(dictunits[strunits[i]], A=p_constant[1])
-        probs_terminal = np.hstack([[p_constant[0]], probs_vars])
-        probs = np.hstack([p_recursion[0]*probs_recur, p_recursion[1]*probs_terminal])
-
-        #probs = [0.4/len(right_recur)]*len(right_recur) + [0.6/len(right_terminal)]*len(right_terminal)
-        
-        grammar += construct_production(left=left_item, 
-                                        items=right,
-                                        probs = probs)
-
-    return grammar
-
 def construct_grammar_universal_dim (variables=["'U'", "'d'", "'k'"],
                                      p_vars = [0.34, 0.33, 0.33],
                                      p_sum = [0.2, 0.2, 0.6],
@@ -365,3 +319,5 @@ if __name__ == "__main__":
     for i in range(5):
         print(grammar.generate_one())
     print("test", construct_production("s", [], []))
+
+
