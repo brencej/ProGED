@@ -90,3 +90,30 @@ def models_statistics (models, data, target_variable_index = -1, success_thresho
     
     return pd.DataFrame(stats, columns = stats_header)
         
+def resample_curve (models, data, target_variable_index = -1, resampleN = 100, success_threshold = 1e-9):
+    # replace with variance
+    meanpred = np.mean(data[target_variable_index])
+    baseerror = np.sum((data[target_variable_index] - meanpred)**2)
+
+    models_keys = list(models.keys())
+
+    joined_probs = []; joined_errors = []
+
+    for m in models_keys:
+        mse = models[m].get_error(dummy = 1e8)
+        
+        if models[m].valid and not mse >= 1e8:
+            rrmse = np.sqrt((mse+1e-32)/baseerror)
+            joined_probs += [models[m].p]
+            joined_errors += [np.log10(rrmse)]
+        
+    joined_probs_norm = np.array(joined_probs)/np.sum(joined_probs)
+    sample_size = np.sum(joined_probs_norm > 0)
+
+    if sample_size > 0:
+        resampled_curves = np.array([np.minimum.accumulate(np.random.choice(joined_errors, size=sample_size, p=joined_probs_norm, replace=False)) for _ in range(resampleN)])
+        successrates = np.sum(resampled_curves < np.log10(success_threshold), axis=0)
+    else:
+        successrates = np.array([0]*sample_size)
+
+    return successrates, resampled_curves
