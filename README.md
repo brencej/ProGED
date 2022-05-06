@@ -1,3 +1,23 @@
+# Upgrade to systems of ODEs 
+We have two tasks: 1) generalize ProGED to handle systems of ODEs, 2) upgrade it to handle limited observability. 
+We should first do 1), once it is implemented and tested, we move on to 2).
+## Discussion
+- fit_models accepts ModelBox. We can't change to list of ModelBoxes, because a ModelBox is a dict - no ordering, not the same length. We could:
+    - generalize ModelBox to represent vectors of models... or generalize Model to represent vectors of equations
+    - add a temporary alternative fit_models that accepts a list of tuples of models
+- Assuming the second option. I think we need to:
+    - update the entire chain of function calls, which are probably only small changes to handle a list of models
+    - replace the integrator with a scipy function that simulates systems of ODEs
+    - update estimation_settings, especially bounds and starting values, everywhere
+    - update the error calculation, which is just adding a mean or sum over the dimensions (or does it need some normalization?)
+    - update EqDisco to streamline the usage of the new functionality. This probably means a new generate function and a new estimate function, with their according class arguments.
+
+##TODO
+###Systems
+
+###Limited observability
+
+-------------------------------
 **Pro**babilistic **G**rammar-based **E**quation **D**iscovery
 
 ProGED discovers physical laws in data, expressed in the form of equations. 
