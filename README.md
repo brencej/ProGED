@@ -12,6 +12,9 @@ We should first do 1), once it is implemented and tested, we move on to 2).
     - update the error calculation, which is just adding a mean or sum over the dimensions (or does it need some normalization?)
     - update EqDisco to streamline the usage of the new functionality. This probably means a new generate function and a new estimate function, with their according class arguments.
 
+- (Nina) Potential issue to solve: DE wants to update parameters all together, regardless of which eq they belong to. E.g. if there are 2 eq, each with 2 parameters, all 4 parameters will be adjusted together. However, Proged treats each model separately, so the parameters need to be manually separated so they are appropriately assigned to the right equation. Thus, e.g. model's method "set estimate" can't be used.
+Maybe a solution would be that a new object is created, that can also be added to a ModelBox, e.g. "system", which would have its own methods, adapted to the system of ODE? With that approach other objects maybe dont need to change but didn't check for that.
+
 ##TODO
 ###Systems
 
