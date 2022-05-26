@@ -430,6 +430,7 @@ def min_fit (model, X, Y):
 
 OPTIMIZER_LIBRARY = {"differential_evolution": DE_fit, "hyperopt": hyperopt_fit, "minimize": min_fit}
 
+
 def find_parameters (model, X, Y, T, **estimation_settings):
     """Calls the appropriate fitting function. 
     
@@ -533,6 +534,7 @@ def fit_models (
     pool_map=map,
     verbosity=0,
     task_type="algebraic",
+    default_error = 10**9,
     estimation_settings={}
     ):
     """Performs parameter estimation on given models. Main interface to the module.
@@ -571,9 +573,9 @@ def fit_models (
         "task_type": task_type,
         "verbosity": verbosity,
         "timeout": np.inf,
-        "lower_upper_bounds": (-30,30),
+        "lower_upper_bounds": (-30, 30),
         "optimizer": 'differential_evolution',
-        "default_error": 10**9,
+        "default_error": default_error,
         "max_constants": 5
         }
     estimation_settings_preset.update(estimation_settings)
