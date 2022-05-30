@@ -6,3 +6,4 @@ ProGED.egg-info/
 .idea/workspace.xml
 *~
 .*
+/data/*

@@ -1,24 +1,30 @@
 # -*- coding: utf-8 -*-
+"""Methods for estimating model parameters. Currently implemented:
+        differential evolution, hyperopt.
+
+Methods:
+    fit_models: Performs parameter estimation on given models. Main interface to the module.
+"""
 
 import os
 import sys
 import time
 
 import numpy as np
+import sympy
 from scipy.optimize import differential_evolution, minimize
 from scipy.interpolate import interp1d
 from scipy.integrate import solve_ivp, odeint
 import sympy as sp
 # from sklearn import ensemble #, tree  # Left for gitch_doctor metamodel
-
-import ProGED.mute_so as mt
 from _io import TextIOWrapper as stdout_type
+import ProGED.mute_so as mt
 from ProGED.examples.tee_so import Tee
-
 from ProGED.model_box import ModelBox
 from ProGED.task import TASK_TYPES
-# from ProGED.optimizers import DE_fit, DE_fit_metamodel, hyperopt_fit, min_fit
 
+
+# from ProGED.optimizers import DE_fit, DE_fit_metamodel, hyperopt_fit, min_fit
 # glitch-doctor downloaded from github:
 # from ProGED.glitch_doctor.metamodel import Metamodel
 # import ProGED.glitch_doctor.metamodel.Metamodel
@@ -35,13 +41,6 @@ warnings.filterwarnings("ignore", message="overflow encountered in square")
 warnings.filterwarnings("ignore", message="overflow encountered in double_scalars")
 
 
-"""Methods for estimating model parameters. Currently implemented: differential evolution.
-
-Methods:
-    fit_models: Performs parameter estimation on given models. Main interface to the module.
-"""
-
-
 def model_error (params, model, X, Y, _T=None, estimation_settings=None):
     """Defines mean squared error as the error metric."""
     try:
@@ -51,7 +50,7 @@ def model_error (params, model, X, Y, _T=None, estimation_settings=None):
         res = np.mean((Y-testY)**2)
         if np.isnan(res) or np.isinf(res) or not np.isreal(res):
             if verbosity >= 3:
-                print("isnan, isinf, isreal =", np.isnan(res), 
+                print("isnan, isinf, isreal =", np.isnan(res),
                         np.isinf(res), not np.isreal(res))
                 print(model.expr, model.params, model.sym_params, model.sym_vars)
             return estimation_settings['default_error']
@@ -68,17 +67,10 @@ def model_error (params, model, X, Y, _T=None, estimation_settings=None):
                     f"{estimation_settings['default_error']}")
         return estimation_settings['default_error']
 
-# def model_constant_error (model, params, X, Y):
-#     """Alternative to model_error, intended to allow the discovery of physical constants.
-#     Work in progress."""
-#     testY = model.evaluate(X, *params)
-#     return np.std(testY)#/np.linalg.norm(params)
-
 
 def model_error_general (params, model, X, Y, T, **estimation_settings):
     """Calculate error of model with given parameters in general with
     type of error given.
-
         Input = TODO:
     - X are columns without features that are derived.
     - Y are columns of features that are derived via ode fitting.
@@ -97,7 +89,8 @@ def model_error_general (params, model, X, Y, T, **estimation_settings):
                 f"\"{task_type}\", while list of possible values: "
                 f"\"{types_string}\".")
 
-def ode (models_list, params_matrix, T, X_data, y0, **estimation_settings):
+
+def ode(models_list, params_matrix, T, X_data, y0, **estimation_settings):
     """Solve system of ODEs defined by equations in models_list.
 
     Raise error if input is incompatible.
@@ -115,72 +108,65 @@ def ode (models_list, params_matrix, T, X_data, y0, **estimation_settings):
         Output:
     Solution of ODE evaluated at times T.
     """
+
+    # 1. Check input
     if not (isinstance(models_list, list)
-            and (isinstance(params_matrix, list)
-                and len(params_matrix)>0
-                and isinstance(params_matrix[0], (list, np.ndarray)))
+            and isinstance(params_matrix, list)
+            and len(params_matrix) > 0
+            and isinstance(params_matrix[0], (list, np.ndarray))
             and X_data.ndim == 2
             and y0.ndim == 1):
         message = str(type(params_matrix[0])) + "\n"
         info = (isinstance(models_list, list),
-            isinstance(params_matrix, list),
-            len(params_matrix)>0,
-            isinstance(params_matrix[0], (list, np.ndarray)),
-            X_data.ndim == 2,
-            y0.ndim == 1 )
+                isinstance(params_matrix, list),
+                len(params_matrix)>0,
+                isinstance(params_matrix[0], (list, np.ndarray)),
+                X_data.ndim == 2)
         print(message, info)
-        print("Function ode's defined error: Input arguments are not"
-                        +" in the required form!")
-        raise TypeError(f"Function ode's defined error: Input arguments are not"
-                        +f" in required form!"
-                        +f"\n{message, info}")
+        print("Function ode's defined error: Input arguments are not in the required form!")
+        raise TypeError(f"Function ode's defined error: Input arguments are not in required form!"
+                        + f"\n{message, info}")
     elif not T.shape[0] == X_data.shape[0]:
         print("Number of samples in T and X does not match.")
         raise IndexError("Number of samples in T and X does not match.")
-    elif not (y0.shape[0] == len(models_list)  #len(equations)=len(models used)
-            and len(models_list[0].sym_vars) == X_data.shape[1] + y0.shape[0]):
+    elif not (y0.shape[0] == X_data.shape[1]):
         print("Number of symbols in models and combination of "
                         + "number of equations and dimensions of input data"
                         + " does not match.")
         raise IndexError("Number of symbols in models and combination of "
                         + "number of equations and dimensions of input data"
                         + " does not match.")
-    X = interp1d(T, X_data, axis=0, kind='cubic', fill_value="extrapolate")  # N-D
-    lamb_exprs = [
-        # sp.lambdify(model.sym_vars, model.full_expr(*params), "numpy")
-        model.lambdify(*params)
-        for model, params in zip(models_list, params_matrix)
-    ]
-    def dy_dt(t, y):
-        """Represents  \frac{dy}{dt}.
 
-        y -- [y1,y2,y3,...] i.e. ( shape= (n,) ) """
+    # 2. Simulate
 
-        # N-D:
-        b = np.concatenate((y, X(t))) # =[y,X(t)] =[y,X1(t),X2(t),...]
-        # Older version with *b.T:
-        return np.array([lamb_expr(*b) for lamb_expr in lamb_exprs])
-    # Older (default RK45) method:
-    # Yode = solve_ivp(dy_dt, (T[0], T[-1]), y0, t_eval=T, atol=0)  
     # Set min_step via prescribing maximum number of steps:
     if "max_ode_steps" in estimation_settings:
         max_steps = estimation_settings["max_ode_steps"]
     else:
         # max_steps = 10**6  # On laptop, this would need less than 3 seconds.
-        max_steps = T.shape[0]*10**3  # Set to |timepoints|*1000.
+        max_steps = T.shape[0] * 10 ** 3  # Set to |timepoints|*1000.
     # Convert max_steps to min_step:
-    min_step_from_max_steps = abs(T[-1] - T[0])/max_steps
+    min_step_from_max_steps = abs(T[-1] - T[0]) / max_steps
     # The minimal min_step to avoid min step error in LSODA:
-    min_step_error = 10**(-15)
+    min_step_error = 10 ** (-15)
     min_step = max(min_step_from_max_steps, min_step_error)  # Force them both.
-    rtol = 10**(-4)
-    atol = 10**(-6)
-    # Yode = solve_ivp(dy_dt, (T[0], T[-1]), y0, t_eval=T, method="LSODA", rtol=rtol, atol=atol, min_step=min_step).y
-    # Alternative LSODA using odeint (may be faster?):
-    Yode = odeint(dy_dt, y0, T, rtol=rtol, atol=atol, tfirst=True, hmin=min_step).T 
+
+    # simulate
+    lamb_odes = [model.lambdify(*params) for model, params in zip(models_list, params_matrix)]
+
+    def lambdified_odes(t, x):
+        x, y = x
+        return [lamb_odes[i](x, y) for i in range(len(lamb_odes))]
+
+    Yode = odeint(lambdified_odes, y0, T,
+                  rtol=estimation_settings['odeint_rtol'],
+                  atol=estimation_settings['odeint_atol'],
+                  hmin=min_step,
+                  tfirst=True)
+
     return Yode
 
-def model_ode_error (params, model, X, Y, T, estimation_settings):
+def model_ode_error(params, model_list, X, Y, T, estimation_settings):
     """Defines mean squared error of solution to differential equation
     as the error metric.
 
@@ -189,9 +175,15 @@ def model_ode_error (params, model, X, Y, T, estimation_settings):
         - X are columns without features that are derived.
         - Y are columns of features that are derived via ode fitting.
     """
-    model_list = [model]; params_matrix = [params] # 12multi conversion (temporary)
+
+    # split the complete set of parameters in subsets for each equation based on the num of parameters each eq has
+    params_matrix = [list(params[s:e]) for s, e in estimation_settings['param_split_indices']]
+    #print('Iter ' + str(estimation_settings["iter"]))
+    estimation_settings["iter"] += 1
+    #print(params_matrix)
+
     try:
-        # Next few lines strongly suppress any warnning messages 
+        # Next few lines strongly suppress any warnning messages
         # produced by LSODA solver, called by ode() function.
         # Suppression further complicates if making log files (Tee):
         change_std2tee = False  # Normaly no need for this mess.
@@ -204,48 +196,41 @@ def model_ode_error (params, model, X, Y, T, estimation_settings):
             sys.stdout = std_output  # Change fake stdout to real stdout.
             change_std2tee = True  # Remember to change it back.
         def run_ode():
-            return ode(model_list, params_matrix, T, X, y0=Y[:1],
+            return ode(model_list, params_matrix, T, X, y0=X[0,:],
                        **estimation_settings)  # Y[:1] if _ or Y[0] if |
         # Next line works only when sys.stdout is real. Thats why above.
         if isinstance(sys.stdout, stdout_type):
             with open(os.devnull, 'w') as f, mt.stdout_redirected(f):
                 try:
-                    odeY = run_ode()
+                    simX = run_ode()
                 except Exception as error:
                     if estimation_settings["verbosity"] >= 1:
                         print("Inside ode(), preventing tee/IO error. Params at error:",
-                            params, f"and {type(error)} with message:", error)
+                            params_matrix, f"and {type(error)} with message:", error)
         else:
-            odeY = run_ode()
-        if change_std2tee: 
+            simX = run_ode()
+        if change_std2tee:
             sys.stdout = tee_object  # Change it back to fake stdout (tee).
 
-        # odeY = odeY.T  # solve_ivp() returns in _ oposite (DxN) shape.
-        odeY = odeY[0]  # If Y is landscape, i.e. _.
-        if not odeY.shape == Y.shape:
-            if estimation_settings["verbosity"] >= 3:
-                print("The ODE solver did not found ys at all times -> returning default error.")
-            if estimation_settings["verbosity"] >= 4:
-                print(odeY.shape, Y.shape)
-            return estimation_settings['default_error']
         try:
-            res = np.mean((Y-odeY)**2)
+            res = np.mean((X-simX)**2)
             if estimation_settings["verbosity"] >= 4:
                 print("succesfully returning now inside model_ode_error")
             if np.isnan(res) or np.isinf(res) or not np.isreal(res):
-# #                print(model.expr, model.params, model.sym_params, model.sym_vars)
+            # #    print(model.expr, model.params, model.sym_params, model.sym_vars)
                 return estimation_settings['default_error']
             return res
+
         except Exception as error:
             if estimation_settings["verbosity"] >= 1:
-                print("Error in ode() in mean(Y-odeY): Params at error:", 
-                    params, f"and {type(error)} with message:", error)
+                print("Error in ode() in mean(Y-odeY): Params at error:",
+                    params_matrix, f"and {type(error)} with message:", error)
             return estimation_settings['default_error']
 
     except Exception as error:
         if estimation_settings["verbosity"] >= 1:
             print("Excepted an error inside ode() of model_ode_error.")
-            print("Params at error:", params, 
+            print("Params at error:", params_matrix,
                     f"and {type(error)} with message:", error)
             print("Returning default error. All is well.")
         return estimation_settings['default_error']
@@ -276,7 +261,7 @@ def hyperopt_fit (model, X, Y, T, p0, **estimation_settings):
                 hyperopt_space_args (hyperopt.pyll.base.Apply):
                     Arguments used in conjunction with
                     hyperopt_space_fn function call when specifying
-                    the search space. 
+                    the search space.
                     Default: (lower_bound, upper_bound).
                 hyperopt_space_kwargs (hyperopt.pyll.base.Apply): Same
                     as hyperopt_space_args except that it is dictionary
@@ -286,7 +271,7 @@ def hyperopt_fit (model, X, Y, T, p0, **estimation_settings):
     configuration in one dimension only. This is because user cannot
     predict how many and which parameters will the random generator
     generate.
-    
+
     One-dimensional configuration of search space is here specified
     by function called in the stochastic space parameter expression
     and by this expression's (also optional) arguments as described at:
@@ -308,7 +293,7 @@ def hyperopt_fit (model, X, Y, T, p0, **estimation_settings):
     [hp.randint('C0', upper_bound),
      hp.randint('C1', upper_bound),
      hp.randint('C2', upper_bound)], since p0 is 3-D.
-    
+
     When omitting arguments in stochastic expression, it defaults
     to arguments=(lower_bound, upper_bound), which are allways
     present inside of estimation_settings input. This default
@@ -398,9 +383,10 @@ def hyperopt_fit (model, X, Y, T, p0, **estimation_settings):
     return result
 
 def DE_fit (model, X, Y, T, p0, **estimation_settings):
-    """Calls scipy.optimize.differential_evolution. 
+    """Calls scipy.optimize.differential_evolution.
     Exists to make passing arguments to the objective function easier."""
-    
+
+
     lu_bounds = estimation_settings["lower_upper_bounds"]
     lower_bound, upper_bound = lu_bounds[0]+1e-30, lu_bounds[1]+1e-30
     bounds = [[lower_bound, upper_bound] for i in range(len(p0))]
@@ -414,68 +400,28 @@ def DE_fit (model, X, Y, T, p0, **estimation_settings):
             return True
         else:
             return False
-    
-    if estimation_settings["verbosity"] >= 4:
-        print("inside DE_fit")
-    return differential_evolution(
-        estimation_settings["objective_function"],
-        bounds,
-        args=[model, X, Y, T, estimation_settings],
-        callback=diff_evol_timeout, maxiter=10**2, popsize=10)
+
+    return differential_evolution(estimation_settings["objective_function"],
+                                  bounds=bounds,
+                                  args=[model, X, Y, T, estimation_settings],
+                                  maxiter=estimation_settings["DE_max_iter"],
+                                  strategy=estimation_settings["DE_strategy"],
+                                  popsize=estimation_settings["DE_pop_size"],
+                                  mutation=(estimation_settings["DE_f"], 1),
+                                  recombination=estimation_settings["DE_cr"],
+                                  tol=estimation_settings["DE_tol"],
+                                  atol=estimation_settings["DE_atol"],
+                                  callback=diff_evol_timeout)
 
 def min_fit (model, X, Y):
     """Calls scipy.optimize.minimize. Exists to make passing arguments to the objective function easier."""
-    
-    return minimize(optimization_wrapper, model.params, args = (model, X, Y))
-
-OPTIMIZER_LIBRARY = {"differential_evolution": DE_fit, "hyperopt": hyperopt_fit, "minimize": min_fit}
-
-def find_parameters (model, X, Y, T, **estimation_settings):
-    """Calls the appropriate fitting function. 
-    
-    TODO: 
-        add method name input, matching to a dictionary of fitting methods.
-    """
-#    try:
-#        popt, pcov = curve_fit(model.evaluate, X, Y, p0=model.params, check_finite=True)
-#    except RuntimeError:
-#        popt, pcov = model.params, 0
-#    opt_params = popt; othr = pcov
-
-    task_type = estimation_settings["task_type"]
-    if task_type == "algebraic":
-        estimation_settings["objective_function"] = model_error
-    elif task_type == "differential":
-        estimation_settings["objective_function"] = model_ode_error
-#     elif task_type == "differential_surrogate":
-#         estimation_settings["objective_function"] = meta_model_ode_error
-    elif task_type == "integer-algebraic":
-        estimation_settings["objective_function"] = (
-            lambda params, model, X, Y, _T, estimation_settings:
-                model_error(np.round(params), model, X, Y, _T=None,
-                            estimation_settings=estimation_settings))
-    else:
-        types_string = "\", \"".join(TASK_TYPES)
-        raise ValueError("Variable task_type has unsupported value "
-                f"\"{task_type}\", while list of possible values: "
-                f"\"{types_string}\".")
-
-
-    res = OPTIMIZER_LIBRARY[estimation_settings['optimizer']](
-        model, X, Y, T, p0=model.params, **estimation_settings)
-    # res = DE_fit(model, X, Y, T, p0=model.params, **estimation_settings)
-
-
-#    res = min_fit (model, X, Y)
-#    opt_params = res.x; othr = res
-    
-    return res
+    return minimize(optimization_wrapper, model.params, args=(model, X, Y))
 
 class ParameterEstimator:
     """Wraps the entire parameter estimation, so that we can pass the map function in fit_models
         a callable with only a single argument.
         Also checks some basic requirements, suich as minimum and maximum number of parameters.
-        
+
         TODO:
             add inputs to make requirements flexible
             add verbosity input
@@ -483,21 +429,43 @@ class ParameterEstimator:
             estimation_settings: Dictionary with multiple parameters
                 that determine estimation process more specifically.
     """
-    def __init__(self, data, target_variable_index, time_index, estimation_settings):
-        #data = np.atleast_2d(data)
+    def __init__(self, data, time_index, estimation_settings):
+
+        task_type = estimation_settings["task_type"]
         var_mask = np.ones(data.shape[-1], bool)
-        var_mask[target_variable_index] = False
-        if estimation_settings["task_type"] == "differential":
+
+        if task_type == "differential":
             var_mask[time_index] = False
+            self.X = data[:, var_mask]
+            self.Y = None
             self.T = data[:, time_index]
-        else:
+            estimation_settings["objective_function"] = model_ode_error
+
+        elif task_type == "algebraic" or task_type == "integer-algebraic":
+            target_index = estimation_settings["target_variable_index"]
+            self.X = data[:, var_mask]
+            self.Y = data[:, target_index]
             self.T = None
-            
-        self.X = data[:, var_mask]
-        self.Y = data[:, target_variable_index]
+            estimation_settings["objective_function"] = model_error
+
+        else:
+            types_string = "\", \"".join(TASK_TYPES)
+            raise ValueError("Variable task_type has unsupported value "
+                             f"\"{task_type}\", while list of possible values: "
+                             f"\"{types_string}\".")
+
+        if task_type == "integer-algebraic":
+            estimation_settings["objective_function"] = (
+                lambda params, model, X, Y, _T, estimation_settings:
+                model_error(np.round(params), model, X, Y, _T=None,
+                            estimation_settings=estimation_settings))
+
         self.estimation_settings = estimation_settings
-        
+
+
     def fit_one (self, model):
+        optimizer_library = {"differential_evolution": DE_fit, "hyperopt": hyperopt_fit, "minimize": min_fit}
+
         if self.estimation_settings["verbosity"] > 0:
             print("Estimating model " + str(model.expr))
         try:
@@ -507,11 +475,12 @@ class ParameterEstimator:
                 model.set_estimated({"x":[], "fun": model_error_general(
                     [], model, self.X, self.Y, self.T, **self.estimation_settings)})
             else:
-                res = find_parameters(model, self.X, self.Y, self.T,
-                                     **self.estimation_settings)
+                optimizer = optimizer_library[self.estimation_settings['optimizer']]
+                res = optimizer(model, self.X, self.Y, self.T, p0=model.params, **self.estimation_settings)
                 model.set_estimated(res)
                 if self.estimation_settings["verbosity"] >= 3:
                     print(res, type(res["x"]), type(res["x"][0]))
+
         except Exception as error:
             if self.estimation_settings["verbosity"] >= 1:
                 print((f"Excepted an error inside fit_one: Of type "
@@ -524,27 +493,69 @@ class ParameterEstimator:
                     + f"error: {model.get_error()}")
 
         return model
-    
-def fit_models (
-    models,
-    data,
-    target_variable_index,
-    time_index=None,
-    pool_map=map,
-    verbosity=0,
-    task_type="algebraic",
-    estimation_settings={}
-    ):
+
+    def fit_systemODE(self, system):
+
+        # next 10 lines added by nina
+        # split the complete set of parameters in subsets for each equation based on the num of paramaters each eq has
+        param_split_indices = []
+        for ii in range(len(system)):
+            numParams = len(system[ii].sym_params)
+            if ii == 0:
+                param_split_indices.append((0, numParams))
+            else:
+                param_split_indices.append((param_split_indices[-1][1], param_split_indices[-1][1] + numParams))
+
+        self.estimation_settings['param_split_indices'] = param_split_indices
+
+        optimizer_library = {"differential_evolution": DE_fit, "hyperopt": hyperopt_fit, "minimize": min_fit}
+        system_size = len(system)
+        system_params = [item for sublist in system for item in sublist.params]
+
+        if self.estimation_settings["verbosity"] > 0:
+            print('Estimating system: ')
+            print([str(system[i].expr) for i in range(system_size)])
+        try:
+            optimizer = optimizer_library[self.estimation_settings['optimizer']]
+            res = optimizer(system, self.X, self.Y, self.T, p0=system_params, **self.estimation_settings)
+            # added by Nina, temporarly, until set_estimate gets fixed for systems of odes.
+            if res.success:
+                for i in range(len(system)):
+                    system[i].set_estimated(res)
+                    system[i].params = list(res["x"][param_split_indices[i][0]:param_split_indices[i][1]])
+                    system[i].valid = True
+            else:
+                print('Issue error! Optimization wasnt successful')
+
+            if self.estimation_settings["verbosity"] >= 3:
+                print(res, type(res["x"]), type(res["x"][0]))
+
+        except Exception as error:
+            if self.estimation_settings["verbosity"] >= 1:
+                print((f"Excepted an error inside fit_systemODE: Of type "
+                        f"{type(error)} and message:{error}!! \nModel:"), system)
+            [system[i].set_estimated({}, valid=False) for i in range(system_size)]
+
+        #if self.estimation_settings["verbosity"] > 0:
+        #    print(f"model: {str(system.get_full_expr()):<70}; "
+        #            + f"p: {system.p:<23}; "
+        #            + f"error: {system.get_error()}")
+
+        return system
+
+def fit_models (models, data, time_index=None, pool_map=map, verbosity=0,
+                task_type="algebraic", estimation_settings={}):
+
     """Performs parameter estimation on given models. Main interface to the module.
-    
+
     Supports parallelization by passing it a pooled map callable.
-    
+
     Arguments:
-        models (ModelBox): Instance of ModelBox, containing the models to be fitted. 
-        data (numpy.array): Input data of shape N x M, where N is the number of samples 
+        models (ModelBox): Instance of ModelBox, containing the models to be fitted.
+        data (numpy.array): Input data of shape N x M, where N is the number of samples
             and M is the number of variables.
         target_variable_index (int): Index of column in data that belongs to the target variable.
-        time_index (int): Index of column in data that belongs to measurement of time. 
+        time_index (int): Index of column in data that belongs to measurement of time.
                 Required for differential equations, None otherwise.
         pool_map (function): Map function for parallelization. Example use with 8 workers:
                 from multiprocessing import Pool
@@ -554,60 +565,81 @@ def fit_models (
         task_type (str): Type of equations, e.g. "algebraic" or "differential", that
             equation discovery algorithm tries to discover.
         estimation_settings (dict): Dictionary where majority of optional arguments is stored
-                and where additional optional arguments can be passed to lower level parts of 
+                and where additional optional arguments can be passed to lower level parts of
                 equation discovery.
             arguments that can be passed via estimation_settings dictionary:
                 max_constants (int): Maximum number of free constants allowed. For the sake of computational
                     efficiency, models exceeding this constraint are ignored. Default: 5.
-                timeout (float): Maximum time in seconds consumed for whole 
-                    minimization optimization process, e.g. for differential evolution, that 
+                timeout (float): Maximum time in seconds consumed for whole
+                    minimization optimization process, e.g. for differential evolution, that
                     is performed for each model.
                 lower_upper_bounds (tuple[float]): Pair, i.e. tuple of lower and upper
-                    bound used to specify the boundaries of optimization, e.g. of 
+                    bound used to specify the boundaries of optimization, e.g. of
                     differential evolution.
                 max_ode_steps (int): Maximum number of steps used in one run of LSODA solver.
     """
     estimation_settings_preset = {
         "task_type": task_type,
-        "verbosity": verbosity,
+        "target_variable_index": 1,
         "timeout": np.inf,
-        "lower_upper_bounds": (-30,30),
-        "optimizer": 'differential_evolution',
+        "max_constants": 5,
+        "lower_upper_bounds": (-30, 30),
         "default_error": 10**9,
-        "max_constants": 5
+        "optimizer": 'differential_evolution',
+        "DE_f": 0.45,
+        "DE_cr": 0.88,
+        "DE_max_iter": 1000,
+        "DE_pop_size": 100,
+        "DE_atol": 0.01,
+        "DE_tol": 0.01,
+        "DE_strategy": 'rand1bin',
+        "odeint_atol": 10 ** (-6),
+        "odeint_rtol": 10 ** (-4),
+        "odeint_max_step": 10 ** 3,
+        "param_split_indices": [],
+        "verbosity": verbosity,
         }
     estimation_settings_preset.update(estimation_settings)
     estimation_settings = estimation_settings_preset
-    estimator = ParameterEstimator(data, target_variable_index, time_index, estimation_settings)
-    
-    return ModelBox(dict(zip(models.keys(), list(pool_map(estimator.fit_one, models.values())))))
+    estimator = ParameterEstimator(data, time_index, estimation_settings)
+
+    if estimation_settings["task_type"] == 'differential':
+        fitted_models = list(pool_map(estimator.fit_systemODE, models))
+        return fitted_models
+    else:
+        fitted_models = list(pool_map(estimator.fit_one, models.values()))
+        fitted_models_dict = dict(zip(models.keys(), fitted_models))
+        return ModelBox(fitted_models_dict)
 
 
 
 if __name__ == "__main__":
+
+    # 1. test (older)
     print("--- parameter_estimation.py test --- ")
     np.random.seed(2)
-    
+
     from pyDOE import lhs
     from generators.grammar import GeneratorGrammar
     from generate import generate_models
 
     def testf (x):
         return 3*x[:,0]*x[:,1]**2 + 0.5
-    
+
     X = lhs(2, 10)*5
     X = X.reshape(-1, 2)
     y = testf(X).reshape(-1,1)
     data = np.hstack((X,y))
-    
+
     grammar = GeneratorGrammar("""S -> S '+' T [0.4] | T [0.6]
                               T -> 'C' [0.6] | T "*" V [0.4]
                               V -> 'x' [0.5] | 'y' [0.5]""")
     symbols = {"x":['x', 'y'], "start":"S", "const":"C"}
     N = 10
-    
-    models = generate_models(grammar, symbols, strategy_settings = {"N":10})
-    
-    models = fit_models(models, data, target_variable_index=-1, task_type="algebraic")
+
+    models = generate_models(grammar, symbols, strategy_settings={"N":10})
+    models = fit_models(models, data, task_type="algebraic")
     print(models)
+
+
 
