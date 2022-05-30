@@ -104,8 +104,9 @@ def resample_curve (models, data, target_variable_index = -1, resampleN = 100, s
         
         if models[m].valid and not mse >= 1e8:
             rrmse = np.sqrt((mse+1e-32)/baseerror)
-            joined_probs += [models[m].p]
-            joined_errors += [np.log10(rrmse)]
+            if not np.isnan(rrmse) and rrmse >= 0:
+                joined_probs += [models[m].p]
+                joined_errors += [np.log10(rrmse)]
         
     joined_probs_norm = np.array(joined_probs)/np.sum(joined_probs)
     sample_size = np.sum(joined_probs_norm > 0)
