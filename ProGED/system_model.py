@@ -109,7 +109,7 @@ class SystemModel:
                 
         return fullexprs
 
-    def lambdify (self, params=None, arg="numpy"):
+    def lambdify (self, params=None, list=False, arg="numpy"):
         """Produce a callable function from the symbolic expression and the parameter values.
         
         This function is required for the evaluate function. It relies on sympy.lambdify, which in turn 
@@ -128,7 +128,10 @@ class SystemModel:
             params = self.params
         fullexprs = self.full_expr(params)
         lambdas = [sp.lambdify(self.sym_vars, full_expr, arg) for full_expr in fullexprs]
-        return lambda x: np.transpose([lam(*x.T) for lam in lambdas]), lambdas
+        if list:
+            return lambdas
+        else:
+            return lambda x: np.transpose([lam(*x.T) for lam in lambdas])
 
 
     def evaluate (self, points, *args):
