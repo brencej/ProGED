@@ -13,7 +13,7 @@ Class methods serve as an interfance to interact with the model.
 The class is intended to be used as part of an equation discovery algorithm."""
 
 class SystemModel:
-    def __init__(self, expr, p=0, params=[], sym_params=[], sym_vars = [], info=None):
+    def __init__(self, expr, p=0, params=[], sym_params=[], sym_vars = [], info={}):
         """Initialize a SystemModel.
         
         Arguments:
@@ -38,12 +38,15 @@ class SystemModel:
         """sym_vars should be tuple of tuples of sympy symbols"""
         self.sym_vars = sym_vars
 
-        self.p = p
+        self.p = 0
 
-        """TODO: figure out structure for trees"""
-        #self.trees = {} #trees has form {"code":[p,n]}"
-        #if len(code)>0:
-            #self.add_tree(code, p)
+        """TODO: figure out better structure for trees"""
+        self.trees = {} #trees has form {"code":[p,n]}"
+        if "code" in info:
+            code = info["code"]
+        else:
+            code = ""
+        self.add_tree(code, p)
 
         self.estimated = {}
         self.valid = False
@@ -89,6 +92,19 @@ class SystemModel:
         else:
             self.params=params
 
+    def add_tree (self, code, p):
+        """Add a new parse tree to the model.
+        
+        Arguments:
+            code (str): The parse tree code, expressed as a string of integers.
+            p (float): Probability of parse tree.
+        """
+        if code in self.trees:
+            self.trees[code][1] += 1
+        else:
+            self.trees[code] = [p,1]
+            self.p += p
+
     def full_expr (self, params=None):
         """Substitutes parameter symbols in the symbolic expression with given parameter values.
         
@@ -133,32 +149,6 @@ class SystemModel:
         else:
             return lambda x: np.transpose([lam(*x.T) for lam in lambdas])
 
-
-    def evaluate (self, points, *args):
-        """Evaluate the model for given variable and parameter values.
-        
-        If possible, use this function when you want to do computations with the model.
-        It relies on lambdify so it shares the same issues, but includes some safety checks.
-        Example of use with stored parameter values:
-            predictions = model.evaluate(X, *model.params)
-        
-        Arguments:
-            points (numpy array): Input data, shaped N x M, where N is the number of samples and
-                M the number of variables.
-            args (list of floats): Parameter values.
-            
-        Returns:
-            Numpy array of shape N x D, where N is the number of samples and D the number of output variables.
-        """
-        lamb_expr = sp.lambdify(self.sym_vars, self.full_expr(*args), "numpy")
-        
-        if type(points[0]) != type(np.array([1])):
-            if type(lamb_expr(np.array([1,2,3]))) != type(np.array([1,2,3])):
-                return np.ones(len(points))*lamb_expr(1)
-            return lamb_expr(points)
-        else:
-#            if type(lamb_expr(np.array([np.array([1,2,3])]).T)) != type(np.array([1,2,3])):
-            return lamb_expr(*points.T)
 
     def __str__(self):
         return str(self.expr)
