@@ -15,6 +15,18 @@ We should first do 1), once it is implemented and tested, we move on to 2).
 - (Nina) Potential issue to solve: DE wants to update parameters all together, regardless of which eq they belong to. E.g. if there are 2 eq, each with 2 parameters, all 4 parameters will be adjusted together. However, Proged treats each model separately, so the parameters need to be manually separated so they are appropriately assigned to the right equation. Thus, e.g. model's method "set estimate" can't be used.
 Maybe a solution would be that a new object is created, that can also be added to a ModelBox, e.g. "system", which would have its own methods, adapted to the system of ODE? With that approach other objects maybe dont need to change but didn't check for that.
 
+- SystemModel: 
+	- expr: list of sympy expressions
+	- params, sym_params: list of lists of parameter values and parameter symbols
+	- p: same as now, probably just multiplied
+	- trees: probably same as now
+	- valid: same as now
+	- lambdify: elementwise + maybe joined in a function
+	- evaluate: uneeded?
+	- str(model): (expr1, expr2, ... exprN)
+- ModelBox:
+	- add_model: 
+
 ##TODO
 ###Systems
 
