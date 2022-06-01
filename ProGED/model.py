@@ -3,7 +3,7 @@
 import numpy as np
 import sympy as sp
 
-"""Module implementing the Module class that represents a single model, 
+"""Module implementing the Model class that represents a single model, 
 defined by its canonical expression string.
     
 An object of Model acts as a container for various representations of the model,
@@ -47,7 +47,7 @@ class Model:
         full_expr: Produce symbolic expression with parameters substituted by their values.
     """
     
-    def __init__(self, expr, code, p, grammar=None, params=[], sym_params=[], sym_vars = []):
+    def __init__(self, expr, params=[], sym_params=[], sym_vars = [], code="", p=1, grammar=None):
         """Initialize a Model with the initial parse tree and information on the task.
         
         Arguments:
@@ -88,8 +88,8 @@ class Model:
         self.p = 0
         self.trees = {} #trees has form {"code":[p,n]}"
         
-        if len(code)>0:
-            self.add_tree(code, p)
+        self.add_tree(code, p)
+
         self.estimated = {}
         self.valid = False
         
@@ -162,14 +162,6 @@ class Model:
         if not params:
             params = self.params
         return sp.lambdify(self.sym_vars, self.full_expr(*params), "numpy")
-        # self.lamb_expr = sp.lambdify(self.sym_vars, self.expr.subs(list(zip(self.sym_params, params))), arg)
-        # print(self.lamb_expr, "self.lamb_expr")
-        # test = self.lamb_expr(np.array([1,2,3, 4]))
-        # print(test, "test")
-        # if type(test) != type(np.array([])):
-        #     print("inside if, i.e. bool=True")
-        #     self.lamb_expr = lambda inp: [test for i in range(len(inp))]
-        # return self.lamb_expr
 
     def evaluate (self, points, *args):
         """Evaluate the model for given variable and parameter values.

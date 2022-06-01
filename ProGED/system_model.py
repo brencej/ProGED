@@ -39,7 +39,8 @@ class SystemModel:
         self.sym_vars = sym_vars
 
         self.p = 0
-
+        self.info = info
+        
         """TODO: figure out better structure for trees"""
         self.trees = {} #trees has form {"code":[p,n]}"
         if "code" in info:
