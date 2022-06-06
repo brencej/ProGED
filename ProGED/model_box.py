@@ -35,8 +35,9 @@ class ModelBox:
         values: Return the Model instances in models_dict.
         items: Return the key and value pairs in models_dict.
     """
-    def __init__ (self, models_dict = {}):
+    def __init__ (self, models_dict = {}, observed = None):
         self.models_dict = dict(models_dict)
+        self.observed = observed
 
     def add_model(self, expr, symbols, p=1.0, params=None, info={}):
         if isinstance(expr, str):
@@ -68,8 +69,9 @@ class ModelBox:
         else:
             if not params:
                 params = [[(np.random.random()-0.5)*10 for _ in range(len(par))] for par in symbols_params]
-
-            self.models_dict[str(exprs)] = SystemModel(expr = exprs, sym_vars = x, sym_params = symbols_params, params=params, p=p, info=info)
+            if not self.observed:
+                self.observed = x
+            self.models_dict[str(exprs)] = SystemModel(expr = exprs, sym_vars = x, sym_params = symbols_params, params=params, p=p, info=info, observed=self.observed)
         
         return True, str(exprs)
         

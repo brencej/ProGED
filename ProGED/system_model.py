@@ -13,7 +13,7 @@ Class methods serve as an interfance to interact with the model.
 The class is intended to be used as part of an equation discovery algorithm."""
 
 class SystemModel:
-    def __init__(self, expr, p=0, params=[], sym_params=[], sym_vars = [], info={}):
+    def __init__(self, expr, p=0, params=[], sym_params=[], sym_vars=[], info={}, observed=[]):
         """Initialize a SystemModel.
         
         Arguments:
@@ -34,6 +34,7 @@ class SystemModel:
         self.sym_params = sym_params
         self.params = params
         self.n_params = [len(par) for par in sym_params]
+        self.total_eq_params = sum(self.n_params)
 
         """sym_vars should be tuple of tuples of sympy symbols"""
         self.sym_vars = sym_vars
@@ -51,6 +52,11 @@ class SystemModel:
 
         self.estimated = {}
         self.valid = False
+
+        # list of variables that are (un)observed - used for partially-observed systems
+        self.observed = observed
+        # extra parameters, i.e. initial values for unobserved variables in partially-observed systems
+        self.initials = []
 
     def set_estimated(self, result, valid=True):
         """Store results of parameter estimation and set validity of model according to input.
@@ -88,9 +94,19 @@ class SystemModel:
         else:
             return dummy
 
+    def get_params(self):
+        return self.params
+
+    def get_all_params(self):
+        params = [par for eq_params in self.params for par in eq_params]
+        params += list(self.initials)
+        return params
+
     def set_params(self, params, split=True):
         if split:
-            self.params = np.split(params, np.cumsum(self.n_params))[:-1]
+            expr_params = params[:self.total_eq_params]
+            self.initials = params[self.total_eq_params:]
+            self.params = np.split(expr_params, np.cumsum(self.n_params))[:-1]
             # self.params = list(filter(None, self.params))
         else:
             self.params=params
