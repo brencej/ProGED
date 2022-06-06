@@ -165,6 +165,8 @@ def fit_models (models, data, task_type="algebraic", time_index=None, pool_map=m
         "rtol": 10 ** (-4),
         "max_step": 10 ** 3}
 
+
+
     optimizer_settings_preset = {
         "lower_upper_bounds": (-10, 10),
         "default_error": 10 ** 9,
@@ -191,7 +193,17 @@ def fit_models (models, data, task_type="algebraic", time_index=None, pool_map=m
         }
 
     estimation_settings_preset.update(estimation_settings)
-    estimation_settings = estimation_settings_preset
+
+    if "objective_settings" in estimation_settings:
+        objective_settings_preset.update(estimation_settings["objective_settings"])
+        estimation_settings_preset["objective_settings"] = dict(objective_settings_preset)
+    if "optimizer_settings" in estimation_settings:
+        optimizer_settings_preset.update(estimation_settings["optimizer_settings"])
+        estimation_settings_preset["optimizer_settings"] = dict(optimizer_settings_preset)
+
+    estimation_settings = dict(estimation_settings_preset)
+
+    print(estimation_settings)
     estimator = ParameterEstimator(data, task_type, time_index, estimation_settings)
 
     fitted_models = list(pool_map(estimator.fit_one, models))

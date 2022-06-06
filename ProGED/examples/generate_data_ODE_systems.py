@@ -3,7 +3,7 @@ import sys
 import numpy as np
 import pandas as pd
 import math
-import matplotlib; matplotlib.use('Qt5Agg')
+#import matplotlib; #mtplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt;
 from scipy.integrate import solve_ivp
 
@@ -53,7 +53,7 @@ def generate_ODE_data(system, inits, **generation_settings):
                   generation_settings["simulation_time"],
                   generation_settings["simulation_step"])
 
-    X = solve_ivp(fun=eval(system),
+    X = solve_ivp(fun=system,
                   t_span=t_span,
                   y0=inits,
                   t_eval=t,
