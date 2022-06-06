@@ -41,6 +41,194 @@ warnings.filterwarnings("ignore", message="overflow encountered in square")
 warnings.filterwarnings("ignore", message="overflow encountered in double_scalars")
 
 
+class ParameterEstimator:
+    """Wraps the entire parameter estimation, so that we can pass the map function in fit_models
+        a callable with only a single argument.
+        Also checks some basic requirements, suich as minimum and maximum number of parameters.
+
+        TODO:
+            add inputs to make requirements flexible
+            add verbosity input
+        Input:
+            estimation_settings: Dictionary with multiple parameters
+                that determine estimation process more specifically.
+    """
+    def __init__(self, data, task_type, time_index, estimation_settings):
+
+        # 1. task-dependent settings
+        var_mask = np.ones(data.shape[-1], bool)
+
+        if task_type == "differential":
+            var_mask[time_index] = False
+            self.X = data[:, var_mask]
+            self.Y = None
+            self.T = data[:, time_index]
+            estimation_settings["objective_function"] = model_ode_error
+
+        elif task_type == "algebraic" or task_type == "integer-algebraic":
+            target_index = estimation_settings["target_variable_index"]
+            self.X = data[:, var_mask]
+            self.Y = data[:, target_index]
+            self.T = None
+            estimation_settings["objective_function"] = model_error
+
+        else:
+            types_string = "\", \"".join(TASK_TYPES)
+            raise ValueError("Variable task_type has unsupported value "
+                             f"\"{task_type}\", while list of possible values: "
+                             f"\"{types_string}\".")
+
+        if task_type == "integer-algebraic":
+            estimation_settings["objective_function"] = (
+                lambda params, model, X, Y, _T, estimation_settings:
+                model_error(np.round(params), model, X, Y, _T=None,
+                            estimation_settings=estimation_settings))
+
+        # 2. observability settings
+        print("here")
+        # 3. embed all settings into self
+        self.estimation_settings = estimation_settings
+
+
+    def fit_one (self, model):
+        optimizer_library = {"differential_evolution": DE_fit, "hyperopt": hyperopt_fit, "minimize": min_fit}
+
+        if self.estimation_settings["verbosity"] > 0:
+            print("Estimating model " + str(model.expr))
+        try:
+            if len(model.params) > self.estimation_settings["max_constants"]:
+                pass
+            elif len(model.params) < 1:
+                model.set_estimated({"x":[], "fun": model_error_general(
+                    [], model, self.X, self.Y, self.T, **self.estimation_settings)})
+            else:
+                optimizer = optimizer_library[self.estimation_settings['optimizer']]
+                model_params = model.get_all_params()
+                #model_params = [item for sublist in model.params for item in sublist]
+                res = optimizer(model, self.X, self.Y, self.T, p0=model_params, **self.estimation_settings)
+                model.set_estimated(res)
+                if self.estimation_settings["verbosity"] >= 3:
+                    print(res, type(res["x"]), type(res["x"][0]))
+
+        except Exception as error:
+            if self.estimation_settings["verbosity"] >= 1:
+                print((f"Excepted an error inside fit_one: Of type "
+                        f"{type(error)} and message:{error}!! \nModel:"), model)
+            model.set_estimated({}, valid=False)
+
+        if self.estimation_settings["verbosity"] > 0:
+            print(f"model: {str(model.full_expr()):<70}; "
+                    + f"p: {model.p:<23}; "
+                    + f"error: {model.get_error()}")
+
+        return model
+
+
+def fit_models (models, data, task_type="algebraic", time_index=None, pool_map=map,
+                estimation_settings={}):
+
+    """Performs parameter estimation on given models. Main interface to the module.
+
+    Supports parallelization by passing it a pooled map callable.
+
+    Arguments:
+        models (ModelBox): Instance of ModelBox, containing the models to be fitted.
+        data (numpy.array): Input data of shape N x M, where N is the number of samples
+            and M is the number of variables.
+        target_variable_index (int): Index of column in data that belongs to the target variable.
+        time_index (int): Index of column in data that belongs to measurement of time.
+                Required for differential equations, None otherwise.
+        pool_map (function): Map function for parallelization. Example use with 8 workers:
+                from multiprocessing import Pool
+                pool = Pool(8)
+                fit_models (models, data, -1, pool_map = pool.map)
+        verbosity (int): Level of printout desired. 0: none, 1: info, 2+: debug.
+        task_type (str): Type of equations, e.g. "algebraic" or "differential", that
+            equation discovery algorithm tries to discover.
+        estimation_settings (dict): Dictionary where majority of optional arguments is stored
+                and where additional optional arguments can be passed to lower level parts of
+                equation discovery.
+            arguments that can be passed via estimation_settings dictionary:
+                max_constants (int): Maximum number of free constants allowed. For the sake of computational
+                    efficiency, models exceeding this constraint are ignored. Default: 5.
+                timeout (float): Maximum time in seconds consumed for whole
+                    minimization optimization process, e.g. for differential evolution, that
+                    is performed for each model.
+                lower_upper_bounds (tuple[float]): Pair, i.e. tuple of lower and upper
+                    bound used to specify the boundaries of optimization, e.g. of
+                    differential evolution.
+                max_ode_steps (int): Maximum number of steps used in one run of LSODA solver.
+    """
+
+    objective_settings_preset = {
+        "atol": 10 ** (-6),
+        "rtol": 10 ** (-4),
+        "max_step": 10 ** 3}
+
+    optimizer_settings_preset = {
+        "lower_upper_bounds": (-10, 10),
+        "default_error": 10 ** 9,
+        "strategy": 'rand1bin',
+        "f": 0.45,
+        "cr": 0.88,
+        "max_iter": 1000,
+        "pop_size": 50,
+        "atol": 0.01,
+        "tol": 0.01
+    }
+
+    estimation_settings_preset = {
+        "target_variable_index": 1,
+        "max_constants": 5,
+        "optimizer": 'differential_evolution',
+        "observed": models.observed,
+        "optimizer_settings": optimizer_settings_preset,
+        "objective_settings": objective_settings_preset,
+        "default_error": 10 ** 9,
+        "timeout": np.inf,
+        "verbosity": 4,
+        "iter": 0,
+        }
+
+    estimation_settings_preset.update(estimation_settings)
+    estimation_settings = estimation_settings_preset
+    estimator = ParameterEstimator(data, task_type, time_index, estimation_settings)
+
+    fitted_models = list(pool_map(estimator.fit_one, models))
+    return fitted_models
+
+def DE_fit (model, X, Y, T, p0, **estimation_settings):
+    """Calls scipy.optimize.differential_evolution.
+    Exists to make passing arguments to the objective function easier."""
+
+
+    lu_bounds = estimation_settings['optimizer_settings']['lower_upper_bounds']
+    lower_bound, upper_bound = lu_bounds[0]+1e-30, lu_bounds[1]+1e-30
+    bounds = [[lower_bound, upper_bound] for i in range(len(p0))]
+
+    start = time.perf_counter()
+    def diff_evol_timeout(x=0, convergence=0):
+        now = time.perf_counter()
+        if (now-start) > estimation_settings["timeout"]:
+            if estimation_settings['verbosity'] >= 1:
+                print("Time out!!!")
+            return True
+        else:
+            return False
+
+    return differential_evolution(func=estimation_settings["objective_function"],
+                                  bounds=bounds,
+                                  callback=diff_evol_timeout,
+                                  args=[model, X, Y, T, estimation_settings],
+                                  maxiter=estimation_settings["optimizer_settings"]["max_iter"],
+                                  strategy=estimation_settings["optimizer_settings"]["strategy"],
+                                  popsize=estimation_settings["optimizer_settings"]["pop_size"],
+                                  mutation=(estimation_settings["optimizer_settings"]["f"], 1),
+                                  recombination=estimation_settings["optimizer_settings"]["cr"],
+                                  tol=estimation_settings["optimizer_settings"]["tol"],
+                                  atol=estimation_settings["optimizer_settings"]["atol"])
+
+
 def model_error (params, model, X, Y, _T=None, estimation_settings=None):
     """Defines mean squared error as the error metric."""
     try:
@@ -89,81 +277,6 @@ def model_error_general (params, model, X, Y, T, **estimation_settings):
                 f"\"{task_type}\", while list of possible values: "
                 f"\"{types_string}\".")
 
-
-def ode(model, params, T, X_data, y0, **objective_settings):
-    """Solve system of ODEs defined by equations in models_list.
-
-    Raise error if input is incompatible.
-        Input:
-    models_list -- list (not dictionary) of models that e.g.
-        generate_models() generates.
-    params_matrix -- list of lists or ndarrays of parameters for
-        corresponding models.
-    y0 -- array (1-dim) of initial value of vector function y(t)
-        i.e. y0 = y(T[0]) = [y1(T[0]), y2(T[0]), y3(T[0]),...].
-    X_data -- 2-dim array (matrix) i.e. X = [X[0,:], X[1,:],...].
-    T -- (1-dim) array, i.e. of shape (N,)
-    max_ode_steps -- maximal number of steps inside ODE solver to
-        determine the minimal step size inside ODE solver.
-        Output:
-    Solution of ODE evaluated at times T.
-    """
-
-    # 1. Check input
-    if not (# isinstance(model, list)
-            # and isinstance(params, list)
-            len(params) > 0
-            # and isinstance(params[0], (list, np.ndarray))
-            and X_data.ndim == 2
-            and y0.ndim == 1):
-        message = str(type(params[0])) + "\n"
-        info = (isinstance(model, list),
-                isinstance(params, list),
-                len(params)>0,
-                isinstance(params[0], (list, np.ndarray)),
-                X_data.ndim == 2)
-        print(message, info)
-        print("Function ode's defined error: Input arguments are not in the required form!")
-        raise TypeError(f"Function ode's defined error: Input arguments are not in required form!"
-                        + f"\n{message, info}")
-    elif not T.shape[0] == X_data.shape[0]:
-        print("Number of samples in T and X does not match.")
-        raise IndexError("Number of samples in T and X does not match.")
-    elif not (y0.shape[0] == X_data.shape[1]):
-        print("Number of symbols in models and combination of "
-                        + "number of equations and dimensions of input data"
-                        + " does not match.")
-        raise IndexError("Number of symbols in models and combination of "
-                        + "number of equations and dimensions of input data"
-                        + " does not match.")
-
-    # 2. Simulate
-    # Set min_step via prescribing maximum number of steps:
-    if "max_steps" in objective_settings:
-        max_steps = objective_settings["max_steps"]
-    else:
-        # max_steps = 10**6  # On laptop, this would need less than 3 seconds.
-        max_steps = T.shape[0] * 10 ** 3  # Set to |timepoints|*1000.
-    # Convert max_steps to min_step:
-    min_step_from_max_steps = abs(T[-1] - T[0]) / max_steps
-    # The minimal min_step to avoid min step error in LSODA:
-    min_step_error = 10 ** (-15)
-    min_step = max(min_step_from_max_steps, min_step_error)  # Force them both.
-
-    # simulate
-    lamb_odes = models.lambdify(list=True)
-
-    def lambdified_odes(t, x):
-        x, y = x
-        return [lamb_odes[i](x, y) for i in range(len(lamb_odes))]
-
-    Yode = odeint(lambdified_odes, y0, T,
-                  rtol=objective_settings['rtol'],
-                  atol=objective_settings['atol'],
-                  hmin=min_step,
-                  tfirst=True)
-
-    return Yode
 
 def model_ode_error(params, model, X, Y, T, estimation_settings):
     """Defines mean squared error of solution to differential equation
@@ -232,6 +345,97 @@ def model_ode_error(params, model, X, Y, T, estimation_settings):
                     f"and {type(error)} with message:", error)
             print("Returning default error. All is well.")
         return estimation_settings['default_error']
+
+
+def ode(model, params, T, X_data, y0, **objective_settings):
+    """Solve system of ODEs defined by equations in models_list.
+
+    Raise error if input is incompatible.
+        Input:
+    models_list -- list (not dictionary) of models that e.g.
+        generate_models() generates.
+    params_matrix -- list of lists or ndarrays of parameters for
+        corresponding models.
+    y0 -- array (1-dim) of initial value of vector function y(t)
+        i.e. y0 = y(T[0]) = [y1(T[0]), y2(T[0]), y3(T[0]),...].
+    X_data -- 2-dim array (matrix) i.e. X = [X[0,:], X[1,:],...].
+    T -- (1-dim) array, i.e. of shape (N,)
+    max_ode_steps -- maximal number of steps inside ODE solver to
+        determine the minimal step size inside ODE solver.
+        Output:
+    Solution of ODE evaluated at times T.
+    """
+
+    # 1. Check input
+    if not (# isinstance(model, list)
+            # and isinstance(params, list)
+            len(params) > 0
+            # and isinstance(params[0], (list, np.ndarray))
+            and X_data.ndim == 2
+            and y0.ndim == 1):
+        message = str(type(params[0])) + "\n"
+        info = (isinstance(model, list),
+                isinstance(params, list),
+                len(params)>0,
+                isinstance(params[0], (list, np.ndarray)),
+                X_data.ndim == 2)
+        print(message, info)
+        print("Function ode's defined error: Input arguments are not in the required form!")
+        raise TypeError(f"Function ode's defined error: Input arguments are not in required form!"
+                        + f"\n{message, info}")
+    elif not T.shape[0] == X_data.shape[0]:
+        print("Number of samples in T and X does not match.")
+        raise IndexError("Number of samples in T and X does not match.")
+    elif not (y0.shape[0] == X_data.shape[1]):
+        print("Number of symbols in models and combination of "
+                        + "number of equations and dimensions of input data"
+                        + " does not match.")
+        raise IndexError("Number of symbols in models and combination of "
+                        + "number of equations and dimensions of input data"
+                        + " does not match.")
+
+    # 2. Simulate
+    # Set min_step via prescribing maximum number of steps:
+    if "max_steps" in objective_settings:
+        max_steps = objective_settings["max_steps"]
+    else:
+        # max_steps = 10**6  # On laptop, this would need less than 3 seconds.
+        max_steps = T.shape[0] * 10 ** 3  # Set to |timepoints|*1000.
+    # Convert max_steps to min_step:
+    min_step_from_max_steps = abs(T[-1] - T[0]) / max_steps
+    # The minimal min_step to avoid min step error in LSODA:
+    min_step_error = 10 ** (-15)
+    min_step = max(min_step_from_max_steps, min_step_error)  # Force them both.
+
+    # simulate
+    if model.observed:
+        obs_idx = [model.sym_vars.index(model.observed[i]) for i in range(len(model.observed))]
+        hid_idx = np.full(len(model.sym_vars), True, dtype=bool)
+        hid_idx[obs_idx] = False
+        inits = np.empty(len(model.sym_vars))
+        inits[obs_idx] = y0
+        inits[hid_idx] = model.initials
+    else:
+        inits = y0
+
+    lamb_odes = model.lambdify(list=True)
+
+    def lambdified_odes(t, x):
+        return [lamb_odes[i](*x) for i in range(len(lamb_odes))]
+
+    Yode = odeint(lambdified_odes, inits, T,
+                  rtol=objective_settings['rtol'],
+                  atol=objective_settings['atol'],
+                  hmin=min_step,
+                  tfirst=True)
+
+    return Yode
+
+
+def min_fit (model, X, Y):
+    """Calls scipy.optimize.minimize. Exists to make passing arguments to the objective function easier."""
+    return minimize(optimization_wrapper, model.params, args=(model, X, Y))
+
 
 def hyperopt_fit (model, X, Y, T, p0, **estimation_settings):
     """Calls Hyperopt.
@@ -379,235 +583,6 @@ def hyperopt_fit (model, X, Y, T, p0, **estimation_settings):
     if verbosity >= 3:
         print(result)
     return result
-
-def DE_fit (model, X, Y, T, p0, **estimation_settings):
-    """Calls scipy.optimize.differential_evolution.
-    Exists to make passing arguments to the objective function easier."""
-
-
-    lu_bounds = estimation_settings['optimizer_settings']['lower_upper_bounds']
-    lower_bound, upper_bound = lu_bounds[0]+1e-30, lu_bounds[1]+1e-30
-    bounds = [[lower_bound, upper_bound] for i in range(len(p0))]
-
-    start = time.perf_counter()
-    def diff_evol_timeout(x=0, convergence=0):
-        now = time.perf_counter()
-        if (now-start) > estimation_settings["timeout"]:
-            if estimation_settings['verbosity'] >= 1:
-                print("Time out!!!")
-            return True
-        else:
-            return False
-
-    return differential_evolution(func=estimation_settings["objective_function"],
-                                  bounds=bounds,
-                                  callback=diff_evol_timeout,
-                                  args=[model, X, Y, T, estimation_settings],
-                                  maxiter=estimation_settings["optimizer_settings"]["max_iter"],
-                                  strategy=estimation_settings["optimizer_settings"]["strategy"],
-                                  popsize=estimation_settings["optimizer_settings"]["pop_size"],
-                                  mutation=(estimation_settings["optimizer_settings"]["f"], 1),
-                                  recombination=estimation_settings["optimizer_settings"]["cr"],
-                           #       tol=estimation_settings["optimizer_settings"]["tol"],
-                          #        atol=estimation_settings["optimizer_settings"]["atol"])
-                                  )
-
-
-def min_fit (model, X, Y):
-    """Calls scipy.optimize.minimize. Exists to make passing arguments to the objective function easier."""
-    return minimize(optimization_wrapper, model.params, args=(model, X, Y))
-
-class ParameterEstimator:
-    """Wraps the entire parameter estimation, so that we can pass the map function in fit_models
-        a callable with only a single argument.
-        Also checks some basic requirements, suich as minimum and maximum number of parameters.
-
-        TODO:
-            add inputs to make requirements flexible
-            add verbosity input
-        Input:
-            estimation_settings: Dictionary with multiple parameters
-                that determine estimation process more specifically.
-    """
-    def __init__(self, data, task_type, time_index, estimation_settings):
-
-        var_mask = np.ones(data.shape[-1], bool)
-
-        if task_type == "differential":
-            var_mask[time_index] = False
-            self.X = data[:, var_mask]
-            self.Y = None
-            self.T = data[:, time_index]
-            estimation_settings["objective_function"] = model_ode_error
-
-        elif task_type == "algebraic" or task_type == "integer-algebraic":
-            target_index = estimation_settings["target_variable_index"]
-            self.X = data[:, var_mask]
-            self.Y = data[:, target_index]
-            self.T = None
-            estimation_settings["objective_function"] = model_error
-
-        else:
-            types_string = "\", \"".join(TASK_TYPES)
-            raise ValueError("Variable task_type has unsupported value "
-                             f"\"{task_type}\", while list of possible values: "
-                             f"\"{types_string}\".")
-
-        if task_type == "integer-algebraic":
-            estimation_settings["objective_function"] = (
-                lambda params, model, X, Y, _T, estimation_settings:
-                model_error(np.round(params), model, X, Y, _T=None,
-                            estimation_settings=estimation_settings))
-
-        self.estimation_settings = estimation_settings
-
-
-    def fit_one (self, model):
-        optimizer_library = {"differential_evolution": DE_fit, "hyperopt": hyperopt_fit, "minimize": min_fit}
-
-        if self.estimation_settings["verbosity"] > 0:
-            print("Estimating model " + str(model.expr))
-        try:
-            if len(model.params) > self.estimation_settings["max_constants"]:
-                pass
-            elif len(model.params) < 1:
-                model.set_estimated({"x":[], "fun": model_error_general(
-                    [], model, self.X, self.Y, self.T, **self.estimation_settings)})
-            else:
-                optimizer = optimizer_library[self.estimation_settings['optimizer']]
-                model_params = [item for sublist in model.params for item in sublist]
-                res = optimizer(model, self.X, self.Y, self.T, p0=model_params, **self.estimation_settings)
-                model.set_estimated(res)
-                if self.estimation_settings["verbosity"] >= 3:
-                    print(res, type(res["x"]), type(res["x"][0]))
-
-        except Exception as error:
-            if self.estimation_settings["verbosity"] >= 1:
-                print((f"Excepted an error inside fit_one: Of type "
-                        f"{type(error)} and message:{error}!! \nModel:"), model)
-            model.set_estimated({}, valid=False)
-
-        if self.estimation_settings["verbosity"] > 0:
-            print(f"model: {str(model.full_expr()):<70}; "
-                    + f"p: {model.p:<23}; "
-                    + f"error: {model.get_error()}")
-
-        return model
-
-    def fit_systemODE(self, system):
-
-        optimizer_library = {"differential_evolution": DE_fit, "hyperopt": hyperopt_fit, "minimize": min_fit}
-
-        system_size = len(system)
-        system_params = [item for sublist in system for item in sublist.params]
-
-        if self.estimation_settings["verbosity"] > 0:
-            print('Estimating system: ')
-            print([str(system[i].expr) for i in range(system_size)])
-        try:
-            optimizer = optimizer_library[self.estimation_settings['optimizer']]
-            res = optimizer(system, self.X, self.Y, self.T, p0=system_params, **self.estimation_settings)
-            # added by Nina, temporarly, until set_estimate gets fixed for systems of odes.
-            if res.success:
-                for i in range(len(system)):
-                    system[i].set_estimated(res)
-                    system[i].params = list(res["x"][param_split_indices[i][0]:param_split_indices[i][1]])
-                    system[i].valid = True
-            else:
-                print('Issue error! Optimization wasnt successful')
-
-            if self.estimation_settings["verbosity"] >= 3:
-                print(res, type(res["x"]), type(res["x"][0]))
-
-        except Exception as error:
-            if self.estimation_settings["verbosity"] >= 1:
-                print((f"Excepted an error inside fit_systemODE: Of type "
-                        f"{type(error)} and message:{error}!! \nModel:"), system)
-            [system[i].set_estimated({}, valid=False) for i in range(system_size)]
-
-        #if self.estimation_settings["verbosity"] > 0:
-        #    print(f"model: {str(system.get_full_expr()):<70}; "
-        #            + f"p: {system.p:<23}; "
-        #            + f"error: {system.get_error()}")
-
-        return system
-
-def fit_models (models, data, task_type="algebraic", time_index=None, pool_map=map,
-                estimation_settings={}):
-
-    """Performs parameter estimation on given models. Main interface to the module.
-
-    Supports parallelization by passing it a pooled map callable.
-
-    Arguments:
-        models (ModelBox): Instance of ModelBox, containing the models to be fitted.
-        data (numpy.array): Input data of shape N x M, where N is the number of samples
-            and M is the number of variables.
-        target_variable_index (int): Index of column in data that belongs to the target variable.
-        time_index (int): Index of column in data that belongs to measurement of time.
-                Required for differential equations, None otherwise.
-        pool_map (function): Map function for parallelization. Example use with 8 workers:
-                from multiprocessing import Pool
-                pool = Pool(8)
-                fit_models (models, data, -1, pool_map = pool.map)
-        verbosity (int): Level of printout desired. 0: none, 1: info, 2+: debug.
-        task_type (str): Type of equations, e.g. "algebraic" or "differential", that
-            equation discovery algorithm tries to discover.
-        estimation_settings (dict): Dictionary where majority of optional arguments is stored
-                and where additional optional arguments can be passed to lower level parts of
-                equation discovery.
-            arguments that can be passed via estimation_settings dictionary:
-                max_constants (int): Maximum number of free constants allowed. For the sake of computational
-                    efficiency, models exceeding this constraint are ignored. Default: 5.
-                timeout (float): Maximum time in seconds consumed for whole
-                    minimization optimization process, e.g. for differential evolution, that
-                    is performed for each model.
-                lower_upper_bounds (tuple[float]): Pair, i.e. tuple of lower and upper
-                    bound used to specify the boundaries of optimization, e.g. of
-                    differential evolution.
-                max_ode_steps (int): Maximum number of steps used in one run of LSODA solver.
-    """
-
-    objective_settings_preset = {
-        "atol": 10 ** (-6),
-        "rtol": 10 ** (-4),
-        "max_step": 10 ** 3}
-
-    optimizer_settings_preset = {
-        "lower_upper_bounds": (-10, 10),
-        "default_error": 10 ** 9,
-        "strategy": 'rand1bin',
-        "f": 0.45,
-        "cr": 0.88,
-        "max_iter": 1000,
-        "pop_size": 50,
-        "atol": 0.01,
-        "tol": 0.01
-    }
-
-    estimation_settings_preset = {
-        "target_variable_index": 1,
-        "max_constants": 5,
-        "optimizer": 'differential_evolution',
-        "optimizer_settings": optimizer_settings_preset,
-        "objective_settings": objective_settings_preset,
-        "default_error": 10 ** 9,
-        "timeout": np.inf,
-        "verbosity": 4,
-        "iter": 0,
-        }
-
-    estimation_settings_preset.update(estimation_settings)
-    estimation_settings = estimation_settings_preset
-    estimator = ParameterEstimator(data, task_type, time_index, estimation_settings)
-
-    fitted_models = list(pool_map(estimator.fit_one, models))
-    return fitted_models
-
-
-"""     fitted_models = list(pool_map(estimator.fit_one, models.values()))
-        fitted_models_dict = dict(zip(models.keys(), fitted_models))
-        return ModelBox(fitted_models_dict)"""
 
 
 

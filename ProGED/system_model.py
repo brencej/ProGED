@@ -56,7 +56,8 @@ class SystemModel:
         # list of variables that are (un)observed - used for partially-observed systems
         self.observed = observed
         # extra parameters, i.e. initial values for unobserved variables in partially-observed systems
-        self.initials = []
+        self.initials = [(np.random.random()-0.5)*10 for _ in range(len(sym_vars) - len(observed))]
+
 
     def set_estimated(self, result, valid=True):
         """Store results of parameter estimation and set validity of model according to input.
