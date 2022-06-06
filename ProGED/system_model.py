@@ -40,7 +40,7 @@ class SystemModel:
 
         self.p = 0
         self.info = info
-        
+
         """TODO: figure out better structure for trees"""
         self.trees = {} #trees has form {"code":[p,n]}"
         if "code" in info:
@@ -71,7 +71,8 @@ class SystemModel:
         self.estimated = result
         self.valid = valid
         if valid:
-            self.params = np.split(result["x"], np.cumsum(self.n_params))
+            #self.params = np.split(result["x"], np.cumsum(self.n_params))
+            self.set_params(result["x"], split=True)
 
     def get_error(self, dummy=10**8):
         """Return model error if the model is valid, or dummy if the model is not valid.
@@ -89,8 +90,7 @@ class SystemModel:
 
     def set_params(self, params, split=True):
         if split:
-            self.params = np.split(params, np.cumsum(self.n_params))
-            self.params.pop()
+            self.params = np.split(params, np.cumsum(self.n_params))[:-1]
             # self.params = list(filter(None, self.params))
         else:
             self.params=params
