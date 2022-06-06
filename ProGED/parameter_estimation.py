@@ -90,7 +90,7 @@ def model_error_general (params, model, X, Y, T, **estimation_settings):
                 f"\"{types_string}\".")
 
 
-def ode(models_list, params_matrix, T, X_data, y0, **estimation_settings):
+def ode(model, params, T, X_data, y0, **objective_settings):
     """Solve system of ODEs defined by equations in models_list.
 
     Raise error if input is incompatible.
@@ -110,17 +110,17 @@ def ode(models_list, params_matrix, T, X_data, y0, **estimation_settings):
     """
 
     # 1. Check input
-    if not (isinstance(models_list, list)
-            and isinstance(params_matrix, list)
-            and len(params_matrix) > 0
-            and isinstance(params_matrix[0], (list, np.ndarray))
+    if not (# isinstance(model, list)
+            # and isinstance(params, list)
+            len(params) > 0
+            # and isinstance(params[0], (list, np.ndarray))
             and X_data.ndim == 2
             and y0.ndim == 1):
-        message = str(type(params_matrix[0])) + "\n"
-        info = (isinstance(models_list, list),
-                isinstance(params_matrix, list),
-                len(params_matrix)>0,
-                isinstance(params_matrix[0], (list, np.ndarray)),
+        message = str(type(params[0])) + "\n"
+        info = (isinstance(model, list),
+                isinstance(params, list),
+                len(params)>0,
+                isinstance(params[0], (list, np.ndarray)),
                 X_data.ndim == 2)
         print(message, info)
         print("Function ode's defined error: Input arguments are not in the required form!")
@@ -138,10 +138,9 @@ def ode(models_list, params_matrix, T, X_data, y0, **estimation_settings):
                         + " does not match.")
 
     # 2. Simulate
-
     # Set min_step via prescribing maximum number of steps:
-    if "max_ode_steps" in estimation_settings:
-        max_steps = estimation_settings["max_ode_steps"]
+    if "max_steps" in objective_settings:
+        max_steps = objective_settings["max_steps"]
     else:
         # max_steps = 10**6  # On laptop, this would need less than 3 seconds.
         max_steps = T.shape[0] * 10 ** 3  # Set to |timepoints|*1000.
@@ -152,21 +151,21 @@ def ode(models_list, params_matrix, T, X_data, y0, **estimation_settings):
     min_step = max(min_step_from_max_steps, min_step_error)  # Force them both.
 
     # simulate
-    lamb_odes = [model.lambdify(*params) for model, params in zip(models_list, params_matrix)]
+    lamb_odes = models.lambdify(list=True)
 
     def lambdified_odes(t, x):
         x, y = x
         return [lamb_odes[i](x, y) for i in range(len(lamb_odes))]
 
     Yode = odeint(lambdified_odes, y0, T,
-                  rtol=estimation_settings['odeint_rtol'],
-                  atol=estimation_settings['odeint_atol'],
+                  rtol=objective_settings['rtol'],
+                  atol=objective_settings['atol'],
                   hmin=min_step,
                   tfirst=True)
 
     return Yode
 
-def model_ode_error(params, model_list, X, Y, T, estimation_settings):
+def model_ode_error(params, model, X, Y, T, estimation_settings):
     """Defines mean squared error of solution to differential equation
     as the error metric.
 
@@ -176,11 +175,10 @@ def model_ode_error(params, model_list, X, Y, T, estimation_settings):
         - Y are columns of features that are derived via ode fitting.
     """
 
-    # split the complete set of parameters in subsets for each equation based on the num of parameters each eq has
-    params_matrix = [list(params[s:e]) for s, e in estimation_settings['param_split_indices']]
-    #print('Iter ' + str(estimation_settings["iter"]))
+    model.set_params(params, split=True)
+    print('Iter ' + str(estimation_settings["iter"]))
     estimation_settings["iter"] += 1
-    #print(params_matrix)
+    print(params)
 
     try:
         # Next few lines strongly suppress any warnning messages
@@ -196,8 +194,7 @@ def model_ode_error(params, model_list, X, Y, T, estimation_settings):
             sys.stdout = std_output  # Change fake stdout to real stdout.
             change_std2tee = True  # Remember to change it back.
         def run_ode():
-            return ode(model_list, params_matrix, T, X, y0=X[0,:],
-                       **estimation_settings)  # Y[:1] if _ or Y[0] if |
+            return ode(model, params, T, X, y0=X[0, :], **estimation_settings["objective_settings"])
         # Next line works only when sys.stdout is real. Thats why above.
         if isinstance(sys.stdout, stdout_type):
             with open(os.devnull, 'w') as f, mt.stdout_redirected(f):
@@ -206,7 +203,7 @@ def model_ode_error(params, model_list, X, Y, T, estimation_settings):
                 except Exception as error:
                     if estimation_settings["verbosity"] >= 1:
                         print("Inside ode(), preventing tee/IO error. Params at error:",
-                            params_matrix, f"and {type(error)} with message:", error)
+                            params, f"and {type(error)} with message:", error)
         else:
             simX = run_ode()
         if change_std2tee:
@@ -214,7 +211,8 @@ def model_ode_error(params, model_list, X, Y, T, estimation_settings):
 
         try:
             res = np.mean((X-simX)**2)
-            if estimation_settings["verbosity"] >= 4:
+            print(res)
+            if estimation_settings["verbosity"] >= 2:
                 print("succesfully returning now inside model_ode_error")
             if np.isnan(res) or np.isinf(res) or not np.isreal(res):
             # #    print(model.expr, model.params, model.sym_params, model.sym_vars)
@@ -222,15 +220,15 @@ def model_ode_error(params, model_list, X, Y, T, estimation_settings):
             return res
 
         except Exception as error:
-            if estimation_settings["verbosity"] >= 1:
+            if estimation_settings["verbosity"] >= 2:
                 print("Error in ode() in mean(Y-odeY): Params at error:",
-                    params_matrix, f"and {type(error)} with message:", error)
+                    params, f"and {type(error)} with message:", error)
             return estimation_settings['default_error']
 
     except Exception as error:
         if estimation_settings["verbosity"] >= 1:
             print("Excepted an error inside ode() of model_ode_error.")
-            print("Params at error:", params_matrix,
+            print("Params at error:", params,
                     f"and {type(error)} with message:", error)
             print("Returning default error. All is well.")
         return estimation_settings['default_error']
@@ -387,7 +385,7 @@ def DE_fit (model, X, Y, T, p0, **estimation_settings):
     Exists to make passing arguments to the objective function easier."""
 
 
-    lu_bounds = estimation_settings["lower_upper_bounds"]
+    lu_bounds = estimation_settings['optimizer_settings']['lower_upper_bounds']
     lower_bound, upper_bound = lu_bounds[0]+1e-30, lu_bounds[1]+1e-30
     bounds = [[lower_bound, upper_bound] for i in range(len(p0))]
 
@@ -401,17 +399,19 @@ def DE_fit (model, X, Y, T, p0, **estimation_settings):
         else:
             return False
 
-    return differential_evolution(estimation_settings["objective_function"],
+    return differential_evolution(func=estimation_settings["objective_function"],
                                   bounds=bounds,
+                                  callback=diff_evol_timeout,
                                   args=[model, X, Y, T, estimation_settings],
-                                  maxiter=estimation_settings["DE_max_iter"],
-                                  strategy=estimation_settings["DE_strategy"],
-                                  popsize=estimation_settings["DE_pop_size"],
-                                  mutation=(estimation_settings["DE_f"], 1),
-                                  recombination=estimation_settings["DE_cr"],
-                                  tol=estimation_settings["DE_tol"],
-                                  atol=estimation_settings["DE_atol"],
-                                  callback=diff_evol_timeout)
+                                  maxiter=estimation_settings["optimizer_settings"]["max_iter"],
+                                  strategy=estimation_settings["optimizer_settings"]["strategy"],
+                                  popsize=estimation_settings["optimizer_settings"]["pop_size"],
+                                  mutation=(estimation_settings["optimizer_settings"]["f"], 1),
+                                  recombination=estimation_settings["optimizer_settings"]["cr"],
+                           #       tol=estimation_settings["optimizer_settings"]["tol"],
+                          #        atol=estimation_settings["optimizer_settings"]["atol"])
+                                  )
+
 
 def min_fit (model, X, Y):
     """Calls scipy.optimize.minimize. Exists to make passing arguments to the objective function easier."""
@@ -429,9 +429,8 @@ class ParameterEstimator:
             estimation_settings: Dictionary with multiple parameters
                 that determine estimation process more specifically.
     """
-    def __init__(self, data, time_index, estimation_settings):
+    def __init__(self, data, task_type, time_index, estimation_settings):
 
-        task_type = estimation_settings["task_type"]
         var_mask = np.ones(data.shape[-1], bool)
 
         if task_type == "differential":
@@ -476,7 +475,8 @@ class ParameterEstimator:
                     [], model, self.X, self.Y, self.T, **self.estimation_settings)})
             else:
                 optimizer = optimizer_library[self.estimation_settings['optimizer']]
-                res = optimizer(model, self.X, self.Y, self.T, p0=model.params, **self.estimation_settings)
+                model_params = [item for sublist in model.params for item in sublist]
+                res = optimizer(model, self.X, self.Y, self.T, p0=model_params, **self.estimation_settings)
                 model.set_estimated(res)
                 if self.estimation_settings["verbosity"] >= 3:
                     print(res, type(res["x"]), type(res["x"][0]))
@@ -488,7 +488,7 @@ class ParameterEstimator:
             model.set_estimated({}, valid=False)
 
         if self.estimation_settings["verbosity"] > 0:
-            print(f"model: {str(model.get_full_expr()):<70}; "
+            print(f"model: {str(model.full_expr()):<70}; "
                     + f"p: {model.p:<23}; "
                     + f"error: {model.get_error()}")
 
@@ -496,19 +496,8 @@ class ParameterEstimator:
 
     def fit_systemODE(self, system):
 
-        # next 10 lines added by nina
-        # split the complete set of parameters in subsets for each equation based on the num of paramaters each eq has
-        param_split_indices = []
-        for ii in range(len(system)):
-            numParams = len(system[ii].sym_params)
-            if ii == 0:
-                param_split_indices.append((0, numParams))
-            else:
-                param_split_indices.append((param_split_indices[-1][1], param_split_indices[-1][1] + numParams))
-
-        self.estimation_settings['param_split_indices'] = param_split_indices
-
         optimizer_library = {"differential_evolution": DE_fit, "hyperopt": hyperopt_fit, "minimize": min_fit}
+
         system_size = len(system)
         system_params = [item for sublist in system for item in sublist.params]
 
@@ -543,8 +532,8 @@ class ParameterEstimator:
 
         return system
 
-def fit_models (models, data, time_index=None, pool_map=map, verbosity=0,
-                task_type="algebraic", estimation_settings={}):
+def fit_models (models, data, task_type="algebraic", time_index=None, pool_map=map,
+                estimation_settings={}):
 
     """Performs parameter estimation on given models. Main interface to the module.
 
@@ -578,38 +567,47 @@ def fit_models (models, data, time_index=None, pool_map=map, verbosity=0,
                     differential evolution.
                 max_ode_steps (int): Maximum number of steps used in one run of LSODA solver.
     """
+
+    objective_settings_preset = {
+        "atol": 10 ** (-6),
+        "rtol": 10 ** (-4),
+        "max_step": 10 ** 3}
+
+    optimizer_settings_preset = {
+        "lower_upper_bounds": (-10, 10),
+        "default_error": 10 ** 9,
+        "strategy": 'rand1bin',
+        "f": 0.45,
+        "cr": 0.88,
+        "max_iter": 1000,
+        "pop_size": 50,
+        "atol": 0.01,
+        "tol": 0.01
+    }
+
     estimation_settings_preset = {
-        "task_type": task_type,
         "target_variable_index": 1,
-        "timeout": np.inf,
         "max_constants": 5,
-        "lower_upper_bounds": (-30, 30),
-        "default_error": 10**9,
         "optimizer": 'differential_evolution',
-        "DE_f": 0.45,
-        "DE_cr": 0.88,
-        "DE_max_iter": 1000,
-        "DE_pop_size": 100,
-        "DE_atol": 0.01,
-        "DE_tol": 0.01,
-        "DE_strategy": 'rand1bin',
-        "odeint_atol": 10 ** (-6),
-        "odeint_rtol": 10 ** (-4),
-        "odeint_max_step": 10 ** 3,
-        "param_split_indices": [],
-        "verbosity": verbosity,
+        "optimizer_settings": optimizer_settings_preset,
+        "objective_settings": objective_settings_preset,
+        "default_error": 10 ** 9,
+        "timeout": np.inf,
+        "verbosity": 4,
+        "iter": 0,
         }
+
     estimation_settings_preset.update(estimation_settings)
     estimation_settings = estimation_settings_preset
-    estimator = ParameterEstimator(data, time_index, estimation_settings)
+    estimator = ParameterEstimator(data, task_type, time_index, estimation_settings)
 
-    if estimation_settings["task_type"] == 'differential':
-        fitted_models = list(pool_map(estimator.fit_systemODE, models))
-        return fitted_models
-    else:
-        fitted_models = list(pool_map(estimator.fit_one, models.values()))
+    fitted_models = list(pool_map(estimator.fit_one, models))
+    return fitted_models
+
+
+"""     fitted_models = list(pool_map(estimator.fit_one, models.values()))
         fitted_models_dict = dict(zip(models.keys(), fitted_models))
-        return ModelBox(fitted_models_dict)
+        return ModelBox(fitted_models_dict)"""
 
 
 

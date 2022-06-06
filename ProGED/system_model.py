@@ -90,6 +90,8 @@ class SystemModel:
     def set_params(self, params, split=True):
         if split:
             self.params = np.split(params, np.cumsum(self.n_params))
+            self.params.pop()
+            # self.params = list(filter(None, self.params))
         else:
             self.params=params
 
