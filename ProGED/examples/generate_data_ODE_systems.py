@@ -1,10 +1,7 @@
 import os
-import sys
 import numpy as np
 import pandas as pd
 import math
-#import matplotlib; #mtplotlib.use('Qt5Agg')
-import matplotlib.pyplot as plt;
 from scipy.integrate import solve_ivp
 
 import warnings
@@ -36,6 +33,8 @@ def lorenz(t, x, sigma=10, beta=2.66667, rho=28):
 
 # main function
 def generate_ODE_data(system, inits, **generation_settings):
+    if isinstance(system, str):
+        system = eval(system)
 
     generation_settings_preset = {
         "initial_time": 0,            # initial time
