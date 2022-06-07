@@ -29,9 +29,12 @@ class Estimation:
         optimizer_settings = {
             "f": hyperparams[0],
             "cr": hyperparams[1],
-            "pop_size": hyperparams[2],
-            "max_iter": hyperparams[3],
-            "lower_upper_bounds": (-10, 10),
+            # "pop_size": hyperparams[2],
+            "pop_size": 5,
+            # "max_iter": hyperparams[3],
+            "max_iter": 10,
+            # "lower_upper_bounds": (-10, 10),
+            "lower_upper_bounds": (-1, 1),
             "atol": 0.01,
             "tol": 0.01
         }

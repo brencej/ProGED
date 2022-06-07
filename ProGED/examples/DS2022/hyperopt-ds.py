@@ -4,33 +4,6 @@ from hyperopt import hp, fmin, rand, pyll, Trials
 import hyperopt.pyll.stochastic
 from ProGED.examples.DS2022.hyperopt_obj import Estimation
 
-# verbosity = estimation_settings["verbosity"]
-# lu_bounds = estimation_settings["lower_upper_bounds"]
-# lower_bound, upper_bound = lu_bounds[0] + 1e-30, lu_bounds[1] + 1e-30
-#
-# space_fn = estimation_settings.get("hyperopt_space_fn", hp.uniform)
-# if space_fn not in {hp.randint, hp.uniform, hp.loguniform}:
-#     # if verbosity >= 1:
-#         print(
-#             f"hyperopt_fit's warnings: "
-#             f"Input estimation_settings[\"hyperopt_space_fn\"]={space_fn} "
-#             f"should be used carefully, since it is not recognized as the"
-#             f" member of the default configuration of the form"
-#             f" space_fn('label', low, high).\n"
-#             f"Therefore make sure the function is compatible with search"
-#             f" space arguments ( hyperopt_space_(kw)args ).\n"
-#             f"In doubt use one of:\n  - hp.randint\n  - hp.uniform\n"
-#             f"  - hp.loguniform")
-#
-# # User can specify one dimensional search space, which is then replicated.
-# args = estimation_settings.get("hyperopt_space_args", ())
-# kwargs = estimation_settings.get("hyperopt_space_kwargs", {})
-# if args != () or kwargs != {}:
-#     space = [space_fn('C' + str(i), *args, **kwargs) for i in range(len(p0))]
-# else:
-#     space = [space_fn('C' + str(i), lower_bound, upper_bound) for i in range(len(p0))]
-
-
 # hyperparameters:
 # - recombination (cr) [0, 1] or [0.5, 1]
 # - mutation (f) [0, 2]
@@ -38,44 +11,34 @@ from ProGED.examples.DS2022.hyperopt_obj import Estimation
 # - maxiter [100, 15000]
 space = [hp.uniform('hp_f', 0, 1),
          hp.uniform('hp_cr', 0, 2),
-         hp.randint('hp_pop_size', 50, 300),
-         hp.randint('hp_max_iter', 100, 15000)
+         # hp.quniform('hp_pop_size', 2, 3, 25),
+         hp.quniform('hp_pop_size', 50, 300, 25),
+         # hp.quniform('hp_max_iter', 4, 5)
+         hp.qloguniform('hp_max_iter', np.log(100), np.log(15000), 100)
          ]
-#          "f": hyperparams[0],
-#               "cr": hyperparams[1],
-# "pop_size": hyperparams[2],
-# "max_iter": hyperparams[3],
 
 est = Estimation("lorenz")
 print(est.models)
 
-# res, t = est.fit([0.5, 0.9, 3, 2])
-# print(res, t)
+expr = est.models[0].full_expr()
 
 
 def objective(params):
-    # First way for solution:
-    # params = [float(i) for i in params]  # Use float instead of np.int32.
-    # return estimation_settings["objective_function"](
-    #     params, model, X, Y, T, estimation_settings)
+    print('\nMy params: ', params, '\n')
     res, t = est.fit(params)
     return res
 
 # Use user's hyperopt specifications or use the default ones:
 algo = rand.suggest
-max_evals = 50
-timeout = 100
+max_evals = 1000000000000000000
+timeout = 1*60*60
+# timeout = 130
+# max_evals = 1
+# timeout = 1
+
+print('whoami')
 
 
-# if verbosity >= 3:
-#     print(f"Hyperopt will run with specs:\n"
-#           f"  - search space:\n" + "".join([str(i) + "\n" for i in space])
-#           # + f"  - algorithm: {algo}\n"
-#           + f"  - timeout: {timeout}\n  - max_evals: {max_evals}")
-#     print("A few points generated from the space specified:")
-#     for i in range(10):
-#         print(hyperopt.pyll.stochastic.sample(space))
-#
 trials = Trials()
 best = fmin(
     fn=objective,
@@ -87,9 +50,30 @@ best = fmin(
     rstate=np.random,
     verbose=True,
 )
+
 params = list(best.values())
 result = {"x": params, "fun": min(trials.losses())}
-# if verbosity >= 3:
-#     print(result)
-# return result
 print(result)
+
+
+#
+#
+# [ 0.1638615  -0.80748112  0.06462776]
+# 175.87690633927954
+#   0%|          | 5/1000000000000000000 [02:36<8713837054040697:44:32, 31.37s/trial, best loss: 166.99465453229976]
+# {'x': [1.5000006944654507, 0.35669813748640533], 'fun': 166.99465453229976}
+
+#
+# [ 0.1638615  -0.80748112  0.06462776]
+# 175.87690633927954
+#   0%|          | 5/1000000000000000000 [02:36<8713837054040697:44:32, 31.37s/trial, best loss: 166.99465453229976]
+# {'x': [1.5000006944654507, 0.35669813748640533], 'fun': 166.99465453229976}
+
+
+# Iter 176
+# [0.31572701 0.80446935 0.00874652]
+# 243.52571666994555
+#   0%|          | 19/1000000000000000000 [10:10<8921890056621261:56:16, 32.12s/trial, best loss: 166.13451348103706]
+# {'x': [1.1320020705987923, 0.23067128499491618], 'fun': 166.13451348103706}
+
+
