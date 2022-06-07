@@ -140,6 +140,9 @@ class Model:
             return self.estimated["fun"]
         else:
             return dummy
+
+    def get_all_params(self):
+        return self.params
         
     def set_params(self, params):
         self.params=params
