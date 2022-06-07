@@ -1,6 +1,7 @@
 import numpy as np
 import ProGED as pg
 from ProGED.examples.generate_data_ODE_systems import generate_ODE_data, lorenz, VDP
+import time
 
 
 class Estimation:
@@ -42,18 +43,20 @@ class Estimation:
         }
 
         try:
+            time0 = time.time()
             models_fit = pg.fit_models(self.models, self.data, task_type='differential', time_index=0,
                             estimation_settings=estimation_settings)
+            time1 = time.time()
         except Exception as e:
             print("Error in ", str(hyperparams))
             print(e)
-            return 1e9
+            return 1e9, 0
         
-        return models_fit[0].get_error()
+        return models_fit[0].get_error(), time1-time0
 
 if __name__ == "__main__":
     est = Estimation("lorenz")
     print(est.models)
 
-    res = est.fit([0.5, 0.9, 3, 2])
-    print(res)
+    res, t = est.fit([0.5, 0.9, 3, 2])
+    print(res, t)
