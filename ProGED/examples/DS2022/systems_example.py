@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.integrate import odeint
 import ProGED as pg
-from ProGED.examples.ds2022.generate_data_ODE_systems import generate_ODE_data
+from ProGED.examples.ds2022 import generate_ODE_data
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
