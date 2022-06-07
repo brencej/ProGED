@@ -1,10 +1,8 @@
 import numpy as np
-import sympy as sp
 from scipy.integrate import odeint
 import ProGED as pg
-from ProGED.examples.generate_data_ODE_systems import generate_ODE_data
+from ProGED.examples.ds2022.generate_data_ODE_systems import generate_ODE_data
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 if __name__ == "__main__":
 
