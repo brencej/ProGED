@@ -58,6 +58,7 @@ if __name__ == "__main__":
                            "observed": ["x", "y"],
                            "optimizer_settings": optimizer_settings}
 
+
     # 3.3 define fully observed system
     ex1 = "C*y"
     ex2 = "C*y - C*x*x*y - C*x"
@@ -73,20 +74,20 @@ if __name__ == "__main__":
     models_out_partial = pg.fit_models(system, data[:, (0, 2)], task_type='differential', time_index=0, estimation_settings=estimation_settings)
 
     # 3.5 with grammar
-    # models_out2 = pg.fit_models(models, data, task_type='differential', time_index=0, estimation_settings=estimation_settings)
+    models_out2 = pg.fit_models(models, data, task_type='differential', time_index=0, estimation_settings=estimation_settings)
 
-    ######################################## 4. Lorenz ############################################
+    ######################################## Part 4. Lorenz ############################################
 
-    # 5.1 get data
+    # 4.1 get data
     inits = [0, 1, 1.05]
     data = generate_ODE_data(system='lorenz', inits=inits)
 
-    # 5.2 create fully observed lorenz model
-    """
+    # 4.2 create fully observed lorenz model
+
     ex1 = "C*y + C*x"
     ex2 = "C*x + C*x*z + C*y"
     ex3 = "C*x*y + C*z" 
-    """
+
 
     ex1 = "C*(y-x)"
     ex2 = "x*(C-z)-y"
@@ -98,7 +99,7 @@ if __name__ == "__main__":
     models_out = pg.fit_models(system, data, task_type='differential', time_index=0,
                                estimation_settings=estimation_settings)
 
-    # 5.4 create partially observed model (no grammar)
+    # 4.4 create partially observed model (no grammar)
     ex1 = "C*(y-x)"
     ex2 = "x*(C-z)-y"
     ex3 = "x*y - C*z"
@@ -108,8 +109,9 @@ if __name__ == "__main__":
     models_out = pg.fit_models(system, data[:,(0, 3)], task_type='differential', time_index=0, estimation_settings=estimation_settings)
 
 
-    # 5.5: lorenz: check if the simulation works by inputing correct parameters
+    # 4.5: lorenz: check if the simulation works by inputing correct parameters
     system[0].params = [[-10., 10.], [-1., 28., -1.], [1., -2.667]]
+    system[0].params = [[10.], [ 28.], [-2.667]]
     lamb_odes = system[0].lambdify(list=True)
 
     def lambdified_odes(t, x):
