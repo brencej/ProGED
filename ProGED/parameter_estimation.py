@@ -55,7 +55,7 @@ class ParameterEstimator:
     """
     def __init__(self, data, task_type, time_index, estimation_settings):
 
-        # 1. task-dependent settings
+        # task-dependent settings
         var_mask = np.ones(data.shape[-1], bool)
 
         if task_type == "differential":
@@ -84,9 +84,6 @@ class ParameterEstimator:
                 model_error(np.round(params), model, X, Y, _T=None,
                             estimation_settings=estimation_settings))
 
-        # 2. observability settings
-        print("here")
-        # 3. embed all settings into self
         self.estimation_settings = estimation_settings
 
 
@@ -104,7 +101,6 @@ class ParameterEstimator:
             else:
                 optimizer = optimizer_library[self.estimation_settings['optimizer']]
                 model_params = model.get_all_params()
-                #model_params = [item for sublist in model.params for item in sublist]
                 res = optimizer(model, self.X, self.Y, self.T, p0=model_params, **self.estimation_settings)
                 model.set_estimated(res)
                 if self.estimation_settings["verbosity"] >= 3:
@@ -165,8 +161,6 @@ def fit_models (models, data, task_type="algebraic", time_index=None, pool_map=m
         "rtol": 10 ** (-4),
         "max_step": 10 ** 3}
 
-
-
     optimizer_settings_preset = {
         "lower_upper_bounds": (-10, 10),
         "default_error": 10 ** 9,
@@ -188,7 +182,7 @@ def fit_models (models, data, task_type="algebraic", time_index=None, pool_map=m
         "objective_settings": objective_settings_preset,
         "default_error": 10 ** 9,
         "timeout": np.inf,
-        "verbosity": 4,
+        "verbosity": 1,
         "iter": 0,
         }
 
@@ -202,17 +196,13 @@ def fit_models (models, data, task_type="algebraic", time_index=None, pool_map=m
         estimation_settings_preset["optimizer_settings"] = dict(optimizer_settings_preset)
 
     estimation_settings = dict(estimation_settings_preset)
-
-    print(estimation_settings)
     estimator = ParameterEstimator(data, task_type, time_index, estimation_settings)
+    return ModelBox(dict(zip(models.keys(), list(pool_map(estimator.fit_one, models.values())))))
 
-    fitted_models = list(pool_map(estimator.fit_one, models))
-    return fitted_models
 
 def DE_fit (model, X, Y, T, p0, **estimation_settings):
     """Calls scipy.optimize.differential_evolution.
     Exists to make passing arguments to the objective function easier."""
-
 
     lu_bounds = estimation_settings['optimizer_settings']['lower_upper_bounds']
     lower_bound, upper_bound = lu_bounds[0]+1e-30, lu_bounds[1]+1e-30
@@ -239,56 +229,6 @@ def DE_fit (model, X, Y, T, p0, **estimation_settings):
                                   recombination=estimation_settings["optimizer_settings"]["cr"],
                                   tol=estimation_settings["optimizer_settings"]["tol"],
                                   atol=estimation_settings["optimizer_settings"]["atol"])
-
-
-def model_error (params, model, X, Y, _T=None, estimation_settings=None):
-    """Defines mean squared error as the error metric."""
-    try:
-        verbosity = estimation_settings['verbosity']
-
-        testY = model.evaluate(X, *params)
-        res = np.mean((Y-testY)**2)
-        if np.isnan(res) or np.isinf(res) or not np.isreal(res):
-            if verbosity >= 3:
-                print("isnan, isinf, isreal =", np.isnan(res),
-                        np.isinf(res), not np.isreal(res))
-                print(model.expr, model.params, model.sym_params, model.sym_vars)
-            return estimation_settings['default_error']
-        if verbosity >= 3:
-            print("Function model_error did not encounter any "
-                "errors, the output *square error/loss* is legit.")
-        return res
-    except Exception as error:
-        if verbosity >= 2:
-            print("model_error: Params at error:", params,
-                  f"and {type(error)} with message:", error)
-        if verbosity >= 1:
-            print(f"Program is returning default_error:"
-                    f"{estimation_settings['default_error']}")
-        return estimation_settings['default_error']
-
-
-def model_error_general (params, model, X, Y, T, **estimation_settings):
-    """Calculate error of model with given parameters in general with
-    type of error given.
-        Input = TODO:
-    - X are columns without features that are derived.
-    - Y are columns of features that are derived via ode fitting.
-    - T is column of times at which samples in X and Y happen.
-    - estimation_settings: look description of fit_models()
-    """
-    task_type = estimation_settings["task_type"]
-    if task_type in ("algebraic", "integer-algebraic"):
-        return model_error(params, model, X, Y, _T=None,
-                            estimation_settings=estimation_settings)
-    elif task_type == "differential":
-        return model_ode_error(params, model, X, Y, T, estimation_settings)
-    else:
-        types_string = "\", \"".join(TASK_TYPES)
-        raise ValueError("Variable task_type has unsupported value "
-                f"\"{task_type}\", while list of possible values: "
-                f"\"{types_string}\".")
-
 
 def model_ode_error(params, model, X, Y, T, estimation_settings):
     """Defines mean squared error of solution to differential equation
@@ -420,28 +360,78 @@ def ode(model, params, T, X_data, y0, **objective_settings):
     min_step = max(min_step_from_max_steps, min_step_error)  # Force them both.
 
     # simulate
-    if model.observed:
-        obs_idx = [model.sym_vars.index(model.observed[i]) for i in range(len(model.observed))]
-        hid_idx = np.full(len(model.sym_vars), True, dtype=bool)
-        hid_idx[obs_idx] = False
-        inits = np.empty(len(model.sym_vars))
-        inits[obs_idx] = y0
-        inits[hid_idx] = model.initials
-    else:
-        inits = y0
 
-    lamb_odes = model.lambdify(list=True)
+    # set initial value
+    obs_idx = [model.sym_vars.index(model.observed[i]) for i in range(len(model.observed))]
+    hid_idx = np.full(len(model.sym_vars), True, dtype=bool)
+    hid_idx[obs_idx] = False
+    inits = np.empty(len(model.sym_vars))
+    inits[obs_idx] = y0
+    inits[hid_idx] = model.initials
 
-    def lambdified_odes(t, x):
-        return [lamb_odes[i](*x) for i in range(len(lamb_odes))]
+    # create a list of system functions from system model
+    model_func = model.lambdify(list=True)
 
-    Yode = odeint(lambdified_odes, inits, T,
+    def func_to_simulate(t, x):
+        return [model_func[i](*x) for i in range(len(model_func))]
+
+    sol = odeint(func_to_simulate, inits, T,
                   rtol=objective_settings['rtol'],
                   atol=objective_settings['atol'],
                   hmin=min_step,
                   tfirst=True)
 
-    return Yode
+    return sol
+
+
+def model_error (params, model, X, Y, _T=None, estimation_settings=None):
+    """Defines mean squared error as the error metric."""
+    try:
+        verbosity = estimation_settings['verbosity']
+
+        testY = model.evaluate(X, *params)
+        res = np.mean((Y-testY)**2)
+        if np.isnan(res) or np.isinf(res) or not np.isreal(res):
+            if verbosity >= 3:
+                print("isnan, isinf, isreal =", np.isnan(res),
+                        np.isinf(res), not np.isreal(res))
+                print(model.expr, model.params, model.sym_params, model.sym_vars)
+            return estimation_settings['default_error']
+        if verbosity >= 3:
+            print("Function model_error did not encounter any "
+                "errors, the output *square error/loss* is legit.")
+        return res
+    except Exception as error:
+        if verbosity >= 2:
+            print("model_error: Params at error:", params,
+                  f"and {type(error)} with message:", error)
+        if verbosity >= 1:
+            print(f"Program is returning default_error:"
+                    f"{estimation_settings['default_error']}")
+        return estimation_settings['default_error']
+
+
+def model_error_general (params, model, X, Y, T, **estimation_settings):
+    """Calculate error of model with given parameters in general with
+    type of error given.
+        Input = TODO:
+    - X are columns without features that are derived.
+    - Y are columns of features that are derived via ode fitting.
+    - T is column of times at which samples in X and Y happen.
+    - estimation_settings: look description of fit_models()
+    """
+    task_type = estimation_settings["task_type"]
+    if task_type in ("algebraic", "integer-algebraic"):
+        return model_error(params, model, X, Y, _T=None,
+                            estimation_settings=estimation_settings)
+    elif task_type == "differential":
+        return model_ode_error(params, model, X, Y, T, estimation_settings)
+    else:
+        types_string = "\", \"".join(TASK_TYPES)
+        raise ValueError("Variable task_type has unsupported value "
+                f"\"{task_type}\", while list of possible values: "
+                f"\"{types_string}\".")
+
 
 
 def min_fit (model, X, Y):
