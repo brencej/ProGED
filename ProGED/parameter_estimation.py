@@ -159,7 +159,8 @@ def fit_models (models, data, task_type="algebraic", time_index=None, pool_map=m
     objective_settings_preset = {
         "atol": 10 ** (-6),
         "rtol": 10 ** (-4),
-        "max_step": 10 ** 3}
+        "max_step": 10 ** 3,
+        "simulate_separately": False}
 
     optimizer_settings_preset = {
         "lower_upper_bounds": (-10, 10),
@@ -370,15 +371,20 @@ def ode(model, params, T, X_data, y0, **objective_settings):
     inits[hid_idx] = model.initials
 
     # create a list of system functions from system model
-    model_func = model.lambdify(list=True)
-
-    def func_to_simulate(t, x):
-        return [model_func[i](*x) for i in range(len(model_func))]
+    if objective_settings["simulate_separately"]:
+        model_func = model.lambdify()
+        def func_to_simulate(t, y):
+            b = np.concatenate((y, X_data))
+            return model_func(*b)
+    else:
+        model_func = model.lambdify(list=True)
+        def func_to_simulate(t, x):
+            return [model_func[i](*x) for i in range(len(model_func))]
 
     sol = odeint(func_to_simulate, inits, T,
                   rtol=objective_settings['rtol'],
                   atol=objective_settings['atol'],
-                  hmin=min_step,
+                  #hmin=min_step,
                   tfirst=True)
 
     return sol
