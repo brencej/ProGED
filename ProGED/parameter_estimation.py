@@ -162,6 +162,7 @@ def fit_models (models, data, task_type="algebraic", time_index=None, pool_map=m
         "atol": 10 ** (-6),
         "rtol": 10 ** (-4),
         "max_step": 10 ** 3,
+        "use_jacobian": True,
         "simulate_separately": False}
 
     optimizer_settings_preset = {
@@ -369,7 +370,11 @@ def ode(model, params, T, X_data, Y, y0, **objective_settings):
     min_step = max(min_step_from_max_steps, min_step_error)  # Force them both.
 
     # simulate
-
+    Jf = None
+    if objective_settings["use_jacobian"]:
+        J = model.lambdify_jacobian()
+        def Jf(t, x):
+            return J(*x)
     # create a list of system functions from system model
 
     if objective_settings["simulate_separately"]:
@@ -397,6 +402,7 @@ def ode(model, params, T, X_data, Y, y0, **objective_settings):
     sol = odeint(func_to_simulate, inits, T,
                 rtol=objective_settings['rtol'],
                 atol=objective_settings['atol'],
+                Dfun = Jf,
                 #hmin=min_step,
                 tfirst=True)
 

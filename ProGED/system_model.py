@@ -145,7 +145,16 @@ class SystemModel:
                 
         return fullexprs
 
-    def lambdify (self, params=None, list=False, arg="numpy"):
+    def get_jacobian(self):
+        return sp.Matrix(self.full_expr()).jacobian(self.sym_vars)
+    
+    def lambdify_jacobian(self):
+        J = self.get_jacobian()
+        Jf = sp.lambdify(self.sym_vars, J)
+        #return lambda x: Jf(*x.T)
+        return Jf
+
+    def lambdify (self, params=None, list=False, matrix_input = True, arg="numpy"):
         """Produce a callable function from the symbolic expression and the parameter values.
         
         This function is required for the evaluate function. It relies on sympy.lambdify, which in turn 
@@ -163,11 +172,15 @@ class SystemModel:
         if not params:
             params = self.params
         fullexprs = self.full_expr(params)
-        lambdas = [sp.lambdify(self.sym_vars, full_expr, arg) for full_expr in fullexprs]
-        if list:
-            return lambdas
+        if matrix_input:
+            lambdas = [sp.lambdify(self.sym_vars, full_expr, arg) for full_expr in fullexprs]
+            if list:
+                return lambdas
+            else:
+                return lambda x: np.transpose([lam(*x.T) for lam in lambdas])
         else:
-            return lambda x: np.transpose([lam(*x.T) for lam in lambdas])
+            system = sp.Matrix(fullexprs)
+            return sp.lambdify((sp.symbols("t"), self.sym_vars), system)
 
 
     def __str__(self):
