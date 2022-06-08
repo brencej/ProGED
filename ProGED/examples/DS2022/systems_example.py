@@ -1,7 +1,8 @@
+import matplotlib; matplotlib.use('Qt5Agg')
 import numpy as np
 from scipy.integrate import odeint
 import ProGED as pg
-from ProGED.examples.ds2022 import generate_ODE_data
+from ProGED.examples.DS2022.generate_data_ODE_systems import generate_ODE_data
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
@@ -112,6 +113,7 @@ if __name__ == "__main__":
     # 4.5: lorenz: check if the simulation works by inputing correct parameters
     system[0].params = [[-10., 10.], [-1., 28., -1.], [1., -2.667]]
     system[0].params = [[10.], [ 28.], [-2.667]]
+    system[0].params = [[0.99999991], [-0.47618066], [0.07107935]]
     lamb_odes = system[0].lambdify(list=True)
 
     def lambdified_odes(t, x):
@@ -123,6 +125,8 @@ if __name__ == "__main__":
                   tfirst=True)
 
     # plot the solution
+    rmse = np.mean((data[:, 1:] - sol) ** 2)
+
     WIDTH, HEIGHT, DPI = 1000, 750, 100
     fig = plt.figure(facecolor='k', figsize=(WIDTH / DPI, HEIGHT / DPI))
     ax = fig.gca(projection='3d')
@@ -130,10 +134,22 @@ if __name__ == "__main__":
     fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
 
     s = 10
-    cmap = plt.cm.winter
     for i in range(0, len(data)):
-        ax.plot(sol[:, 0][i:i + s + 1], sol[:, 1][i:i + s + 1], sol[:, 2][i:i + s + 1], color=cmap(i / len(data)), alpha=0.4)
+        ax.plot(sol[:, 0][i:i + s + 1], sol[:, 1][i:i + s + 1], sol[:, 2][i:i + s + 1], color='red', alpha=0.4)
+        ax.plot(data[:, 1][i:i + s + 1], data[:, 2][i:i + s + 1], data[:, 3][i:i + s + 1], color='blue', alpha=0.4)
 
     ax.set_axis_off()
     plt.show()
 
+    fig, ax = plt.subplots(3)
+    ax[0].plot(data[:, 0], data[:, 1], color='blue')
+    ax[0].plot(data[:, 0], sol[:, 0], color='red')
+    ax[0].set(xlabel='time', ylabel='X')
+    ax[1].plot(data[:, 0], data[:, 2], color='blue')
+    ax[1].plot(data[:, 0], sol[:, 1], color='red')
+    ax[1].set(xlabel='time', ylabel='Y')
+    ax[2].plot(data[:, 0], data[:, 3], color='blue')
+    ax[2].plot(data[:, 0], sol[:, 2], color='red')
+    ax[2].set(xlabel='time', ylabel='Z')
+    plt.suptitle("Best possible reconstruction; RMSE = " + str(rmse))
+    plt.show()

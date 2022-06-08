@@ -8,3 +8,4 @@ ProGED.egg-info/
 .*
 /data/*
 /proged_singularity.sif
+/venv/*
