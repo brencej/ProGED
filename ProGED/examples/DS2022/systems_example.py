@@ -113,7 +113,7 @@ if __name__ == "__main__":
     # 4.5: lorenz: check if the simulation works by inputing correct parameters
     system[0].params = [[-10., 10.], [-1., 28., -1.], [1., -2.667]]
     system[0].params = [[10.], [ 28.], [-2.667]]
-    system[0].params = [[0.99999991], [-0.47618066], [0.07107935]]
+    system[0].params = [[1.27491074699593], [23.0613472453172], [-0.450466692334018]]
     lamb_odes = system[0].lambdify(list=True)
 
     def lambdified_odes(t, x):

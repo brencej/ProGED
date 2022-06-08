@@ -3,12 +3,12 @@ import os
 import pickle
 import ProGED as pg
 from ProGED.examples.DS2022.generate_data_ODE_systems import generate_ODE_data
-sys.path.append(os.getcwd()+"/source")
+# sys.path.append(os.getcwd()+"/source")
 
 if __name__ == '__main__':
 
-    batch_idx = sys.argv[1]
-    #batch_idx = '1'
+    #batch_idx = sys.argv[1]
+    batch_idx = '1'
     job_version = '1'
     system = 'VDP'
     inits = [-0.2, -0.8]
@@ -48,6 +48,6 @@ if __name__ == '__main__':
                                estimation_settings=estimation_settings)
 
     print("--Exporting results")
-    pathOut = os.path.join("results", "{}".format(system), "v{}".format(job_version))
-    with open(pathOut + os.sep + models_file.split(".")[0] + "_fit.pg", "wb") as file:
+    with open(models_path + os.sep + models_file.split(".")[0] + "_fit.pg", "wb") as file:
         pickle.dump(models, file)
+
