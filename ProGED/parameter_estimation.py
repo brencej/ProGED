@@ -61,9 +61,11 @@ class ParameterEstimator:
         if task_type == "differential":
             var_mask[time_index] = False
             self.X = data[:, var_mask]
-            self.Y = None
             self.T = data[:, time_index]
+            self.Y = None
             estimation_settings["objective_function"] = model_ode_error
+            if estimation_settings["objective_settings"]["simulate_separately"]:
+                self.Y = data[:, estimation_settings["target_variable_index"]]
 
         elif task_type == "algebraic" or task_type == "integer-algebraic":
             target_index = estimation_settings["target_variable_index"]
@@ -103,7 +105,7 @@ class ParameterEstimator:
                 model_params = model.get_all_params()
                 res = optimizer(model, self.X, self.Y, self.T, p0=model_params, **self.estimation_settings)
                 model.set_estimated(res)
-                if self.estimation_settings["verbosity"] >= 3:
+                if self.estimation_settings["verbosity"] >= 2:
                     print(res, type(res["x"]), type(res["x"][0]))
 
         except Exception as error:
@@ -242,9 +244,10 @@ def model_ode_error(params, model, X, Y, T, estimation_settings):
     """
 
     model.set_params(params, split=True)
-    print('Iter ' + str(estimation_settings["iter"]))
     estimation_settings["iter"] += 1
-    print(params)
+    if estimation_settings["verbosity"] >= 2:
+        print('Iter ' + str(estimation_settings["iter"]))
+        print(params)
 
     try:
         # Next few lines strongly suppress any warnning messages
@@ -260,7 +263,7 @@ def model_ode_error(params, model, X, Y, T, estimation_settings):
             sys.stdout = std_output  # Change fake stdout to real stdout.
             change_std2tee = True  # Remember to change it back.
         def run_ode():
-            return ode(model, params, T, X, y0=X[0, :], **estimation_settings["objective_settings"])
+            return ode(model, params, T, X, Y, y0=X[0], **estimation_settings["objective_settings"])
         # Next line works only when sys.stdout is real. Thats why above.
         if isinstance(sys.stdout, stdout_type):
             with open(os.devnull, 'w') as f, mt.stdout_redirected(f):
@@ -276,10 +279,13 @@ def model_ode_error(params, model, X, Y, T, estimation_settings):
             sys.stdout = tee_object  # Change it back to fake stdout (tee).
 
         try:
-            res = np.mean((X-simX)**2)
-            print(res)
+            if estimation_settings["objective_settings"]["simulate_separately"]:
+                res = np.mean((Y-simX.reshape(-1))**2)
+            else:
+                res = np.mean((X-simX)**2)
+            
             if estimation_settings["verbosity"] >= 2:
-                print("succesfully returning now inside model_ode_error")
+                print(res)
             if np.isnan(res) or np.isinf(res) or not np.isreal(res):
             # #    print(model.expr, model.params, model.sym_params, model.sym_vars)
                 return estimation_settings['default_error']
@@ -296,11 +302,10 @@ def model_ode_error(params, model, X, Y, T, estimation_settings):
             print("Excepted an error inside ode() of model_ode_error.")
             print("Params at error:", params,
                     f"and {type(error)} with message:", error)
-            print("Returning default error. All is well.")
         return estimation_settings['default_error']
 
 
-def ode(model, params, T, X_data, y0, **objective_settings):
+def ode(model, params, T, X_data, Y, y0, **objective_settings):
     """Solve system of ODEs defined by equations in models_list.
 
     Raise error if input is incompatible.
@@ -332,17 +337,20 @@ def ode(model, params, T, X_data, y0, **objective_settings):
                 len(params)>0,
                 isinstance(params[0], (list, np.ndarray)),
                 X_data.ndim == 2)
-        print(message, info)
-        print("Function ode's defined error: Input arguments are not in the required form!")
+        if estimation_settings["verbosity"] >= 1:
+            print(message, info)
+            print("Function ode's defined error: Input arguments are not in the required form!")
         raise TypeError(f"Function ode's defined error: Input arguments are not in required form!"
                         + f"\n{message, info}")
     elif not T.shape[0] == X_data.shape[0]:
-        print("Number of samples in T and X does not match.")
+        if estimation_settings["verbosity"] >= 1:
+            print("Number of samples in T and X does not match.")
         raise IndexError("Number of samples in T and X does not match.")
     elif not (y0.shape[0] == X_data.shape[1]):
-        print("Number of symbols in models and combination of "
-                        + "number of equations and dimensions of input data"
-                        + " does not match.")
+        if estimation_settings["verbosity"] >= 1:
+            print("Number of symbols in models and combination of "
+                            + "number of equations and dimensions of input data"
+                            + " does not match.")
         raise IndexError("Number of symbols in models and combination of "
                         + "number of equations and dimensions of input data"
                         + " does not match.")
@@ -362,30 +370,35 @@ def ode(model, params, T, X_data, y0, **objective_settings):
 
     # simulate
 
-    # set initial value
-    obs_idx = [model.sym_vars.index(model.observed[i]) for i in range(len(model.observed))]
-    hid_idx = np.full(len(model.sym_vars), True, dtype=bool)
-    hid_idx[obs_idx] = False
-    inits = np.empty(len(model.sym_vars))
-    inits[obs_idx] = y0
-    inits[hid_idx] = model.initials
-
     # create a list of system functions from system model
+
     if objective_settings["simulate_separately"]:
+        X = interp1d(T, X_data, axis=0, kind='cubic', fill_value="extrapolate")
         model_func = model.lambdify()
+        inits = Y[0]
+
         def func_to_simulate(t, y):
-            b = np.concatenate((y, X_data))
+            #b = np.concatenate((X(t)))
+            b = X(t)
             return model_func(*b)
     else:
+        # set initial value
+        obs_idx = [model.sym_vars.index(model.observed[i]) for i in range(len(model.observed))]
+        hid_idx = np.full(len(model.sym_vars), True, dtype=bool)
+        hid_idx[obs_idx] = False
+        inits = np.empty(len(model.sym_vars))
+        inits[obs_idx] = y0
+        inits[hid_idx] = model.initials
+
         model_func = model.lambdify(list=True)
         def func_to_simulate(t, x):
             return [model_func[i](*x) for i in range(len(model_func))]
 
     sol = odeint(func_to_simulate, inits, T,
-                  rtol=objective_settings['rtol'],
-                  atol=objective_settings['atol'],
-                  #hmin=min_step,
-                  tfirst=True)
+                rtol=objective_settings['rtol'],
+                atol=objective_settings['atol'],
+                #hmin=min_step,
+                tfirst=True)
 
     return sol
 
@@ -398,14 +411,11 @@ def model_error (params, model, X, Y, _T=None, estimation_settings=None):
         testY = model.evaluate(X, *params)
         res = np.mean((Y-testY)**2)
         if np.isnan(res) or np.isinf(res) or not np.isreal(res):
-            if verbosity >= 3:
+            if verbosity >= 2:
                 print("isnan, isinf, isreal =", np.isnan(res),
                         np.isinf(res), not np.isreal(res))
                 print(model.expr, model.params, model.sym_params, model.sym_vars)
             return estimation_settings['default_error']
-        if verbosity >= 3:
-            print("Function model_error did not encounter any "
-                "errors, the output *square error/loss* is legit.")
         return res
     except Exception as error:
         if verbosity >= 2:

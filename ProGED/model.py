@@ -65,6 +65,7 @@ class Model:
         
         self.grammar = grammar
         self.params = params
+        self.observed =  [s.strip("'") for s in sym_vars]
         
         if isinstance(expr, type("")):
             self.expr = sp.sympify(expr)
@@ -144,7 +145,7 @@ class Model:
     def get_all_params(self):
         return self.params
         
-    def set_params(self, params):
+    def set_params(self, params, split=False):
         self.params=params
         
     def lambdify (self, *params, arg="numpy"):
