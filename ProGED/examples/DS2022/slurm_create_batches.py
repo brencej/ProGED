@@ -16,7 +16,7 @@ def create_sh_file(path_for_jobs, **batch_settings):
             "#SBATCH --mem-per-cpu=2GB\n")
     f.write("#SBATCH --array=0-{}\n".format(str(batch_settings["n_batches"]-1)))
     f.write("#SBATCH --cpus-per-task=1\n")
-    f.write("\nsingularity exec proged_container.sif python3.7 slurm_run_jobs.py ${SLURM_ARRAY_TASK_ID}")
+    f.write("\nsingularity exec proged_container.sif python3.7 slurm_run_batch.py ${SLURM_ARRAY_TASK_ID}")
     f.close()
 
 
