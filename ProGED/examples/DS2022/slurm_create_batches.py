@@ -9,7 +9,7 @@ def create_sh_file(**batch_settings):
     job_vers = batch_settings["job_version"]
     pyfile_name = "slurm_run_batch_{}_v{}.py".format(sys_name, job_vers)
 
-    title = "slurm_run_jobs_{}_v{}.sh".format(sys_name, job_vers)
+    title = "slurm_run_batch_{}_v{}.sh".format(sys_name, job_vers)
     f = io.open(os.path.join(batch_settings["path_out"], title), "w", newline='\n')
     f.write("#!/bin/bash\n"
             "#SBATCH --job-name={}v{}\n".format(sys_name, job_vers))

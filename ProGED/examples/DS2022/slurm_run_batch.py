@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 import pickle
 import ProGED as pg
 from ProGED.examples.DS2022.generate_data_ODE_systems import generate_ODE_data
@@ -36,6 +37,8 @@ if __name__ == '__main__':
                            "optimizer_settings": optimizer_settings}
 
     # 3. estimate parameters
+    start_time = time.time()
+
     print("--Loading models")
     with open(os.path.join(models_path, models_file), "rb") as file:
         models = pickle.load(file)
@@ -50,4 +53,6 @@ if __name__ == '__main__':
     print("--Exporting results")
     with open(models_path + os.sep + models_file.split(".")[0] + "_fit.pg", "wb") as file:
         pickle.dump(models, file)
+
+    print("--End time in seconds: " + str(time.time() - start_time))
 
