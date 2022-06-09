@@ -379,7 +379,7 @@ def ode(model, params, T, X_data, Y, y0, **objective_settings):
 
     if objective_settings["simulate_separately"]:
         X = interp1d(T, X_data, axis=0, kind='cubic', fill_value="extrapolate")
-        model_func = model.lambdify()
+        model_func = model.lambdify(list=True)[0]
         inits = Y[0]
 
         def func_to_simulate(t, y):
