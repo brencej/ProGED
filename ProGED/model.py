@@ -148,7 +148,7 @@ class Model:
     def set_params(self, params, split=False):
         self.params=params
         
-    def lambdify (self, *params, arg="numpy"):
+    def lambdify (self, *params, arg="numpy", list=False):
         """Produce a callable function from the symbolic expression and the parameter values.
         
         This function is required for the evaluate function. It relies on sympy.lambdify, which in turn 

@@ -200,6 +200,7 @@ def fit_models (models, data, task_type="algebraic", time_index=None, pool_map=m
         estimation_settings_preset["optimizer_settings"] = dict(optimizer_settings_preset)
 
     estimation_settings = dict(estimation_settings_preset)
+    estimation_settings["objective_settings"]["verbosity"] = estimation_settings["verbosity"]
     estimator = ParameterEstimator(data, task_type, time_index, estimation_settings)
     return ModelBox(dict(zip(models.keys(), list(pool_map(estimator.fit_one, models.values())))))
 
@@ -251,33 +252,35 @@ def model_ode_error(params, model, X, Y, T, estimation_settings):
         print(params)
 
     try:
-        # Next few lines strongly suppress any warnning messages
-        # produced by LSODA solver, called by ode() function.
-        # Suppression further complicates if making log files (Tee):
-        change_std2tee = False  # Normaly no need for this mess.
-        if isinstance(sys.stdout, Tee):
-            # In this case the real standard output (sys.stdout) is not
-            # saved in original location sys.stdout. We have to obtain
-            # it inside of Tee object (look module tee_so).
-            tee_object = sys.stdout  # obtain Tee object that has sys.stdout
-            std_output = tee_object.stdout  # Obtain sys.stdout.
-            sys.stdout = std_output  # Change fake stdout to real stdout.
-            change_std2tee = True  # Remember to change it back.
+        # # Next few lines strongly suppress any warnning messages
+        # # produced by LSODA solver, called by ode() function.
+        # # Suppression further complicates if making log files (Tee):
+        # change_std2tee = False  # Normaly no need for this mess.
+        # if isinstance(sys.stdout, Tee):
+        #     # In this case the real standard output (sys.stdout) is not
+        #     # saved in original location sys.stdout. We have to obtain
+        #     # it inside of Tee object (look module tee_so).
+        #     tee_object = sys.stdout  # obtain Tee object that has sys.stdout
+        #     std_output = tee_object.stdout  # Obtain sys.stdout.
+        #     sys.stdout = std_output  # Change fake stdout to real stdout.
+        #     change_std2tee = True  # Remember to change it back.
         def run_ode():
             return ode(model, params, T, X, Y, y0=X[0], **estimation_settings["objective_settings"])
         # Next line works only when sys.stdout is real. Thats why above.
-        if isinstance(sys.stdout, stdout_type):
-            with open(os.devnull, 'w') as f, mt.stdout_redirected(f):
-                try:
-                    simX = run_ode()
-                except Exception as error:
-                    if estimation_settings["verbosity"] >= 1:
-                        print("Inside ode(), preventing tee/IO error. Params at error:",
-                            params, f"and {type(error)} with message:", error)
+        #if isinstance(sys.stdout, stdout_type):
+        #    with open(os.devnull, 'w') as f, mt.stdout_redirected(f):
+        try:
+            simX = run_ode()
+        except Exception as error:
+            if estimation_settings["verbosity"] >= 1:
+                print("Inside ode(), error: ")
+                print(error)
+                #print("Inside ode(), preventing tee/IO error. Params at error:",
+                #    params, f"and {type(error)} with message:", error)
         else:
             simX = run_ode()
-        if change_std2tee:
-            sys.stdout = tee_object  # Change it back to fake stdout (tee).
+        #if change_std2tee:
+        #    sys.stdout = tee_object  # Change it back to fake stdout (tee).
 
         try:
             if estimation_settings["objective_settings"]["simulate_separately"]:
@@ -338,17 +341,17 @@ def ode(model, params, T, X_data, Y, y0, **objective_settings):
                 len(params)>0,
                 isinstance(params[0], (list, np.ndarray)),
                 X_data.ndim == 2)
-        if estimation_settings["verbosity"] >= 1:
+        if objective_settings["verbosity"] >= 1:
             print(message, info)
             print("Function ode's defined error: Input arguments are not in the required form!")
         raise TypeError(f"Function ode's defined error: Input arguments are not in required form!"
                         + f"\n{message, info}")
     elif not T.shape[0] == X_data.shape[0]:
-        if estimation_settings["verbosity"] >= 1:
+        if objective_settings["verbosity"] >= 1:
             print("Number of samples in T and X does not match.")
         raise IndexError("Number of samples in T and X does not match.")
     elif not (y0.shape[0] == X_data.shape[1]):
-        if estimation_settings["verbosity"] >= 1:
+        if objective_settings["verbosity"] >= 1:
             print("Number of symbols in models and combination of "
                             + "number of equations and dimensions of input data"
                             + " does not match.")
@@ -379,7 +382,7 @@ def ode(model, params, T, X_data, Y, y0, **objective_settings):
 
     if objective_settings["simulate_separately"]:
         X = interp1d(T, X_data, axis=0, kind='cubic', fill_value="extrapolate")
-        model_func = model.lambdify()
+        model_func = model.lambdify(list=True)[0]
         inits = Y[0]
 
         def func_to_simulate(t, y):
