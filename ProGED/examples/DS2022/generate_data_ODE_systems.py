@@ -24,7 +24,14 @@ def STL(t, x):
     return [1 * x[0] - 1 * x[1] - 1 * x[0]**3 - 1 * x[0]*x[1]**2,
             1 * x[0] + 1 * x[1] - 1 * x[1]**3 - 1 * x[1]*x[0]**2]
 
-def lorenz(t, x, sigma=10, beta=2.66667, rho=28):
+def lorenz(t, x, sigma=10, rho=28, beta=2.66667):
+    return [
+        sigma * (x[1] - x[0]),
+        x[0] * (rho - x[2]) - x[1],
+        x[0] * x[1] - beta * x[2],
+    ]
+
+def lorenz_stable(t, x, sigma=10, rho=16,  beta=8/3):
     return [
         sigma * (x[1] - x[0]),
         x[0] * (rho - x[2]) - x[1],
@@ -71,7 +78,7 @@ if __name__ == "__main__":
 
     ## 1. SIMPLE VERSION -- for single data set
     system = 'VDP'
-    inits = [0.2, 0.8]
+    inits = [-0.2, -0.8]
     data = generate_ODE_data(system, inits, **generation_settings)
 
     ## 2. MORE COMPLEX DATA GENERATION -- for multiple datasets and multiple initial values
@@ -80,7 +87,7 @@ if __name__ == "__main__":
     data_path = "C:\\Users\\NinaO\\PycharmProjects\\ProGED\\data\\v{}\\".format(data_version)
     os.makedirs(data_path, exist_ok=True)
 
-    systems = ['VDP', 'POI', 'lorenz']
+    systems = ['VDP', 'POI']
     num_system_variables = [2, 2, 3]
     num_inits = 10
     inits = np.random.uniform(low=-6, high=6, size=(num_inits, max(num_system_variables)))

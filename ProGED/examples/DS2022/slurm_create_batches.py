@@ -1,16 +1,18 @@
 import os
 import io
 import pickle
+import pandas as pd
 import ProGED as pg
 from ProGED.generate import generate_models
+from ProGED.examples.DS2022.generate_data_ODE_systems import generate_ODE_data
 
 def create_sh_file(**batch_settings):
-    sys_name = batch_settings["system_name"]
+    sys_name = batch_settings["system"]
     job_vers = batch_settings["job_version"]
     pyfile_name = "slurm_run_batch_{}_v{}.py".format(sys_name, job_vers)
 
     title = "slurm_run_batch_{}_v{}.sh".format(sys_name, job_vers)
-    f = io.open(os.path.join(batch_settings["path_out"], title), "w", newline='\n')
+    f = io.open(os.path.join(batch_settings["path_main"], title), "w", newline='\n')
     f.write("#!/bin/bash\n"
             "#SBATCH --job-name={}v{}\n".format(sys_name, job_vers))
     f.write("#SBATCH --time=2-00:00:00\n"
@@ -39,13 +41,13 @@ def create_batches(**batch_settings):
     model_batches = models.split(n_batches=batch_settings["n_batches"])
 
     # save batches
-    path_for_jobs = os.path.join(batch_settings["path_out"],
+    path_jobs = os.path.join(batch_settings["path_main"],
                                  "jobs",
-                                 "{}".format(batch_settings["system_name"]),
+                                 "{}".format(batch_settings["system"]),
                                  "v{}".format(batch_settings["job_version"]))
-    os.makedirs(path_for_jobs, exist_ok=True)
+    os.makedirs(path_jobs, exist_ok=True)
     for ib in range(batch_settings["n_batches"]):
-        file_name = os.path.join(path_for_jobs, "job_{}_v{}_batch{}.pg".format(batch_settings["system_name"], batch_settings["job_version"], str(ib)))
+        file_name = os.path.join(path_jobs, "job_{}_v{}_batch{}.pg".format(batch_settings["system"], batch_settings["job_version"], str(ib)))
         with open(file_name, "wb") as file:
             pickle.dump(model_batches[ib], file)
 
@@ -56,16 +58,27 @@ if __name__ == '__main__':
 
     # settings
     batch_settings = {
-        "system_name": 'VDP',
+        "system": 'VDP',
         "job_version": '1',
         "variables": ["'x'", "'y'"],
         "p_vars": [1 / 2, 1 / 2],
         "num_samples": 100,
         "n_batches": 10,
-        "path_out": os.path.join("D:", "ED_paper")
+        "path_main": os.path.join("D:\\", "Experiments", "DS2022")
     }
 
     create_batches(**batch_settings)
+
+    # create data
+    idx_init = '0'
+    data_path = batch_settings["path_main"] + "\\data\\{}\\v{}\\".format(batch_settings["system"], batch_settings["job_version"])
+    os.makedirs(data_path, exist_ok=True)
+    data_file = "data_{}_v{}_init{}.csv".format(batch_settings["system"], batch_settings["job_version"],  idx_init)
+
+    data = generate_ODE_data('VDP', [-0.2, -0.8])
+    pd.DataFrame(data).to_csv(data_path + data_file, header=False, index=False)
+
+
 
 
 

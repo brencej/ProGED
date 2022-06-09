@@ -2,22 +2,24 @@ import sys
 import os
 import time
 import pickle
+import pandas as pd
 import ProGED as pg
-from ProGED.examples.DS2022.generate_data_ODE_systems import generate_ODE_data
 # sys.path.append(os.getcwd()+"/source")
 
 if __name__ == '__main__':
 
-    #batch_idx = sys.argv[1]
-    batch_idx = '1'
-    job_version = '1'
+    batch_idx = sys.argv[1]
+    #batch_idx = '1'
+    job_version = '2'
     system = 'VDP'
-    inits = [-0.2, -0.8]
     models_path = os.path.join("jobs", "{}".format(system), "v{}".format(job_version))
     models_file = "job_{}_v{}_batch{}.pg".format(system, job_version, batch_idx)
 
     # 1. get data
-    data = generate_ODE_data(system=system, inits=inits)
+    idx_init = '0'
+    data_path = os.path.join("data", "{}".format(system), "v{}".format(job_version))
+    data_file = "data_{}_v{}_init{}.csv".format(system, job_version, idx_init)
+    data = pd.read_csv(os.path.join(data_path, data_file), header=None)
 
     # 2. param estimation settings
     optimizer_settings = {
@@ -28,8 +30,8 @@ if __name__ == '__main__':
         "cr": 0.88,
         "max_iter": 1000,
         "pop_size": 100,
-        "atol": 0.001,
-        "tol": 0.001
+        "atol": 0.01,
+        "tol": 0.01
     }
 
     estimation_settings = {"optimizer": 'differential_evolution',
@@ -50,9 +52,16 @@ if __name__ == '__main__':
                                time_index=0,
                                estimation_settings=estimation_settings)
 
+    print("--End time in seconds: " + str(time.time() - start_time))
+
     print("--Exporting results")
     with open(models_path + os.sep + models_file.split(".")[0] + "_fit.pg", "wb") as file:
         pickle.dump(models, file)
 
-    print("--End time in seconds: " + str(time.time() - start_time))
+    if batch_idx == '0':
+        with open(models_path + os.sep + models_file.split(".")[0] + "_settings.pg", "wb") as file:
+            pickle.dump(models, file)
+
+
+
 
