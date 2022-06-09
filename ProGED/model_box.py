@@ -317,7 +317,11 @@ class ModelBox:
     def __str__(self):
         txt = "ModelBox: " + str(len(self.models_dict)) + " models"
         for m in self.models_dict:
-            txt += "\n-> " + str(self.models_dict[m].expr) + ", p = " + str(self.models_dict[m].p)
+            if self.models_dict[m].valid:
+                txt += "\n-> " + str(self.models_dict[m])
+            else: 
+                txt += "\n-> " + str(self.models_dict[m].expr) 
+            txt += ", p = " + str(self.models_dict[m].p)
             txt += ", parse trees = " + str(len(self.models_dict[m].trees))
             txt += ", valid = " + str(self.models_dict[m].valid)
             if self.models_dict[m].valid:

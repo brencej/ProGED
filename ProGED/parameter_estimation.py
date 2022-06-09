@@ -69,6 +69,7 @@ class ParameterEstimator:
 
         elif task_type == "algebraic" or task_type == "integer-algebraic":
             target_index = estimation_settings["target_variable_index"]
+            var_mask[target_index] = False
             self.X = data[:, var_mask]
             self.Y = data[:, target_index]
             self.T = None
