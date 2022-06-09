@@ -387,11 +387,8 @@ def ode(model, params, T, X_data, Y, y0, **objective_settings):
         model_func = model.lambdify(list=True)[0]
         inits = Y[0]
 
-        def func_to_simulate(t, y):
-            #b = np.concatenate((X(t)))
-            b = X(t)
-            return model_func(*b)
     else:
+        model_func = model.lambdify(list=True)
         # set initial value
         obs_idx = [model.sym_vars.index(model.observed[i]) for i in range(len(model.observed))]
         hid_idx = np.full(len(model.sym_vars), True, dtype=bool)
@@ -400,12 +397,11 @@ def ode(model, params, T, X_data, Y, y0, **objective_settings):
         inits[obs_idx] = y0
         inits[hid_idx] = model.initials
 
-        model_func = model.lambdify(list=True)
-        def func_to_simulate(t, x):
-            b = np.empty(len(model.sym_vars))
-            b[hid_idx] = x[hid_idx]
-            b[~hid_idx] = X(t)
-            return [model_func[i](*b) for i in range(len(model_func))]
+    def func_to_simulate(t, x):
+        b = np.empty(len(model.sym_vars))
+        b[hid_idx] = x[hid_idx]
+        b[~hid_idx] = X(t)
+        return [model_func[i](*b) for i in range(len(model_func))]
 
     sol = odeint(func_to_simulate, inits, T,
                 rtol=objective_settings['rtol'],
