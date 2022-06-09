@@ -378,10 +378,11 @@ def ode(model, params, T, X_data, Y, y0, **objective_settings):
         J = model.lambdify_jacobian()
         def Jf(t, x):
             return J(*x)
+
     # create a list of system functions from system model
+    X = interp1d(T, X_data, axis=0, kind='cubic', fill_value="extrapolate")
 
     if objective_settings["simulate_separately"]:
-        X = interp1d(T, X_data, axis=0, kind='cubic', fill_value="extrapolate")
         model_func = model.lambdify(list=True)[0]
         inits = Y[0]
 
@@ -400,7 +401,10 @@ def ode(model, params, T, X_data, Y, y0, **objective_settings):
 
         model_func = model.lambdify(list=True)
         def func_to_simulate(t, x):
-            return [model_func[i](*x) for i in range(len(model_func))]
+            b = np.empty(len(model.sym_vars))
+            b[hid_idx] = x[hid_idx]
+            b[~hid_idx] = X(t)
+            return [model_func[i](*b) for i in range(len(model_func))]
 
     sol = odeint(func_to_simulate, inits, T,
                 rtol=objective_settings['rtol'],
