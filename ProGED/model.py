@@ -210,10 +210,13 @@ class Model:
         return self.full_expr(*self.params)
     
     def __str__(self):
-        return str(self.expr)
+        if self.valid:
+            return str(self.full_expr(*self.params))
+        else:
+            return str(self.expr)
     
     def __repr__(self):
-        return str(self.expr)
+        return self.__str__()
     
     
     
