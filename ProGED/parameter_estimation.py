@@ -410,7 +410,10 @@ def ode(model, params, T, X_data, Y, y0, **objective_settings):
                 #hmin=min_step,
                 tfirst=True)
 
-    return sol[:, ~hid_idx]
+    if not objective_settings["simulate_separately"]:
+        sol = sol[:, ~hid_idx]
+
+    return sol
 
 
 def model_error (params, model, X, Y, _T=None, estimation_settings=None):
