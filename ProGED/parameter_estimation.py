@@ -282,8 +282,6 @@ def model_ode_error(params, model, X, Y, T, estimation_settings):
                 print(error)
                 #print("Inside ode(), preventing tee/IO error. Params at error:",
                 #    params, f"and {type(error)} with message:", error)
-        else:
-            simX = run_ode()
         #if change_std2tee:
         #    sys.stdout = tee_object  # Change it back to fake stdout (tee).
 
@@ -294,7 +292,7 @@ def model_ode_error(params, model, X, Y, T, estimation_settings):
                 res = np.mean((X-simX)**2)
             
             if estimation_settings["verbosity"] >= 2:
-                print(res)
+                print("Error: " + str(res))
             if np.isnan(res) or np.isinf(res) or not np.isreal(res):
             # #    print(model.expr, model.params, model.sym_params, model.sym_vars)
                 return estimation_settings['default_error']

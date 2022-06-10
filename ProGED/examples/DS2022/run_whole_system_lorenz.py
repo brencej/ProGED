@@ -11,7 +11,8 @@ from ProGED.examples.DS2022.lorenz_simulation import plot_results
 
 
 if __name__ == "__main__":
-    #sys.stdout = open("D:\\Experiments\\DS2022\\trials\\lorenz_stable_point3_console.txt", "w")
+    #path_main = "D:\\Experiments\\DS2022\\trials\\"
+    path_main = "N:\\IJS\\DS2022\\trials\\"
     start_time = time.time()
     params = [[10], [16], [-8 / 3]]
     inits = [1., 1., 1.]
@@ -26,7 +27,7 @@ if __name__ == "__main__":
         "default_error": 10 ** 9,
         "strategy": 'rand1bin',
         "f": 0.45, "cr": 0.88,
-        "max_iter": 200, "pop_size": 50,
+        "max_iter": 10, "pop_size": 5,
         "atol": 0.01, "tol": 0.01}
 
     estimation_settings = {"optimizer": 'differential_evolution',
@@ -45,10 +46,10 @@ if __name__ == "__main__":
 
     print("--End time in seconds: " + str(time.time() - start_time))
 
-    with open("D:\\Experiments\\DS2022\\trials\\lorenz_stable_point46_fit.pg", "wb") as file:
+    with open(os.path.join(path_main, "lorenz_stable_point47_fit.pg"), "wb") as file:
         pickle.dump(models_out, file)
 
-    with open("D:\\Experiments\\DS2022\\trials\\lorenz_stable_point32_settings.pg", "wb") as file:
+    with open(os.path.join(path_main, "lorenz_stable_point47_settings.pg"), "wb") as file:
         pickle.dump(estimation_settings, file)
 
     #sys.stdout.close()
