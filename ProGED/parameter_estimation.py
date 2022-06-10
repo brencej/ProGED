@@ -104,7 +104,10 @@ class ParameterEstimator:
             else:
                 optimizer = optimizer_library[self.estimation_settings['optimizer']]
                 model_params = model.get_all_params()
+                t1 = time.time()
                 res = optimizer(model, self.X, self.Y, self.T, p0=model_params, **self.estimation_settings)
+                t2 = time.time()
+                res["time"] = t2-t1
                 model.set_estimated(res)
                 if self.estimation_settings["verbosity"] >= 2:
                     print(res, type(res["x"]), type(res["x"][0]))

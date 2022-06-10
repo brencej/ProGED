@@ -182,6 +182,11 @@ class SystemModel:
             system = sp.Matrix(fullexprs)
             return sp.lambdify((sp.symbols("t"), self.sym_vars), system)
 
+    def get_time(self):
+        if "time" in self.estimated:
+            return self.estimated["time"]
+        else:
+            return 0
 
     def __str__(self):
         return str(self.expr)

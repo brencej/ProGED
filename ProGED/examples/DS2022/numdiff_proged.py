@@ -44,7 +44,7 @@ if __name__ == "__main__":
     t1 = time.time()
     for i in range(3):
         """ SETUP THE MODELS """
-        models = pg.generate.generate_models(grammar, symbols, strategy_settings={"N":500})
+        models = pg.generate.generate_models(grammar, symbols, strategy_settings={"N":2})
         #models = pg.ModelBox()
         #models.add_model(optimal_model[i], symbols)
 
@@ -53,7 +53,7 @@ if __name__ == "__main__":
         models_fit = pg.fit_models(models, dat, task_type="algebraic", 
                                     estimation_settings=estimation_settings)
         
-        models_fit.dump("numdiff_lorenz_eq" + str(i) + "_models_fit.pg")
+        #models_fit.dump("numdiff_lorenz_eq" + str(i) + "_models_fit.pg")
         print(models_fit)
     t2 = time.time()
     print("Time: ", t2-t1)

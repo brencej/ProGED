@@ -208,6 +208,12 @@ class Model:
         
     def get_full_expr(self):
         return self.full_expr(*self.params)
+
+    def get_time(self):
+        if "time" in self.estimated:
+            return self.estimated["time"]
+        else:
+            return 0
     
     def __str__(self):
         if self.valid:

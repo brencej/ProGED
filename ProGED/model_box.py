@@ -326,6 +326,7 @@ class ModelBox:
             txt += ", valid = " + str(self.models_dict[m].valid)
             if self.models_dict[m].valid:
                 txt += ", error = " + str(self.models_dict[m].get_error())
+                txt += ", time = " + str(self.models_dict[m].get_time())
         return txt
     
     def keys(self):
