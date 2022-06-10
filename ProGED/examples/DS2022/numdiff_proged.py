@@ -6,13 +6,20 @@ from scipy.integrate import solve_ivp, odeint
 import time
 
 from ProGED.examples.DS2022.generate_data_ODE_systems import generate_ODE_data, lorenz
+from ProGED.generators.grammar_construction import construct_production
 
 if __name__ == "__main__":
     np.random.seed(0)
 
-    """ DATA """
+    """  SETTINGS """
     inits = [1,1,1]
     rho = 16
+    gram = "poly"
+    N = 1000
+    save_models = True
+    name = "numdiff_lorenz_poly"
+
+    """ DATA """
     lor = lambda t, x: lorenz(t, x, rho=rho)
     data = generate_ODE_data(lor, inits)
     T = data[:,0]
@@ -27,14 +34,25 @@ if __name__ == "__main__":
     optimal_model = ["C*x + C*y", "C*x + C*y + C*x*z", "C*x*y + C*z"]
 
     """ GRAMMAR """
-    grammar_settings = {"variables": ["'x'", "'y'", "'z'"], 
-                        "p_vars": [1/3, 1/3, 1/3], 
-                        "functions": [], "p_F": []}
-    grammar = pg.grammar_from_template("polynomial", grammar_settings)
+    
+    if gram == "poly":
+        grammar_settings = {"variables": ["'x'", "'y'", "'z'"], 
+                            "p_vars": [1/3, 1/3, 1/3], 
+                            "functions": [], "p_F": []}
+        grammar = pg.grammar_from_template("polynomial", grammar_settings)
+    elif gram == "custom":
+        grammarstr = construct_production("E", ["E '+' F", "E '-' F", "F"], [0.15, 0.15, 0.7])
+        grammarstr += construct_production("F", ["F '*' T", "T"], [0.2, 0.8])
+        grammarstr += construct_production("T", ["'(' E ')'", "V", "'C'"], [0.2, 0.5, 0.3])
+        grammarstr += construct_production("V", ["'x'", "'y'", "'z'"], [1/3, 1/3, 1/3])
+
+        grammar = pg.GeneratorGrammar(grammarstr)
 
     
     optimizer_settings = {"lower_upper_bounds": (-30,30),
-                            "atol": 0.001, "tol": 0.001}
+                            "atol": 0.01, "tol": 0.01,
+                            "max_iter": 500,
+                            "pop_size": 20}
     estimation_settings = {"target_variable_index": 0,
                             "verbosity": 1,
                             "optimizer_settings": optimizer_settings,
@@ -44,7 +62,7 @@ if __name__ == "__main__":
     t1 = time.time()
     for i in range(3):
         """ SETUP THE MODELS """
-        models = pg.generate.generate_models(grammar, symbols, strategy_settings={"N":2})
+        models = pg.generate.generate_models(grammar, symbols, strategy_settings={"N":N})
         #models = pg.ModelBox()
         #models.add_model(optimal_model[i], symbols)
 
@@ -53,7 +71,10 @@ if __name__ == "__main__":
         models_fit = pg.fit_models(models, dat, task_type="algebraic", 
                                     estimation_settings=estimation_settings)
         
-        #models_fit.dump("numdiff_lorenz_eq" + str(i) + "_models_fit.pg")
-        print(models_fit)
+        if save_models:
+            models_fit.dump(name + "_eq" + str(i) + "_models_fit.pg")
+        print("------- best models -------")
+        print(models_fit.retrieve_best_models(3))
     t2 = time.time()
     print("Time: ", t2-t1)
+    print(grammar)

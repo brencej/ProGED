@@ -115,7 +115,7 @@ class ParameterEstimator:
         except Exception as error:
             if self.estimation_settings["verbosity"] >= 1:
                 print((f"Excepted an error inside fit_one: Of type "
-                        f"{type(error)} and message:{error}!! \nModel:"), model)
+                        f"{type(error)} and message:{error}! \nModel:"), model)
             model.set_estimated({}, valid=False)
 
         if self.estimation_settings["verbosity"] > 0:
@@ -205,6 +205,7 @@ def fit_models (models, data, task_type="algebraic", time_index=None, pool_map=m
 
     estimation_settings = dict(estimation_settings_preset)
     estimation_settings["objective_settings"]["verbosity"] = estimation_settings["verbosity"]
+    estimation_settings["task_type"] = task_type
     estimator = ParameterEstimator(data, task_type, time_index, estimation_settings)
     return ModelBox(dict(zip(models.keys(), list(pool_map(estimator.fit_one, models.values())))))
 
