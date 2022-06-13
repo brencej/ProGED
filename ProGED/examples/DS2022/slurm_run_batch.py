@@ -23,12 +23,12 @@ if __name__ == '__main__':
 
     # 2. param estimation settings
     optimizer_settings = {
-        "lower_upper_bounds": (-10, 10),
+        "lower_upper_bounds": (-30, 30),
         "default_error": 10 ** 9,
         "strategy": 'rand1bin',
         "f": 0.45,
-        "cr": 0.88,
-        "max_iter": 1000,
+        "cr": 0.60,
+        "max_iter": 500,
         "pop_size": 100,
         "atol": 0.01,
         "tol": 0.01
@@ -60,8 +60,25 @@ if __name__ == '__main__':
 
     if batch_idx == '0':
         with open(models_path + os.sep + models_file.split(".")[0] + "_settings.pg", "wb") as file:
-            pickle.dump(models, file)
+            pickle.dump(estimation_settings, file)
 
 
+    filepath = "D:\\Experiments\\DS2022\\jobs\\lorenz_stable\\v14\\nbatches1\\"
+    with open(os.path.join(filepath, "job_lorenz_stable_v14_batch0.pg"), "rb") as file:
+        models = pickle.load(file)
 
+    """    
+    filepath = "C:\\Users\\NinaO\\PycharmProjects\\ProGED\\ProGED\\examples\\DS2022\\results\\numdiff\\numdiff_lorenz_custom_eq0_models_fit.pg"
+    with open(filepath, "rb") as file:
+        models = pickle.load(file)
+    """
 
+    for im in models:
+        if "C0*y + C1*x" in str(im) or \
+           "C0*x + C1*y" in str(im) or \
+           "C0*(y-x)" in str(im) or \
+           "C0*(-x+y)" in str(im):
+            print(im)
+
+    ex1 = ["C*y + C*x, C*x + C*x*z + C*y, C*x*y + C*z"]
+    ex2 = ["C*(y-x)", "x*(C-z)-y", "x*y - C*z"]
