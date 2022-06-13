@@ -167,6 +167,7 @@ def fit_models (models, data, task_type="algebraic", time_index=None, pool_map=m
         "rtol": 10 ** (-4),
         "max_step": 10 ** 3,
         "use_jacobian": True,
+        "teacher_forcing": False,
         "simulate_separately": False}
 
     optimizer_settings_preset = {
@@ -400,11 +401,15 @@ def ode(model, params, T, X_data, Y, y0, **objective_settings):
         inits[obs_idx] = y0
         inits[hid_idx] = model.initials
 
-    def func_to_simulate(t, x):
-        b = np.empty(len(model.sym_vars))
-        b[hid_idx] = x[hid_idx]
-        b[~hid_idx] = X(t)
-        return [model_func[i](*b) for i in range(len(model_func))]
+    if objective_settings["teacher_forcing"]:
+        def func_to_simulate(t, x):
+            b = np.empty(len(model.sym_vars))
+            b[hid_idx] = x[hid_idx]
+            b[~hid_idx] = X(t)
+            return [model_func[i](*b) for i in range(len(model_func))]
+    else:
+        def func_to_simulate(t, x):
+            return [model_func[i](*x) for i in range(len(model_func))]
 
     sol = odeint(func_to_simulate, inits, T,
                 rtol=objective_settings['rtol'],

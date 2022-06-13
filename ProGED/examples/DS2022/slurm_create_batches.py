@@ -51,6 +51,17 @@ def create_batches(**batch_settings):
         with open(file_name, "wb") as file:
             pickle.dump(model_batches[ib], file)
 
+    # do manually
+    if False:
+        symbols = {"x": ["x", "y"], "const": "C"}
+        models = pg.ModelBox()
+        models.add_system(["C*y", "C*y + C*x*x*y + C*x"], symbols=symbols)
+        models.add_system(["C*x", "C*y"], symbols=symbols)
+        file_name = os.path.join(path_jobs, "job_{}_v{}_batchM.pg".format(batch_settings["system"], batch_settings["job_version"]))
+        with open(file_name, "wb") as file:
+            pickle.dump(models, file)
+
+
     # create shell file
     create_sh_file(**batch_settings)
 
@@ -59,7 +70,7 @@ if __name__ == '__main__':
     # settings
     batch_settings = {
         "system": 'VDP',
-        "job_version": '1',
+        "job_version": '3',
         "variables": ["'x'", "'y'"],
         "p_vars": [1 / 2, 1 / 2],
         "num_samples": 100,
