@@ -18,7 +18,7 @@ if __name__ == "__main__":
     data = generate_ODE_data(system='lorenz_stable', inits=inits)
 
     objective_settings = {
-        "atol": 10 ** (-6), "rtol": 10 ** (-4),
+        "atol": 10 ** (-6), "rtol": 10 ** (-6),
         "use_jacobian": False, "simulate_separately": False}
 
     optimizer_settings = {
@@ -26,7 +26,7 @@ if __name__ == "__main__":
         "default_error": 10 ** 9,
         "strategy": 'rand1bin',
         "f": 0.45, "cr": 0.88,
-        "max_iter": 2, "pop_size": 1,
+        "max_iter": 200, "pop_size": 50,
         "atol": 0.01, "tol": 0.01}
 
     estimation_settings = {"optimizer": 'differential_evolution',
@@ -52,4 +52,4 @@ if __name__ == "__main__":
         pickle.dump(estimation_settings, file)
 
     #sys.stdout.close()
-    plot_results('lorenz_stable', models_out[0], inits)
+    plot_results('lorenz_stable', models_out[2], inits)

@@ -108,7 +108,8 @@ def resample_curve (models, data, target_variable_index = -1, resampleN = 100, s
             joined_errors += [np.log10(rrmse)]
         
     joined_probs_norm = np.array(joined_probs)/np.sum(joined_probs)
-    sample_size = np.sum(joined_probs_norm > 0)
+    #sample_size = np.sum(joined_probs_norm > 0)
+    sample_size = len(joined_errors)
 
     if sample_size > 0:
         resampled_curves = np.array([np.minimum.accumulate(np.random.choice(joined_errors, size=sample_size, p=joined_probs_norm, replace=False)) for _ in range(resampleN)])

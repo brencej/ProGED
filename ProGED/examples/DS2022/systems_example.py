@@ -56,8 +56,8 @@ if __name__ == "__main__":
         "strategy": 'rand1bin',
         "f": 0.45,
         "cr": 0.50,
-        "max_iter": 100,
-        "pop_size": 50,
+        "max_iter": 10,
+        "pop_size": 2,
         "atol": 0.01,
         "tol": 0.01
     }

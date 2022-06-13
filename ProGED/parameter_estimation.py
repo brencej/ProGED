@@ -115,7 +115,7 @@ class ParameterEstimator:
         except Exception as error:
             if self.estimation_settings["verbosity"] >= 1:
                 print((f"Excepted an error inside fit_one: Of type "
-                        f"{type(error)} and message:{error}!! \nModel:"), model)
+                        f"{type(error)} and message:{error}! \nModel:"), model)
             model.set_estimated({}, valid=False)
 
         if self.estimation_settings["verbosity"] > 0:
@@ -206,6 +206,7 @@ def fit_models (models, data, task_type="algebraic", time_index=None, pool_map=m
 
     estimation_settings = dict(estimation_settings_preset)
     estimation_settings["objective_settings"]["verbosity"] = estimation_settings["verbosity"]
+    estimation_settings["task_type"] = task_type
     estimator = ParameterEstimator(data, task_type, time_index, estimation_settings)
     return ModelBox(dict(zip(models.keys(), list(pool_map(estimator.fit_one, models.values())))))
 
@@ -282,8 +283,6 @@ def model_ode_error(params, model, X, Y, T, estimation_settings):
                 print(error)
                 #print("Inside ode(), preventing tee/IO error. Params at error:",
                 #    params, f"and {type(error)} with message:", error)
-        else:
-            simX = run_ode()
         #if change_std2tee:
         #    sys.stdout = tee_object  # Change it back to fake stdout (tee).
 
@@ -294,7 +293,7 @@ def model_ode_error(params, model, X, Y, T, estimation_settings):
                 res = np.mean((X-simX)**2)
             
             if estimation_settings["verbosity"] >= 2:
-                print(res)
+                print("Error: " + str(res))
             if np.isnan(res) or np.isinf(res) or not np.isreal(res):
             # #    print(model.expr, model.params, model.sym_params, model.sym_vars)
                 return estimation_settings['default_error']
