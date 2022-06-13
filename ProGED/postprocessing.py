@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from email import message
 import numpy as np
 import pandas as pd
 
@@ -104,8 +105,10 @@ def resample_curve (models, data, target_variable_index = -1, resampleN = 100, s
         
         if models[m].valid and not mse >= 1e8:
             rrmse = np.sqrt((mse+1e-32)/baseerror)
+            rrmse = np.sqrt((mse+1e-32))/np.std(data[target_variable_index])
+            rmse = np.sqrt(mse+1e-32)
             joined_probs += [models[m].p]
-            joined_errors += [np.log10(rrmse)]
+            joined_errors += [np.log10(rmse)]
         
     joined_probs_norm = np.array(joined_probs)/np.sum(joined_probs)
     #sample_size = np.sum(joined_probs_norm > 0)
