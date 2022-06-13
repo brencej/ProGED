@@ -14,10 +14,10 @@ if __name__ == "__main__":
     """  SETTINGS """
     inits = [1,1,1]
     rho = 16
-    gram = "poly"
-    N = 1000
+    gram = "polylim"
+    N = 500
     save_models = True
-    name = "numdiff_lorenz_poly"
+    name = "numdiff_lorenz_polylim"
 
     """ DATA """
     lor = lambda t, x: lorenz(t, x, rho=rho)
@@ -40,6 +40,11 @@ if __name__ == "__main__":
                             "p_vars": [1/3, 1/3, 1/3], 
                             "functions": [], "p_F": []}
         grammar = pg.grammar_from_template("polynomial", grammar_settings)
+    elif gram == "polylim":
+        grammarstr = construct_production("P", ["P '+' M", "M"], [0.3, 0.7])
+        grammarstr += construct_production("M", ["M '*' V", "'C' '*' V", "V"], [0.3, 0.3, 0.4])
+        grammarstr += construct_production("V", ["'x'", "'y'", "'z'"], [1/3, 1/3, 1/3])
+        grammar = pg.GeneratorGrammar(grammarstr)
     elif gram == "custom":
         grammarstr = construct_production("E", ["E '+' F", "E '-' F", "F"], [0.15, 0.15, 0.7])
         grammarstr += construct_production("F", ["F '*' T", "T"], [0.2, 0.8])
@@ -62,9 +67,10 @@ if __name__ == "__main__":
     t1 = time.time()
     for i in range(3):
         """ SETUP THE MODELS """
-        models = pg.generate.generate_models(grammar, symbols, strategy_settings={"N":N})
+        models = pg.generate.generate_models(grammar, symbols, strategy_settings={"N":N, "max_repeat":100})
         #models = pg.ModelBox()
         #models.add_model(optimal_model[i], symbols)
+        print(models)
 
         """ FIT PARAMETERS """
         dat = np.hstack((dX[i].reshape((-1,1)), X))
