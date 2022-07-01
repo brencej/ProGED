@@ -1,10 +1,11 @@
+import math
 import os
+import warnings
+
 import numpy as np
 import pandas as pd
-import math
 from scipy.integrate import solve_ivp
 
-import warnings
 warnings.filterwarnings("ignore")
 
 # MODEL EQUATIONS

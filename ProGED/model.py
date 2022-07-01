@@ -65,7 +65,7 @@ class Model:
         
         self.grammar = grammar
         self.params = params
-        self.observed =  [s.strip("'") for s in sym_vars]
+        self.observed = [s.strip("'") for s in sym_vars]
         
         if isinstance(expr, type("")):
             self.expr = sp.sympify(expr)
@@ -93,6 +93,10 @@ class Model:
 
         self.estimated = {}
         self.valid = False
+
+        # extra parameters, i.e. initial values
+        self.initials = [(np.random.random()-0.5)*10 for _ in range(len(sym_vars) - len(self.observed))]
+
         
     def add_tree (self, code, p):
         """Add a new parse tree to the model.

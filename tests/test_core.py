@@ -4,8 +4,6 @@ import numpy as np
 from nltk import Nonterminal, PCFG
 from hyperopt import hp
 
-# import sys
-
 from ProGED.equation_discoverer import EqDisco
 from ProGED.generators.grammar import GeneratorGrammar
 from ProGED.generators.grammar_construction import grammar_from_template
@@ -13,6 +11,7 @@ from ProGED.generate import generate_models
 from ProGED.model import Model
 from ProGED.model_box import ModelBox
 from ProGED.parameter_estimation import fit_models, hyperopt_fit
+from utils.generate_data_ODE_systems import generate_ODE_data
 
 def test_grammar_general():
     np.random.seed(0)
@@ -110,11 +109,13 @@ def test_parameter_estimation():
     grammar = GeneratorGrammar("""S -> S '+' T [0.4] | T [0.6]
                               T -> 'C' [0.6] | T "*" V [0.4]
                               V -> 'x' [0.5] | 'y' [0.5]""")
-    symbols = {"x":['x'], "start":"S", "const":"C"}
-    N = 2
-    
-    models = generate_models(grammar, symbols, strategy_settings = {"N":N})
-    models = fit_models(models, data, target_variable_index = -1, task_type="algebraic")
+    symbols = {"x": ['x'], "start": "S", "const": "C"}
+    models = generate_models(grammar, symbols, strategy_settings={"N": 2})
+
+    estimation_settings = {"target_variable_index": -1,
+                           "time_index": None,
+                           "verbosity": 0}
+    models = fit_models(models, data, task_type="algebraic", estimation_settings=estimation_settings)
     
     assert np.abs(models[0].get_error() - 0.36) < 1e-6
     assert np.abs(models[1].get_error() - 1.4736842) < 1e-6
@@ -122,21 +123,24 @@ def test_parameter_estimation():
 def test_parameter_estimation_2D():
     np.random.seed(0)
     def f(x):
-        return 2.0 * (x[:,0]*x[:,1] + 0.3)
+        return 2.0 * (x[:, 0]*x[:, 1] + 0.3)
     
     r = np.linspace(-1, 1, 4)
-    X = np.array([[[x,y] for x in r] for y in r]).reshape(-1,2)
-    Y = f(X).reshape(-1,1)
+    X = np.array([[[x, y] for x in r] for y in r]).reshape(-1, 2)
+    Y = f(X).reshape(-1, 1)
     data = np.hstack((X, Y))
     
     grammar = GeneratorGrammar("""S -> S '+' T [0.4] | T [0.6]
                               T -> 'C' [0.6] | T "*" V [0.4]
                               V -> 'x' [0.5] | 'y' [0.5]""")
-    symbols = {"x":['x', 'y'], "start":"S", "const":"C"}
-    N = 2
-    
-    models = generate_models(grammar, symbols, strategy_settings = {"N":N})
-    models = fit_models(models, data, target_variable_index = -1, task_type="algebraic")
+    symbols = {"x": ['x', 'y'], "start": "S", "const": "C"}
+    models = generate_models(grammar, symbols, strategy_settings={"N":2})
+
+    estimation_settings = {"target_variable_index": -1,
+                           "time_index": None,
+                           "verbosity": 0}
+
+    models = fit_models(models, data, task_type="algebraic", estimation_settings=estimation_settings)
     
     assert np.abs(models[0].get_error() - 0.36) < 1e-6
     assert np.abs(models[1].get_error() - 1.5945679) < 1e-6
@@ -148,36 +152,78 @@ def test_parameter_estimation_ODE():
     data = np.hstack((ts.reshape(-1, 1), xs.reshape(-1, 1), ys.reshape(-1, 1)))
 
     grammar = GeneratorGrammar("""S -> S '+' T [0.4] | T [0.6]
-                                T -> V [0.6] | 'C' "*" V [0.4]
+                                T -> V [0.4] | 'C' "*" V [0.6]
                                 V -> 'x' [0.5] | 'y' [0.5]""")
-    symbols = {"x":['y', 'x'], "start":"S", "const":"C"}
+    symbols = {"x": ["x", "y"], "start": "S", "const": "C"}
     np.random.seed(2)
-    models = generate_models(grammar, symbols, strategy_settings={"N":5})
-    models = fit_models(models, data, target_variable_index=-1, time_index=0, task_type="differential")
+    models = generate_models(grammar, symbols, strategy_settings={"N": 3})
 
-    print("\n", models, "\n\nFinal score:")
-    for m in models:
-        print(f"model: {str(m.get_full_expr()):<30}; error: {m.get_error():<15}")
+    estimation_settings = {"target_variable_index": 1,
+                           "time_index": 0,
+                           "objective_settings": {"use_jacobian": False},
+                           "verbosity": 0}
 
+    fit_models(models, data, task_type="differential", estimation_settings=estimation_settings)
+
+    """    
+        print("\n", models, "\n\nFinal score:")
+        for m in models:
+            print(f"model: {str(m.get_full_expr()):<30}; error: {m.get_error():<15}")
+    
     def assert_line(models, i, expr, error, tol=1e-9, n=100):
         assert str(models[i].get_full_expr())[:n] == expr[:n]
         assert abs(models[i].get_error() - error) < tol
     assert_line(models, 0, "y", 0.7321678286712089)
     assert_line(models, 1, "x", 0.06518775248116751)
     assert_line(models, 2, "x + 0.40026612522043*y", 2.5265334439915307e-09, n=8)
+    """
+    return
+
+def test_parameter_estimation_ODE_system():
+    generation_settings = {"simulation_time": 1}
+    data = generate_ODE_data(system='VDP', inits=[-0.2, -0.8], **generation_settings)
+
+    system = ModelBox(observed=["x", "y"])
+    system.add_system(["C*y", "C*y - C*x*x*y - C*x"], symbols={"x": ["x", "y"], "const": "C"})
+    estimation_settings = {"target_variable_index": None,
+                           "time_index": 0,
+                           "max_iter": 10,
+                           "pop_size": 3,
+                           "objective_settings": {"use_jacobian": False},
+                           "verbosity": 0}
+
+    fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
+    return
+
+
+def test_parameter_estimation_ODE_system_partial_observability():
+    generation_settings = {"simulation_time": 1}
+    data = generate_ODE_data(system='VDP', inits=[-0.2, -0.8], **generation_settings)
+    data = data[:, (0, 2)]
+
+    system = ModelBox(observed=["x"])
+    system.add_system(["C*y", "C*y - C*x*x*y - C*x"], symbols={"x": ["x", "y"], "const": "C"})
+    estimation_settings = {"target_variable_index": None,
+                           "time_index": 0,
+                           "max_iter": 10,
+                           "pop_size": 3,
+                           "objective_settings": {"use_jacobian": False},
+                           "verbosity": 0}
+
+    fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
     return
 
 def test_equation_discoverer():
     np.random.seed(0)
     def f(x):
-        return 2.0 * (x[:,0] + 0.3)
+        return 2.0 * (x[:, 0] + 0.3)
 	
     X = np.linspace(-1, 1, 20).reshape(-1,1)
-    Y = f(X).reshape(-1,1)
-    data = np.hstack((X,Y))
+    Y = f(X).reshape(-1, 1)
+    data = np.hstack((X, Y))
         
-    ED = EqDisco(data = data,
-                 task = None,
+    ED = EqDisco(data=data,
+                 task=None,
                  target_variable_index = -1,
                  sample_size = 5,
                  verbosity = 0)
@@ -244,14 +290,17 @@ def test_equation_discoverer_hyperopt():
     return
 
 
-#if __name__ == "__main__":
-#     test_grammar_general()
-#     test_grammar_templates()
-#     test_generate_models()
-#     test_model()
-#     test_model_box()
-test_parameter_estimation()
-#     test_parameter_estimation_2D()    
-#    test_equation_discoverer()
-#     test_parameter_estimation_ODE()
-#     test_equation_discoverer_ODE()
+if __name__ == "__main__":
+
+    # test_grammar_general()
+    # test_grammar_templates()
+    # test_generate_models()
+    # test_model()
+    # test_model_box()
+    # test_parameter_estimation()
+    # test_parameter_estimation_2D()
+    # test_equation_discoverer()
+    # test_parameter_estimation_ODE()
+    # test_equation_discoverer_ODE()
+    # test_parameter_estimation_ODE_system()
+    test_parameter_estimation_ODE_system_partial_observability()

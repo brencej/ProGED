@@ -51,7 +51,7 @@ class ModelBox:
             print("Error in add_model: unknown type for input expression. Should be string or a list or tuple of strings.")
             return False, expr
 
-    def add_system (self, expr_strs, symbols, p=1.0, params=None, info={}):
+    def add_system(self, expr_strs, symbols, p=1.0, params=None, info={}):
         x = [s.strip("'") for s in symbols["x"]]
         exprs, symbols_params = self.string_to_canonic_system(expr_strs, symbols)
         
@@ -75,7 +75,7 @@ class ModelBox:
         
         return True, str(exprs)
         
-    def add_single_model (self, expr_str, symbols, p=1.0, info={}, params=None):
+    def add_single_model(self, expr_str, symbols, p=1.0, info={}, params=None):
         x = [s.strip("'") for s in symbols["x"]]
         expr, symbols_params = self.string_to_canonic_expression(expr_str, symbols)
         

@@ -4,18 +4,17 @@ Created on Tue Oct 12 14:52:13 2021
 
 @author: jureb
 """
-import numpy as np
-import pandas as pd
-import sys
 import os
 import pickle
-import multiprocessing as mp
+import sys
+
+import numpy as np
+import pandas as pd
 
 sys.path.append(os.getcwd()+"/source")
 import ProGED as pg
 from ProGED.generators.grammar_construction import string_to_unit, unit_to_string
 
-import warnings
 #warnings.filterwarnings("ignore")
 
 np.random.seed(0)

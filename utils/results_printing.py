@@ -5,12 +5,8 @@ Created on Mon Oct 18 14:32:17 2021
 @author: jureb
 """
 
-import numpy as np
-import pandas as pd
-import sys
-import os
-import pickle
 import glob
+import sys
 
 import ProGED as pg
 

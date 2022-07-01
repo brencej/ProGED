@@ -44,7 +44,7 @@ warnings.filterwarnings("ignore", message="overflow encountered in double_scalar
 class ParameterEstimator:
     """Wraps the entire parameter estimation, so that we can pass the map function in fit_models
         a callable with only a single argument.
-        Also checks some basic requirements, suich as minimum and maximum number of parameters.
+        Also checks some basic requirements, such as minimum and maximum number of parameters.
 
         TODO:
             add inputs to make requirements flexible
@@ -53,56 +53,88 @@ class ParameterEstimator:
             estimation_settings: Dictionary with multiple parameters
                 that determine estimation process more specifically.
     """
-    def __init__(self, data, task_type, time_index, estimation_settings):
 
-        # task-dependent settings
+    def __init__(self, data, task_type, estimation_settings):
+
+        TASK_TYPES = ["algebraic", "differential", "integer-algebraic"]
+        target_index = estimation_settings["target_variable_index"]
+        time_index = estimation_settings["time_index"]
+
+        # setup of the mask for the data columns
         var_mask = np.ones(data.shape[-1], bool)
 
+        ## a. set parameter estimation for differential equations
         if task_type == "differential":
-            var_mask[time_index] = False
+
+            # check if all required variables are defined
+            if time_index is None:
+                raise ValueError("\nVariable time_index has to be defined when task_type = differential.\n")
+            if target_index is None and estimation_settings["objective_settings"]["simulate_separately"]:
+                raise ValueError("\nVariable target_variable_index has to be defined when simulate_separately = true.\n")
+
+            # set parameter estimator values
+            estimation_settings["objective_function"] = model_ode_error
+            var_mask[[time_index, target_index]] = False
             self.X = data[:, var_mask]
             self.T = data[:, time_index]
-            self.Y = None
-            estimation_settings["objective_function"] = model_ode_error
-            if estimation_settings["objective_settings"]["simulate_separately"]:
+            if estimation_settings["objective_settings"]["simulate_separately"] or estimation_settings["target_variable_index"]:
                 self.Y = data[:, estimation_settings["target_variable_index"]]
+            else:
+                self.Y = None
 
+        ## b. set parameter estimation for algebraic and integer-algebraic equations
         elif task_type == "algebraic" or task_type == "integer-algebraic":
-            target_index = estimation_settings["target_variable_index"]
+
+            # check if all required variables are defined
+            if estimation_settings["target_variable_index"] is None:
+                raise ValueError("\nVariable target_variable_index has to be defined when task_type = algebraic.\n")
+
+            # set parameter estimator values
             var_mask[target_index] = False
             self.X = data[:, var_mask]
             self.Y = data[:, target_index]
             self.T = None
             estimation_settings["objective_function"] = model_error
 
+        ## c. raise error if the task_type doesnt exist
         else:
             types_string = "\", \"".join(TASK_TYPES)
             raise ValueError("Variable task_type has unsupported value "
                              f"\"{task_type}\", while list of possible values: "
                              f"\"{types_string}\".")
 
+        ## additional settings for integer-algebraic equations
         if task_type == "integer-algebraic":
             estimation_settings["objective_function"] = (
                 lambda params, model, X, Y, _T, estimation_settings:
-                model_error(np.round(params), model, X, Y, _T=None,
-                            estimation_settings=estimation_settings))
+                    model_error(np.round(params), model, X, Y, _T=None, estimation_settings=estimation_settings))
 
+        ##
         self.estimation_settings = estimation_settings
+        self.verbosity = estimation_settings["verbosity"]
 
 
     def fit_one (self, model):
-        optimizer_library = {"differential_evolution": DE_fit, "hyperopt": hyperopt_fit, "minimize": min_fit}
+        # fits one model within the models dictionary
 
-        if self.estimation_settings["verbosity"] > 0:
-            print("Estimating model " + str(model.expr))
+        OPTIMIZER_TYPES = {"differential_evolution": DE_fit, "hyperopt": hyperopt_fit, "minimize": min_fit}
+
+        if self.verbosity > 0:
+            print("Estimating model: " + str(model.expr))
         try:
+
+            ## a. check requirements
             if len(model.params) > self.estimation_settings["max_constants"]:
+                print("Model skipped. More model parameters than allowed (check max constant).")
                 pass
             elif len(model.params) < 1:
                 model.set_estimated({"x":[], "fun": model_error_general(
                     [], model, self.X, self.Y, self.T, **self.estimation_settings)})
+
+            ## b. estimate parameters
             else:
-                optimizer = optimizer_library[self.estimation_settings['optimizer']]
+                optimizer = OPTIMIZER_TYPES[self.estimation_settings['optimizer']]
+                # (info) include all parameters, including potential initial values in the partially observed scenarios.
                 model_params = model.get_all_params()
                 t1 = time.time()
                 res = optimizer(model, self.X, self.Y, self.T, p0=model_params, **self.estimation_settings)
@@ -114,43 +146,40 @@ class ParameterEstimator:
 
         except Exception as error:
             if self.estimation_settings["verbosity"] >= 1:
-                print((f"Excepted an error inside fit_one: Of type "
-                        f"{type(error)} and message:{error}! \nModel:"), model)
+                print(f"Excepted an error inside fit_one: Of type {type(error)} and message:{error}! \nModel:", model)
             model.set_estimated({}, valid=False)
 
         if self.estimation_settings["verbosity"] > 0:
-            print(f"model: {str(model.full_expr()):<70}; "
-                    + f"p: {model.p:<23}; "
-                    + f"error: {model.get_error()}")
+            print(f"model: {str(model.full_expr()):<70}; p: {model.p:<23}; error: {model.get_error()}")
 
         return model
 
 
-def fit_models (models, data, task_type="algebraic", time_index=None, pool_map=map,
-                estimation_settings={}):
-
-    """Performs parameter estimation on given models. Main interface to the module.
-
+def fit_models(models, data, task_type="algebraic", pool_map=map, estimation_settings={}):
+    """
+    Performs parameter estimation on given models. Main interface to the module.
     Supports parallelization by passing it a pooled map callable.
 
     Arguments:
         models (ModelBox): Instance of ModelBox, containing the models to be fitted.
         data (numpy.array): Input data of shape N x M, where N is the number of samples
             and M is the number of variables.
-        target_variable_index (int): Index of column in data that belongs to the target variable.
-        time_index (int): Index of column in data that belongs to measurement of time.
-                Required for differential equations, None otherwise.
+        task_type (str): Type of equations, e.g. "algebraic" or "differential", that
+            equation discovery algorithm tries to discover.
+
         pool_map (function): Map function for parallelization. Example use with 8 workers:
                 from multiprocessing import Pool
                 pool = Pool(8)
                 fit_models (models, data, -1, pool_map = pool.map)
-        verbosity (int): Level of printout desired. 0: none, 1: info, 2+: debug.
-        task_type (str): Type of equations, e.g. "algebraic" or "differential", that
-            equation discovery algorithm tries to discover.
+
         estimation_settings (dict): Dictionary where majority of optional arguments is stored
                 and where additional optional arguments can be passed to lower level parts of
                 equation discovery.
+
             arguments that can be passed via estimation_settings dictionary:
+                target_variable_index (int): Index of column in data that belongs to the target variable.
+                time_index (int): Index of column in data that belongs to measurement of time.
+                        Required for differential equations, None otherwise.
                 max_constants (int): Maximum number of free constants allowed. For the sake of computational
                     efficiency, models exceeding this constraint are ignored. Default: 5.
                 timeout (float): Maximum time in seconds consumed for whole
@@ -160,6 +189,7 @@ def fit_models (models, data, task_type="algebraic", time_index=None, pool_map=m
                     bound used to specify the boundaries of optimization, e.g. of
                     differential evolution.
                 max_ode_steps (int): Maximum number of steps used in one run of LSODA solver.
+                verbosity (int): Level of printout desired. 0: none, 1: info, 2+: debug.
     """
 
     objective_settings_preset = {
@@ -176,14 +206,15 @@ def fit_models (models, data, task_type="algebraic", time_index=None, pool_map=m
         "strategy": 'rand1bin',
         "f": 0.45,
         "cr": 0.88,
-        "max_iter": 1000,
+        "max_iter": 500,
         "pop_size": 50,
         "atol": 0.01,
         "tol": 0.01
     }
 
     estimation_settings_preset = {
-        "target_variable_index": 1,
+        "target_variable_index": None,
+        "time_index": None,
         "max_constants": 5,
         "optimizer": 'differential_evolution',
         "observed": models.observed,
@@ -207,7 +238,8 @@ def fit_models (models, data, task_type="algebraic", time_index=None, pool_map=m
     estimation_settings = dict(estimation_settings_preset)
     estimation_settings["objective_settings"]["verbosity"] = estimation_settings["verbosity"]
     estimation_settings["task_type"] = task_type
-    estimator = ParameterEstimator(data, task_type, time_index, estimation_settings)
+    estimator = ParameterEstimator(data, task_type, estimation_settings)
+
     return ModelBox(dict(zip(models.keys(), list(pool_map(estimator.fit_one, models.values())))))
 
 
@@ -224,7 +256,7 @@ def DE_fit (model, X, Y, T, p0, **estimation_settings):
         now = time.perf_counter()
         if (now-start) > estimation_settings["timeout"]:
             if estimation_settings['verbosity'] >= 1:
-                print("Time out!!!")
+                print("Time out!")
             return True
         else:
             return False
@@ -242,8 +274,7 @@ def DE_fit (model, X, Y, T, p0, **estimation_settings):
                                   atol=estimation_settings["optimizer_settings"]["atol"])
 
 def model_ode_error(params, model, X, Y, T, estimation_settings):
-    """Defines mean squared error of solution to differential equation
-    as the error metric.
+    """Defines mean squared error of solution to differential equation as the error metric.
 
         Input:
         - T is column of times at which samples in X and Y happen.
@@ -252,119 +283,83 @@ def model_ode_error(params, model, X, Y, T, estimation_settings):
     """
 
     model.set_params(params, split=True)
-    estimation_settings["iter"] += 1
-    if estimation_settings["verbosity"] >= 2:
+
+    # check the parameter estimation process if needed
+    if estimation_settings["verbosity"] > 1:
+        estimation_settings["iter"] += 1
         print('Iter ' + str(estimation_settings["iter"]))
         print(params)
 
     try:
-        # # Next few lines strongly suppress any warnning messages
-        # # produced by LSODA solver, called by ode() function.
-        # # Suppression further complicates if making log files (Tee):
-        # change_std2tee = False  # Normaly no need for this mess.
-        # if isinstance(sys.stdout, Tee):
-        #     # In this case the real standard output (sys.stdout) is not
-        #     # saved in original location sys.stdout. We have to obtain
-        #     # it inside of Tee object (look module tee_so).
-        #     tee_object = sys.stdout  # obtain Tee object that has sys.stdout
-        #     std_output = tee_object.stdout  # Obtain sys.stdout.
-        #     sys.stdout = std_output  # Change fake stdout to real stdout.
-        #     change_std2tee = True  # Remember to change it back.
-        def run_ode():
-            return ode(model, params, T, X, Y, y0=X[0], **estimation_settings["objective_settings"])
-        # Next line works only when sys.stdout is real. Thats why above.
-        #if isinstance(sys.stdout, stdout_type):
-        #    with open(os.devnull, 'w') as f, mt.stdout_redirected(f):
-        try:
-            simX = run_ode()
-        except Exception as error:
-            if estimation_settings["verbosity"] >= 1:
-                print("Inside ode(), error: ")
-                print(error)
-                #print("Inside ode(), preventing tee/IO error. Params at error:",
-                #    params, f"and {type(error)} with message:", error)
-        #if change_std2tee:
-        #    sys.stdout = tee_object  # Change it back to fake stdout (tee).
 
-        try:
-            if estimation_settings["objective_settings"]["simulate_separately"]:
-                res = np.mean((Y-simX.reshape(-1))**2)
-            else:
-                res = np.mean((X-simX)**2)
-            
-            if estimation_settings["verbosity"] >= 2:
-                print("Error: " + str(res))
-            if np.isnan(res) or np.isinf(res) or not np.isreal(res):
-            # #    print(model.expr, model.params, model.sym_params, model.sym_vars)
-                return estimation_settings['default_error']
-            return res
+        # simulate
+        # Next few lines strongly suppress any warnning messages produced by LSODA solver, called by ode() function.
+        change_std2tee = False
+        if isinstance(sys.stdout, Tee):
+            # In this case the real standard output (sys.stdout) is not saved in original location sys.stdout.
+            # We have to obtain it inside of Tee object (look module tee_so).
+            tee_object = sys.stdout  # obtain Tee object that has sys.stdout
+            std_output = tee_object.stdout  # Obtain sys.stdout.
+            sys.stdout = std_output  # Change fake stdout to real stdout.
+            change_std2tee = True
 
-        except Exception as error:
-            if estimation_settings["verbosity"] >= 2:
-                print("Error in ode() in mean(Y-odeY): Params at error:",
-                    params, f"and {type(error)} with message:", error)
+        if isinstance(sys.stdout, stdout_type):
+            with open(os.devnull, 'w') as f, mt.stdout_redirected(f):
+                try:
+                    simX = ode(model, params, T, X, Y, **estimation_settings["objective_settings"])
+                except Exception as error:
+                    if estimation_settings["verbosity"] > 0:
+                        print("Error inside ode(), preventing tee/IO error.\n", error)
+        else:
+            simX = ode(model, params, T, X, Y, **estimation_settings["objective_settings"])
+
+        if change_std2tee:
+            sys.stdout = tee_object  # change_std2tee, Change it back to fake stdout (tee).
+
+        # b. calculate the objective (MSE of the fit)
+        if estimation_settings["objective_settings"]["simulate_separately"]:
+            res = np.mean((Y - simX.reshape(-1))**2)
+        else:
+            res = np.mean((X - simX)**2)
+
+        if np.isnan(res) or np.isinf(res) or not np.isreal(res):
+            if estimation_settings["verbosity"] > 1:
+                print("Objective error is nan, inf or unreal. Returning default error.")
             return estimation_settings['default_error']
 
     except Exception as error:
-        if estimation_settings["verbosity"] >= 1:
-            print("Excepted an error inside ode() of model_ode_error.")
-            print("Params at error:", params,
-                    f"and {type(error)} with message:", error)
-        return estimation_settings['default_error']
+        print("\nError within model_ode_error().\n", error)
+
+    return res
 
 
-def ode(model, params, T, X_data, Y, y0, **objective_settings):
+
+def ode(model, params, T, X, Y, **objective_settings):
     """Solve system of ODEs defined by equations in models_list.
 
     Raise error if input is incompatible.
         Input:
-    models_list -- list (not dictionary) of models that e.g.
-        generate_models() generates.
-    params_matrix -- list of lists or ndarrays of parameters for
-        corresponding models.
-    y0 -- array (1-dim) of initial value of vector function y(t)
-        i.e. y0 = y(T[0]) = [y1(T[0]), y2(T[0]), y3(T[0]),...].
-    X_data -- 2-dim array (matrix) i.e. X = [X[0,:], X[1,:],...].
-    T -- (1-dim) array, i.e. of shape (N,)
-    max_ode_steps -- maximal number of steps inside ODE solver to
-        determine the minimal step size inside ODE solver.
-        Output:
-    Solution of ODE evaluated at times T.
+            models_list -- list (not dictionary) of models that e.g. generate_models() generates.
+            params_matrix -- list of lists or ndarrays of parameters for corresponding models.
+            X_data -- 2-dim array (matrix) i.e. X = [X[0,:], X[1,:],...].
+            T -- (1-dim) array, i.e. of shape (N,)
+            max_ode_steps -- maximal number of steps inside ODE solver to determine the minimal step size inside ODE solver.
+        Outputs:
+            Solution of ODE evaluated at times T.
     """
 
-    # 1. Check input
-    if not (# isinstance(model, list)
-            # and isinstance(params, list)
-            len(params) > 0
-            # and isinstance(params[0], (list, np.ndarray))
-            and X_data.ndim == 2
-            and y0.ndim == 1):
-        message = str(type(params[0])) + "\n"
-        info = (isinstance(model, list),
-                isinstance(params, list),
-                len(params)>0,
-                isinstance(params[0], (list, np.ndarray)),
-                X_data.ndim == 2)
-        if objective_settings["verbosity"] >= 1:
-            print(message, info)
-            print("Function ode's defined error: Input arguments are not in the required form!")
-        raise TypeError(f"Function ode's defined error: Input arguments are not in required form!"
-                        + f"\n{message, info}")
-    elif not T.shape[0] == X_data.shape[0]:
-        if objective_settings["verbosity"] >= 1:
-            print("Number of samples in T and X does not match.")
-        raise IndexError("Number of samples in T and X does not match.")
-    elif not (y0.shape[0] == X_data.shape[1]):
-        if objective_settings["verbosity"] >= 1:
-            print("Number of symbols in models and combination of "
-                            + "number of equations and dimensions of input data"
-                            + " does not match.")
-        raise IndexError("Number of symbols in models and combination of "
-                        + "number of equations and dimensions of input data"
-                        + " does not match.")
+    # a. Check input
+    if not (X.ndim == 2):
+        raise TypeError("Function ode's defined error: Input arguments are not in required form! \n"
+                        "data is a 2D matrix: {}, \n".format(str(X.ndim == 2)))
+    elif not T.shape[0] == X.shape[0]:
+        raise IndexError("Number of samples in time column and data matrix does not match.")
 
-    # 2. Simulate
-    # Set min_step via prescribing maximum number of steps:
+
+    # b. Settings for simulations
+
+    # b.1 Set min_step
+    """  optional: Set min_step via prescribing maximum number of steps:
     if "max_steps" in objective_settings:
         max_steps = objective_settings["max_steps"]
     else:
@@ -375,79 +370,92 @@ def ode(model, params, T, X_data, Y, y0, **objective_settings):
     # The minimal min_step to avoid min step error in LSODA:
     min_step_error = 10 ** (-15)
     min_step = max(min_step_from_max_steps, min_step_error)  # Force them both.
+    """
 
-    # simulate
+
+    # b.2 set jacobian
     Jf = None
     if objective_settings["use_jacobian"]:
         J = model.lambdify_jacobian()
         def Jf(t, x):
             return J(*x)
 
-    # create a list of system functions from system model
-    X = interp1d(T, X_data, axis=0, kind='cubic', fill_value="extrapolate")
-
+    # b.3 get model function
     if objective_settings["simulate_separately"]:
         model_func = model.lambdify(list=True)[0]
-        inits = Y[0]
-
     else:
         model_func = model.lambdify(list=True)
-        # set initial value
-        obs_idx = [model.sym_vars.index(model.observed[i]) for i in range(len(model.observed))]
+
+    # b.4 set initial values
+    if Y is None:
+        obs_idx = [model.sym_vars.index(sp.symbols(model.observed[i])) for i in range(len(model.observed))]
         hid_idx = np.full(len(model.sym_vars), True, dtype=bool)
         hid_idx[obs_idx] = False
         inits = np.empty(len(model.sym_vars))
-        inits[obs_idx] = y0
+        inits[obs_idx] = np.array([X[0]])
         inits[hid_idx] = model.initials
+    else:
+        hid_idx = np.full(Y.ndim, False, dtype=bool)
+        inits = np.array([Y[0]])
 
+    # b.5 interpolate data matrix
+        X_interp = interp1d(T, X, axis=0, kind='cubic', fill_value="extrapolate")
+
+    # b.6 set derivative functions either for or without teacher forcing
     if objective_settings["teacher_forcing"]:
-        def func_to_simulate(t, x):
+
+        def dxdt(t, x):
             b = np.empty(len(model.sym_vars))
             b[hid_idx] = x[hid_idx]
-            b[~hid_idx] = X(t)
+            b[~hid_idx] = X_interp(t)
             return [model_func[i](*b) for i in range(len(model_func))]
+
     else:
-        def func_to_simulate(t, x):
-            return [model_func[i](*x) for i in range(len(model_func))]
+        if Y is None:           # hasattr(model.expr, '__len__')?
+            def dxdt(t, x):
+                return [model_func[i](*x) for i in range(len(model_func))]
+        else:
+            def dxdt(t, x):
+                b = np.concatenate((x, X_interp(t)))
+                return [model_func(*b)]
 
-    sol = odeint(func_to_simulate, inits, T,
-                rtol=objective_settings['rtol'],
-                atol=objective_settings['atol'],
-                Dfun = Jf,
-                #hmin=min_step,
-                tfirst=True)
+    # c. simulate
+    sim = odeint(dxdt, inits, T,
+                rtol=objective_settings['rtol'], atol=objective_settings['atol'],
+                Dfun=Jf, tfirst=True)
 
+    # d. return simulation only for the observed state variables
     if not objective_settings["simulate_separately"]:
-        sol = sol[:, ~hid_idx]
+        sim = sim[:, ~hid_idx]
 
-    return sol
+    return sim
 
 
-def model_error (params, model, X, Y, _T=None, estimation_settings=None):
+def model_error(params, model, X, Y, _T=None, estimation_settings=None):
     """Defines mean squared error as the error metric."""
+
     try:
         verbosity = estimation_settings['verbosity']
 
         testY = model.evaluate(X, *params)
         res = np.mean((Y-testY)**2)
+
         if np.isnan(res) or np.isinf(res) or not np.isreal(res):
-            if verbosity >= 2:
-                print("isnan, isinf, isreal =", np.isnan(res),
-                        np.isinf(res), not np.isreal(res))
+            if verbosity > 1:
+                print("isnan, isinf, isreal =", np.isnan(res), np.isinf(res), not np.isreal(res))
                 print(model.expr, model.params, model.sym_params, model.sym_vars)
             return estimation_settings['default_error']
         return res
+
     except Exception as error:
-        if verbosity >= 2:
-            print("model_error: Params at error:", params,
-                  f"and {type(error)} with message:", error)
-        if verbosity >= 1:
-            print(f"Program is returning default_error:"
-                    f"{estimation_settings['default_error']}")
+        if verbosity > 1:
+            print("model_error: Params at error:", params, f"and {type(error)} with message:", error)
+        if verbosity > 0:
+            print(f"Program is returning default_error: {estimation_settings['default_error']}")
         return estimation_settings['default_error']
 
 
-def model_error_general (params, model, X, Y, T, **estimation_settings):
+def model_error_general(params, model, X, Y, T, **estimation_settings):
     """Calculate error of model with given parameters in general with
     type of error given.
         Input = TODO:

@@ -6,12 +6,14 @@ Created on Tue Oct  5 15:51:27 2021
 """
 
 
+import os
+import pickle
+import sys
+import time
+
 import numpy as np
 import pandas as pd
-import sys
-import os
-import time
-import pickle
+
 #sys.path.append("../../nltk/")
 
 sys.path.append(os.getcwd()+"/source")
@@ -19,7 +21,6 @@ import ProGED as pg
 from ProGED.generators.base_generator import ProGEDMaxAttemptError
 from ProGED.generators.grammar_construction import string_to_unit, unit_to_string
 
-import warnings
 #warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":

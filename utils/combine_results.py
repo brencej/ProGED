@@ -1,8 +1,7 @@
-import numpy as np
-import ProGED as pg
 import glob
 import sys
-import os
+
+import ProGED as pg
 
 if __name__ == "__main__":
     name = sys.argv[1]

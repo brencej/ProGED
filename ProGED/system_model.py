@@ -37,7 +37,7 @@ class SystemModel:
         self.total_eq_params = sum(self.n_params)
 
         """sym_vars should be tuple of tuples of sympy symbols"""
-        self.sym_vars = sym_vars
+        self.sym_vars = sp.symbols(sym_vars)
 
         self.p = 0
         self.info = info
@@ -55,7 +55,7 @@ class SystemModel:
 
         # list of variables that are (un)observed - used for partially-observed systems
         self.observed = observed
-        # extra parameters, i.e. initial values for unobserved variables in partially-observed systems
+        # extra parameters, i.e. initial values
         self.initials = [(np.random.random()-0.5)*10 for _ in range(len(sym_vars) - len(observed))]
 
 
