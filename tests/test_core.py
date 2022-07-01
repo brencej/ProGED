@@ -250,7 +250,7 @@ def test_equation_discoverer_hyperopt():
 #     test_generate_models()
 #     test_model()
 #     test_model_box()
-#     test_parameter_estimation()
+test_parameter_estimation()
 #     test_parameter_estimation_2D()    
 #    test_equation_discoverer()
 #     test_parameter_estimation_ODE()

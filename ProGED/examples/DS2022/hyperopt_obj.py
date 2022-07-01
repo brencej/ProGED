@@ -1,6 +1,5 @@
-import numpy as np
 import ProGED as pg
-from ProGED.examples.DS2022.generate_data_ODE_systems import generate_ODE_data, lorenz, VDP
+from utils.generate_data_ODE_systems import generate_ODE_data, lorenz, VDP
 import time
 
 

@@ -1,11 +1,8 @@
 import numpy as np
-import sympy as sp
-from matplotlib import pyplot as plt
 import ProGED as pg
-from scipy.integrate import solve_ivp, odeint
 import time
 
-from ProGED.examples.DS2022.generate_data_ODE_systems import generate_ODE_data, lorenz
+from utils.generate_data_ODE_systems import generate_ODE_data, lorenz
 from ProGED.generators.grammar_construction import construct_production
 
 if __name__ == "__main__":

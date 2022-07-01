@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import ProGED as pg
 from ProGED.generate import generate_models
-from ProGED.examples.DS2022.generate_data_ODE_systems import generate_ODE_data
+from utils.generate_data_ODE_systems import generate_ODE_data
 from ProGED.generators.grammar_construction import construct_production
 
 def create_sh_file(**batch_settings):
@@ -34,13 +34,31 @@ def create_batches(**batch_settings):
         grammar = pg.grammar_from_template("polynomial",
                                            generator_settings={"variables": batch_settings["variables"],
                                                                "p_vars": batch_settings["p_vars"], "functions": [],
-                                                               "p_F": []})
-    else:
+                                                               "p_F": [],
+                                                               "p_T": [0.4, 0.6]})
+    elif batch_settings["grammar"] == "universal_type":
         grammarstr = construct_production("E", ["E '+' F", "E '-' F", "F"], [0.15, 0.15, 0.7])
         grammarstr += construct_production("F", ["F '*' T", "T"], [0.2, 0.8])
         grammarstr += construct_production("T", ["'(' E ')'", "V", "'C'"], [0.2, 0.55, 0.25])
         grammarstr += construct_production("V", ["'x'", "'y'", "'z'"], [1 / 3, 1 / 3, 1 / 3])
         grammar = pg.GeneratorGrammar(grammarstr)
+
+    elif batch_settings["grammar"] == "poly_stricter":
+        grammarstr = construct_production("P", ["P '+' M", "M"], [0.4, 0.6])
+        grammarstr += construct_production("M", ["T", "'C' '*' T"], [0.5, 0.5])
+        grammarstr += construct_production("T", ["V '*' V", "V"], [1 / 3, 2 / 3])
+        grammarstr += construct_production("V", ["'x'", "'y'", "'z'"], [1 / 3, 1 / 3, 1 / 3])
+        grammar = pg.GeneratorGrammar(grammarstr)
+
+    elif batch_settings["grammar"] == "poly_stricter2":
+        grammarstr = construct_production("P", ["P '+' M", "M"], [0.4, 0.6])
+        grammarstr += construct_production("M", ["V '*' V", "'-' V '*' V", "'C' '*' V"], [0.25, 0.25, 0.5])
+        grammarstr += construct_production("V", ["'x'", "'y'", "'z'"], [1/3, 1/3, 1/3])
+        grammar = pg.GeneratorGrammar(grammarstr)
+
+    else:
+        print("Error: no such grammar.")
+
 
     symbols = {"x": batch_settings["variables"], "const": "C"}
     # generate models from grammar
@@ -48,7 +66,7 @@ def create_batches(**batch_settings):
     models = generate_models(grammar,
                              symbols,
                              strategy_settings={"N": batch_settings["num_samples"],
-                                                "max_repeat": 100},
+                                                "max_repeat": 50},
                              dimension=len(batch_settings["variables"]))
 
     model_batches = models.split(n_batches=batch_settings["n_batches"])
@@ -62,7 +80,8 @@ def create_batches(**batch_settings):
     os.makedirs(path_jobs, exist_ok=True)
 
     for ib in range(batch_settings["n_batches"]):
-        file_name = os.path.join(path_jobs, "job_{}_v{}_batch{}.pg".format(batch_settings["system"], batch_settings["job_version"], str(ib)))
+        file_name = os.path.join(path_jobs, "job_{}_v{}_batch{}.pg".format(batch_settings["system"],
+                                                                              batch_settings["job_version"], str(ib)))
         with open(file_name, "wb") as file:
             pickle.dump(model_batches[ib], file)
 
@@ -84,14 +103,14 @@ if __name__ == '__main__':
 
     # settings
     batch_settings = {
-        "system": 'lorenz_stable',
-        "job_version": '14',
-        "variables": ["'x'", "'y'", "'z'"],
-        "grammar": "custom",
-        "p_vars": [1 / 3, 1 / 3, 1 / 3],
-        "num_samples": 10000,
-        "n_batches": 1,
-        "path_main": os.path.join("D:\\", "Experiments", "DS2022"),
+        "system": 'VDP',
+        "job_version": '10',
+        "variables": ["'x'", "'y'"],
+        "grammar": "polynomial",
+        "p_vars": [1 / 2, 1 / 2],
+        "num_samples": 1000,
+        "n_batches": 100,
+        "path_main": os.path.join("D:\\", "Experiments", "DS2022", "proged"),
         "manual": False
     }
 
@@ -103,7 +122,7 @@ if __name__ == '__main__':
     os.makedirs(data_path, exist_ok=True)
     data_file = "data_{}_v{}_init{}.csv".format(batch_settings["system"], batch_settings["job_version"],  idx_init)
 
-    data = generate_ODE_data('lorenz_stable', [1., 1., 1.])
+    data = generate_ODE_data('VDP', [-0.2, -0.8])
     pd.DataFrame(data).to_csv(data_path + data_file, header=False, index=False)
 
 

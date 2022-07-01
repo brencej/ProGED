@@ -62,23 +62,43 @@ if __name__ == '__main__':
         with open(models_path + os.sep + models_file.split(".")[0] + "_settings.pg", "wb") as file:
             pickle.dump(estimation_settings, file)
 
-
-    filepath = "D:\\Experiments\\DS2022\\jobs\\lorenz_stable\\v14\\nbatches1\\"
-    with open(os.path.join(filepath, "job_lorenz_stable_v14_batch0.pg"), "rb") as file:
+    """   
+    # CHECK IF SPECIFIC MODEL IN MODELS
+    
+    filepath = "D:\\Experiments\\DS2022\\proged\\jobs\\VDP\\v10\\nbatches1\\"
+    with open(os.path.join(filepath, "job_VDP_v10_batch0.pg"), "rb") as file:
         models = pickle.load(file)
 
-    """    
+  
     filepath = "C:\\Users\\NinaO\\PycharmProjects\\ProGED\\ProGED\\examples\\DS2022\\results\\numdiff\\numdiff_lorenz_custom_eq0_models_fit.pg"
     with open(filepath, "rb") as file:
         models = pickle.load(file)
-    """
+
 
     for im in models:
-        if "C0*y + C1*x" in str(im) or \
-           "C0*x + C1*y" in str(im) or \
-           "C0*(y-x)" in str(im) or \
-           "C0*(-x+y)" in str(im):
+        im = str(im)
+        if "x**2*y" in im and \
+            "C0*x**2*y + C1*x," in im:
             print(im)
+
+    for idx, im in enumerate(models):
+        im = str(im)
+        if "C0*y," in im and \
+           "x**2*y + " in im:
+            print(im)
+            print(idx)
 
     ex1 = ["C*y + C*x, C*x + C*x*z + C*y, C*x*y + C*z"]
     ex2 = ["C*(y-x)", "x*(C-z)-y", "x*y - C*z"]
+    
+    if ("C0*y + C1*x," in im or \
+   "C0*x + C1*y," in im or \
+   "C0*(y-x)," in im or \
+   "C0*(-x+y)," in im) and \
+   ("C2*x +" in im or \
+   "C2*x*z +" in im or \
+   "C2*z*x +" in im or \
+   "C2*y +" in im):
+        print(im)
+   
+   """

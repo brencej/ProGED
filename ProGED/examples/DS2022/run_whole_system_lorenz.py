@@ -1,12 +1,7 @@
-import matplotlib
-import numpy as np
-from scipy.integrate import odeint
-import sys
-import os
 import pickle
 import time
 import ProGED as pg
-from ProGED.examples.DS2022.generate_data_ODE_systems import generate_ODE_data
+from utils.generate_data_ODE_systems import generate_ODE_data
 from ProGED.examples.DS2022.lorenz_simulation import plot_results
 
 

@@ -9,7 +9,7 @@ Methods:
 import os
 import sys
 import time
-
+import pandas as pd
 import numpy as np
 import sympy
 from scipy.optimize import differential_evolution, minimize

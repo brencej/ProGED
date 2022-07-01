@@ -1,8 +1,6 @@
-import matplotlib
 import numpy as np
-from scipy.integrate import odeint
 import ProGED as pg
-from ProGED.examples.DS2022.generate_data_ODE_systems import generate_ODE_data
+from utils.generate_data_ODE_systems import generate_ODE_data
 
 if __name__ == "__main__":
 
