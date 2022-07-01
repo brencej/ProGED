@@ -9,13 +9,13 @@ Methods:
 import os
 import sys
 import time
-import pandas as pd
 import numpy as np
-import sympy
+import sympy as sp
+
 from scipy.optimize import differential_evolution, minimize
 from scipy.interpolate import interp1d
 from scipy.integrate import solve_ivp, odeint
-import sympy as sp
+
 # from sklearn import ensemble #, tree  # Left for gitch_doctor metamodel
 from _io import TextIOWrapper as stdout_type
 import ProGED.mute_so as mt
@@ -291,30 +291,36 @@ def model_ode_error(params, model, X, Y, T, estimation_settings):
         print(params)
 
     try:
-
         # simulate
-        # Next few lines strongly suppress any warnning messages produced by LSODA solver, called by ode() function.
-        change_std2tee = False
+        # Next few lines strongly suppress any warnning messages
+        # produced by LSODA solver, called by ode() function.
+        # Suppression further complicates if making log files (Tee):
+        change_std2tee = False  # Normaly no need for this mess.
         if isinstance(sys.stdout, Tee):
-            # In this case the real standard output (sys.stdout) is not saved in original location sys.stdout.
-            # We have to obtain it inside of Tee object (look module tee_so).
+            # In this case the real standard output (sys.stdout) is not
+            # saved in original location sys.stdout. We have to obtain
+            # it inside of Tee object (look module tee_so).
             tee_object = sys.stdout  # obtain Tee object that has sys.stdout
             std_output = tee_object.stdout  # Obtain sys.stdout.
             sys.stdout = std_output  # Change fake stdout to real stdout.
-            change_std2tee = True
+            change_std2tee = True  # Remember to change it back.
 
+        def run_ode():
+            return ode(model, params, T, X, **estimation_settings)
+
+        # Next line works only when sys.stdout is real. Thats why above.
         if isinstance(sys.stdout, stdout_type):
             with open(os.devnull, 'w') as f, mt.stdout_redirected(f):
                 try:
-                    simX = ode(model, params, T, X, Y, **estimation_settings["objective_settings"])
+                    simX = run_ode()
                 except Exception as error:
-                    if estimation_settings["verbosity"] > 0:
-                        print("Error inside ode(), preventing tee/IO error.\n", error)
+                    if estimation_settings["verbosity"] >= 1:
+                        print("Inside ode(), preventing tee/IO error. Params at error:",
+                              params, f"and {type(error)} with message:", error)
         else:
-            simX = ode(model, params, T, X, Y, **estimation_settings["objective_settings"])
-
+            simX = run_ode()
         if change_std2tee:
-            sys.stdout = tee_object  # change_std2tee, Change it back to fake stdout (tee).
+            sys.stdout = tee_object  # Change it back to fake stdout (tee).
 
         # b. calculate the objective (MSE of the fit)
         if estimation_settings["objective_settings"]["simulate_separately"]:
