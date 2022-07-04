@@ -306,7 +306,7 @@ def model_ode_error(params, model, X, Y, T, estimation_settings):
             change_std2tee = True  # Remember to change it back.
 
         def run_ode():
-            return ode(model, params, T, X, **estimation_settings)
+            return ode(model, params, T, X, Y, **estimation_settings["objective_settings"])
 
         # Next line works only when sys.stdout is real. Thats why above.
         if isinstance(sys.stdout, stdout_type):
