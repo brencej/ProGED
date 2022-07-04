@@ -101,9 +101,9 @@ def test_model_box():
 def test_parameter_estimation():
     np.random.seed(1)
     def f(x):
-        return 2.0 * (x[:,0] + 0.3)
-    X = np.linspace(-1, 1, 20).reshape(-1,1)
-    Y = f(X).reshape(-1,1)
+        return 2.0 * (x[:, 0] + 0.3)
+    X = np.linspace(-1, 1, 20).reshape(-1, 1)
+    Y = f(X).reshape(-1, 1)
     data = np.hstack((X, Y))
     
     grammar = GeneratorGrammar("""S -> S '+' T [0.4] | T [0.6]
@@ -134,7 +134,7 @@ def test_parameter_estimation_2D():
                               T -> 'C' [0.6] | T "*" V [0.4]
                               V -> 'x' [0.5] | 'y' [0.5]""")
     symbols = {"x": ['x', 'y'], "start": "S", "const": "C"}
-    models = generate_models(grammar, symbols, strategy_settings={"N":2})
+    models = generate_models(grammar, symbols, strategy_settings={"N": 2})
 
     estimation_settings = {"target_variable_index": -1,
                            "time_index": None,
@@ -155,7 +155,8 @@ def test_parameter_estimation_ODE():
                                 T -> V [0.4] | 'C' "*" V [0.6]
                                 V -> 'x' [0.5] | 'y' [0.5]""")
     symbols = {"x": ["x", "y"], "start": "S", "const": "C"}
-    np.random.seed(2)
+
+    np.random.seed(0)
     models = generate_models(grammar, symbols, strategy_settings={"N": 3})
 
     estimation_settings = {"target_variable_index": 1,
@@ -163,43 +164,41 @@ def test_parameter_estimation_ODE():
                            "objective_settings": {"use_jacobian": False},
                            "verbosity": 0}
 
-    fit_models(models, data, task_type="differential", estimation_settings=estimation_settings)
+    models = fit_models(models, data, task_type="differential", estimation_settings=estimation_settings)
+
+    def assert_line(models, i, expr, error, tol=1e-9, n=100):
+        assert str(models[i].get_full_expr())[:n] == expr[:n]
+        assert abs(models[i].get_error() - error) < tol
+    assert_line(models, 0, "4.65716206980249*y", 4.60039764161529)
+    assert_line(models, 1, "-10.0*x", 8.256188274283515)
+    assert_line(models, 2, "y", 10.044322790817118, n=8)
 
     """    
         print("\n", models, "\n\nFinal score:")
         for m in models:
             print(f"model: {str(m.get_full_expr()):<30}; error: {m.get_error():<15}")
-    
-    def assert_line(models, i, expr, error, tol=1e-9, n=100):
-        assert str(models[i].get_full_expr())[:n] == expr[:n]
-        assert abs(models[i].get_error() - error) < tol
-    assert_line(models, 0, "y", 0.7321678286712089)
-    assert_line(models, 1, "x", 0.06518775248116751)
-    assert_line(models, 2, "x + 0.40026612522043*y", 2.5265334439915307e-09, n=8)
     """
-    return
 
 def test_parameter_estimation_ODE_system():
-    generation_settings = {"simulation_time": 1}
+    generation_settings = {"simulation_time": 0.25}
     data = generate_ODE_data(system='VDP', inits=[-0.2, -0.8], **generation_settings)
 
     system = ModelBox(observed=["x", "y"])
     system.add_system(["C*y", "C*y - C*x*x*y - C*x"], symbols={"x": ["x", "y"], "const": "C"})
     estimation_settings = {"target_variable_index": None,
                            "time_index": 0,
-                           "max_iter": 8,
+                           "max_iter": 6,
                            "pop_size": 3,
                            "objective_settings": {"use_jacobian": False},
                            "verbosity": 0}
-
+    np.random.seed(0)
     system = fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
     assert system[0].get_error() < 1e-6
     # true params: [[1.], [-0.5., -1., 0.5]]
-    return
 
 
 def test_parameter_estimation_ODE_system_partial_observability():
-    generation_settings = {"simulation_time": 1}
+    generation_settings = {"simulation_time": 0.25}
     data = generate_ODE_data(system='VDP', inits=[-0.2, -0.8], **generation_settings)
     data = data[:, (0, 1)]  # y, 2nd column, is not observed
 
@@ -207,14 +206,14 @@ def test_parameter_estimation_ODE_system_partial_observability():
     system.add_system(["C*y", "C*y - C*x*x*y - C*x"], symbols={"x": ["x", "y"], "const": "C"})
     estimation_settings = {"target_variable_index": None,
                            "time_index": 0,
-                           "max_iter": 10,
+                           "max_iter": 6,
                            "pop_size": 3,
                            "objective_settings": {"use_jacobian": False},
                            "verbosity": 0}
 
     models = fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
     assert models[0].get_error() < 1e-6
-    return
+    # true params: [[1.], [-0.5., -1., 0.5]]
 
 def test_equation_discoverer():
     np.random.seed(0)

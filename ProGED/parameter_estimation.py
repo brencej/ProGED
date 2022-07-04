@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Methods for estimating model parameters. Currently implemented:
-        differential evolution, hyperopt.
+"""
+Methods for estimating model parameters. Currently implemented for algebraic and differential equations.
+Optimization methods available are differential evolution, hyperopt.
 
 Methods:
     fit_models: Performs parameter estimation on given models. Main interface to the module.
@@ -42,16 +43,13 @@ warnings.filterwarnings("ignore", message="overflow encountered in double_scalar
 
 
 class ParameterEstimator:
-    """Wraps the entire parameter estimation, so that we can pass the map function in fit_models
+    """ Wraps the entire parameter estimation, so that we can pass the map function in fit_models
         a callable with only a single argument.
         Also checks some basic requirements, such as minimum and maximum number of parameters.
 
         TODO:
             add inputs to make requirements flexible
             add verbosity input
-        Input:
-            estimation_settings: Dictionary with multiple parameters
-                that determine estimation process more specifically.
     """
 
     def __init__(self, data, task_type, estimation_settings):
@@ -177,7 +175,8 @@ def fit_models(models, data, task_type="algebraic", pool_map=map, estimation_set
                 equation discovery.
 
             arguments that can be passed via estimation_settings dictionary:
-                target_variable_index (int): Index of column in data that belongs to the target variable.
+                target_variable_index (int): Index of column in data that belongs to the target variable. If None,
+                         all variables are considered targets (e.g. for systems ODE).
                 time_index (int): Index of column in data that belongs to measurement of time.
                         Required for differential equations, None otherwise.
                 max_constants (int): Maximum number of free constants allowed. For the sake of computational
@@ -188,7 +187,9 @@ def fit_models(models, data, task_type="algebraic", pool_map=map, estimation_set
                 lower_upper_bounds (tuple[float]): Pair, i.e. tuple of lower and upper
                     bound used to specify the boundaries of optimization, e.g. of
                     differential evolution.
-                max_ode_steps (int): Maximum number of steps used in one run of LSODA solver.
+                default_error: if the error for objective function could not be calculated, use this default.
+                objective_settings: settings for odeint (scipy.integrate documentation)
+                optimizer_settings: settings for differential_evolution (scipy.optimize documentation)
                 verbosity (int): Level of printout desired. 0: none, 1: info, 2+: debug.
     """
 
@@ -244,8 +245,7 @@ def fit_models(models, data, task_type="algebraic", pool_map=map, estimation_set
 
 
 def DE_fit (model, X, Y, T, p0, **estimation_settings):
-    """Calls scipy.optimize.differential_evolution.
-    Exists to make passing arguments to the objective function easier."""
+    """Calls scipy.optimize.differential_evolution."""
 
     lu_bounds = estimation_settings['optimizer_settings']['lower_upper_bounds']
     lower_bound, upper_bound = lu_bounds[0]+1e-30, lu_bounds[1]+1e-30
@@ -278,8 +278,8 @@ def model_ode_error(params, model, X, Y, T, estimation_settings):
 
         Input:
         - T is column of times at which samples in X and Y happen.
-        - X are columns without features that are derived.
-        - Y are columns of features that are derived via ode fitting.
+        - X are columns of data (without potential target variables/columns).
+        - Y are columns of data that correspond to target variables: features that are derived via ode fitting.
     """
 
     model.set_params(params, split=True)
@@ -345,8 +345,8 @@ def ode(model, params, T, X, Y, **objective_settings):
 
     Raise error if input is incompatible.
         Input:
-            models_list -- list (not dictionary) of models that e.g. generate_models() generates.
-            params_matrix -- list of lists or ndarrays of parameters for corresponding models.
+            model -- list (not dictionary) of models that e.g. generate_models() generates.
+            params -- list of lists or ndarrays of parameters for corresponding models.
             X_data -- 2-dim array (matrix) i.e. X = [X[0,:], X[1,:],...].
             T -- (1-dim) array, i.e. of shape (N,)
             max_ode_steps -- maximal number of steps inside ODE solver to determine the minimal step size inside ODE solver.
@@ -462,14 +462,14 @@ def model_error(params, model, X, Y, _T=None, estimation_settings=None):
 
 
 def model_error_general(params, model, X, Y, T, **estimation_settings):
-    """Calculate error of model with given parameters in general with
-    type of error given.
+    """Calculate error of model with given parameters in general with type of error given.
         Input = TODO:
     - X are columns without features that are derived.
     - Y are columns of features that are derived via ode fitting.
     - T is column of times at which samples in X and Y happen.
     - estimation_settings: look description of fit_models()
     """
+
     task_type = estimation_settings["task_type"]
     if task_type in ("algebraic", "integer-algebraic"):
         return model_error(params, model, X, Y, _T=None,
@@ -487,7 +487,6 @@ def model_error_general(params, model, X, Y, T, **estimation_settings):
 def min_fit (model, X, Y):
     """Calls scipy.optimize.minimize. Exists to make passing arguments to the objective function easier."""
     return minimize(optimization_wrapper, model.params, args=(model, X, Y))
-
 
 def hyperopt_fit (model, X, Y, T, p0, **estimation_settings):
     """Calls Hyperopt.
@@ -654,15 +653,15 @@ if __name__ == "__main__":
     X = lhs(2, 10)*5
     X = X.reshape(-1, 2)
     y = testf(X).reshape(-1,1)
-    data = np.hstack((X,y))
+    data = np.hstack((X, y))
 
     grammar = GeneratorGrammar("""S -> S '+' T [0.4] | T [0.6]
                               T -> 'C' [0.6] | T "*" V [0.4]
                               V -> 'x' [0.5] | 'y' [0.5]""")
-    symbols = {"x":['x', 'y'], "start":"S", "const":"C"}
+    symbols = {"x":['x', 'y'], "start": "S", "const": "C"}
     N = 10
 
-    models = generate_models(grammar, symbols, strategy_settings={"N":10})
+    models = generate_models(grammar, symbols, strategy_settings={"N": 10})
     models = fit_models(models, data, task_type="algebraic")
     print(models)
 
