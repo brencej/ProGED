@@ -197,17 +197,32 @@ def extend_units_dio(units_list, target_variable_index):
     units = list(units_list)
     units.pop(target_variable_index)
 
-    """Define and solve the system of diophantine equations."""
-    A = sp.Matrix(np.vstack(units)).T
-    b = sp.Matrix(target_unit)
-    solutions = clumsy_solve(A, b)
+    """diophantine removes zero-value rows, so we need to track those zeros and add them back later"""
+    units_matrix = np.vstack(units_list).T
+    #zeroind = np.where((units_matrix==0).all(axis=1))[0]
+    #units_matrix = np.delete(units_matrix, zeroind, axis=0)
 
+    """Define and solve the system of diophantine equations."""
+    A = sp.Matrix(units_matrix[:, :-1])
+    b = sp.Matrix(units_matrix[:, -1])
+    if len(A) < 1:
+        return units_list
+    solutions = clumsy_solve(A, b)
+    if len(solutions) < 1:
+        print("Unable to extend units - found no solutions to diophantine equation.")
+        return units_list
+
+    """Convert from the coefficient basis to the units basis"""
     expanded_units = list(units)
     for solution in solutions:
         expanded_multipliers = []
+        """Insert back the removed zeros"""
+        #solution = np.array(sol).reshape((-1,))
+        #for i in zeroind:
+        #    solution = np.insert(solution, i, 0)
         """For each dimension, generate every integer multiplier up to the maxumal."""
         for u in solution:
-            expanded_multipliers += [[ui for ui in range(0, u+1)]]
+            expanded_multipliers += [[np.sign(u)*ui for ui in range(0, abs(u)+1)]]
         """Generate the cartesian product of the integer multipliers between all dimensions."""
         expanded_combinations = product(*expanded_multipliers)
         """Obtain units by computing sums of weighted units."""
