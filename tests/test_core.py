@@ -115,7 +115,8 @@ def test_parameter_estimation():
     
     models = generate_models(grammar, symbols, strategy_settings = {"N":N})
     models = fit_models(models, data, target_variable_index = -1, task_type="algebraic")
-    
+    print(models[0].get_error())
+    print(models[1].get_error())
     assert np.abs(models[0].get_error() - 0.36) < 1e-6
     assert np.abs(models[1].get_error() - 1.4736842) < 1e-6
 
