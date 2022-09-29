@@ -23,6 +23,7 @@ Attributes:
 
 GENERATOR_LIBRARY = {"grammar": grammar_from_template}
 
+
 class EqDisco:
     """
     EqDisco provides a modular interface to the ProGED system that simplifies the workflow for common problems in equation discovery.
@@ -102,48 +103,45 @@ class EqDisco:
             Returns:
                 ProGED.ModelBox of models with fitted parameters.
     """
-        
-        
-            
-        
-    def __init__ (self, 
-                  task = None,  
-                  data = None, 
-                  target_variable_index = -1, 
-                  time_index = None, 
-                  variable_names = None, 
-                  constant_symbol = "C",
-                  task_type = "algebraic",
-                  generator = "grammar", 
-                  generator_template_name = "universal", 
-                  variable_probabilities = None, 
-                  generator_settings = {},
-                  strategy = "monte-carlo", 
-                  strategy_settings = None, 
-                  sample_size = 10,
-                  max_attempts = 1,
-                  repeat_limit = 100,
-                  depth_limit = 1000,
-                  estimation_settings = {},
-                  success_threshold = 1e-8,
-                  verbosity = 1):        
+
+    def __init__(self,
+                 task=None,
+                 data=None,
+                 target_variable_index=-1,
+                 time_index=None,
+                 variable_names=None,
+                 constant_symbol="C",
+                 task_type="algebraic",
+                 generator="grammar",
+                 generator_template_name="universal",
+                 variable_probabilities=None,
+                 generator_settings={},
+                 strategy="monte-carlo",
+                 strategy_settings=None,
+                 sample_size=10,
+                 max_attempts=1,
+                 repeat_limit=100,
+                 depth_limit=1000,
+                 estimation_settings={},
+                 success_threshold=1e-8,
+                 verbosity=1):
         
         if not task:
             if isinstance(data, type(None)):
-                raise TypeError ("Missing inputs. Either task object or data required.")
+                raise TypeError("Missing inputs. Either task object or data required.")
             else:
-                self.task = EDTask(data = data, 
-                                   target_variable_index = target_variable_index, 
-                                   time_index = time_index, 
-                                   variable_names = variable_names, 
-                                   constant_symbol = constant_symbol,
-                                   success_threshold = success_threshold, 
-                                   task_type = task_type)
+                self.task = EDTask(data=data,
+                                   target_variable_index=target_variable_index,
+                                   time_index=time_index,
+                                   variable_names=variable_names,
+                                   constant_symbol=constant_symbol,
+                                   success_threshold=success_threshold,
+                                   task_type=task_type)
                 
         elif isinstance(task, EDTask):
             self.task = task
         else:
-            raise TypeError ("Missing task information!")
+            raise TypeError("Missing task information!")
         
         if not variable_probabilities:
             variable_probabilities = [1/len(self.task.var_names)]*np.sum(self.task.variable_mask)
@@ -154,8 +152,8 @@ class EqDisco:
             if generator in GENERATOR_LIBRARY:
                 self.generator = GENERATOR_LIBRARY[generator](generator_template_name, 
                                                               generator_settings,
-                                                              repeat_limit = repeat_limit,
-                                                              depth_limit = depth_limit)
+                                                              repeat_limit=repeat_limit,
+                                                              depth_limit=depth_limit)
             else:
                 raise KeyError("Generator name not found. Supported generators:\n" + str(list(GENERATOR_LIBRARY.keys())))
         else:
@@ -175,25 +173,26 @@ class EqDisco:
         self.solution = None
         
         self.verbosity = verbosity
-        
-        
-    def generate_models (self, strategy_settings = None):
+
+    def generate_models(self, strategy_settings=None):
         if not strategy_settings:
             strategy_settings = self.strategy_settings
-        self.models = generate_models(self.generator, self.task.symbols, self.strategy, strategy_settings, verbosity=self.verbosity)
+        self.models = generate_models(self.generator, self.task.symbols, self.strategy,
+                                      strategy_settings, verbosity=self.verbosity)
         return self.models
     
-    def fit_models (self, estimation_settings = {}, pool_map = map):
+    def fit_models(self, default_error=10**9, estimation_settings={}, pool_map=map):
         if not estimation_settings:
             estimation_settings = self.estimation_settings
         self.models = fit_models(self.models, self.task.data, self.task.target_variable_index, 
-                                 time_index = self.task.time_index,
-                                 task_type = self.task.task_type, pool_map = pool_map, 
+                                 time_index=self.task.time_index,
+                                 task_type=self.task.task_type, pool_map=pool_map,
                                  verbosity=self.verbosity,
-                                 estimation_settings = estimation_settings)
+                                 default_error=default_error,
+                                 estimation_settings=estimation_settings)
         return self.models
     
-    def get_results (self, N=3):
+    def get_results(self, N=3):
         return self.models.retrieve_best_models(N)
     
     def get_stats (self):
@@ -202,41 +201,37 @@ class EqDisco:
                                  self.task.target_variable_index,
                                  self.task.success_thr)
 
-    def write_results(self, filename):
+    def write_results(self, filename=None, dummy=10**8):
         res = []
         models = self.models.models_dict
         for eq in models.keys():
             model = models[eq]
             for tree in model.trees.keys():
                 try:
-                    res.append({"eq": eq, "error": model.get_error(), "p": model.p, "code": tree})
+                    res.append({"eq": eq, "error": model.get_error(dummy=dummy), "p": model.p, "code": tree})
                 except Exception as error:
                     print(f"Failed to write results for equation {eq}.")
         res = sorted(res, key=lambda x: x["error"])
-        with open(filename, 'w') as file:
-            json.dump(res, file)
+        if filename is not None:
+            with open(filename, 'w') as file:
+                json.dump(res, file)
+        else:
+            return res
 
 
-        
-    
 if __name__ == "__main__":
     print("--- equation_discoverer.py test --- ")
     np.random.seed(1)
     
     def f(x):
         return 2.0 * (x + 0.3)
-	
     X = np.linspace(-1, 1, 20)
     Y = f(X)
-    X = X.reshape(-1,1)
-    Y = Y.reshape(-1,1)
-    data = np.hstack((X,Y))
+    X = X.reshape(-1, 1)
+    Y = Y.reshape(-1, 1)
+    data = np.hstack((X, Y))
         
-    ED = EqDisco(task = None,
-                 data = data,
-                 target_variable_index = -1,
-                 sample_size = 100,
-                 verbosity = 1)
+    ED = EqDisco(task=None, data=data, target_variable_index=-1, sample_size=100, verbosity=1)
     
     #print(ED.generate_models())
     #print(ED.fit_models())
