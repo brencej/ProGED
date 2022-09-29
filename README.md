@@ -14,10 +14,16 @@ The output of ProGED is a list of equations, ordered according to the likelihood
 Details in https://www.sciencedirect.com/science/article/pii/S0950705121003403.
 
 ## Dependencies
+CORE:
 - numpy
 - scipy
 - sympy
 - NLTK
+
+OPTIONAL:
+- diophantine (for dimensionally-consistent grammars)
+- torch, tqdm (for HVAE generator)
+- botorch (for Bayesian optimization with HVAE)
 
 ## Setup
 You can install the package directly from the git repository:
