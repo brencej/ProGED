@@ -46,7 +46,6 @@ def model_error (params, model, X, Y, _T=None, estimation_settings=None):
     """Defines mean squared error as the error metric."""
     try:
         verbosity = estimation_settings['verbosity']
-
         testY = model.evaluate(X, *params)
         res = np.mean((Y-testY)**2)
         if np.isnan(res) or np.isinf(res) or not np.isreal(res):
@@ -421,7 +420,8 @@ def DE_fit (model, X, Y, T, p0, **estimation_settings):
         estimation_settings["objective_function"],
         bounds,
         args=[model, X, Y, T, estimation_settings],
-        callback=diff_evol_timeout, maxiter=10**2, popsize=10)
+        callback=diff_evol_timeout, 
+        **estimation_settings["optimizer_settings"])
 
 def min_fit (model, X, Y):
     """Calls scipy.optimize.minimize. Exists to make passing arguments to the objective function easier."""
