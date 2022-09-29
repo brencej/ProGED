@@ -1,0 +1,32 @@
+I cannot tell for sure, but as far as I can see from old lorenz.py file,
+I used the following times and initial values:
+
+T = np.linspace(0.48, 0.85, 1000)  # Times currently run at.
+with following initial values:
+y0 = [0.1, 0.4, 0.5]
+
+in 2 different scenarios:
+# non-chaotic configuration:
+    sigma = 1.3  # 1 # 0
+    rho = -15  # 1 # 0
+    beta = 3.4  # 1 # 0
+# Chaotic configuration:
+    sigma = 10  # 1 # k0
+    rho = 28  # 1 # 0
+    beta = 8/3  # 1 # 0
+
+
+But in my old file I also have notes with recommend values from wiki:
+
+T = np.linspace(0, 40, 4000)  # Chaotic Lorenz times noted on Wiki.
+y0 = [1, 1, 1]  # Chaotic Lorenz initial values noted on Wiki.
+
+# # Lorenz's sode (for reference):
+# dx/dt = \sigma * (y-x)
+# dy/dt = x*(\rho-z) - y
+# dz/dt = x*y - \beta*z
+
+python's implementation on wiki:
+https://en.wikipedia.org/wiki/Lorenz_system#Python_simulation
+
+

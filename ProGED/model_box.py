@@ -7,6 +7,7 @@ from sympy import symbols as sympy_symbols
 import pickle
 
 from ProGED.model import Model
+from ProGED.system_model import SystemModel
 
 """Implements ModelBox, an class that stores and manages a collection of Model instances."""
 
@@ -34,39 +35,105 @@ class ModelBox:
         values: Return the Model instances in models_dict.
         items: Return the key and value pairs in models_dict.
     """
-    def __init__ (self, models_dict = {}):
+    def __init__ (self, models_dict = {}, observed = None):
         self.models_dict = dict(models_dict)
+        self.observed = observed
+
+    def add_model(self, expr, symbols, p=1.0, params=None, info={}):
+        if isinstance(expr, str):
+            return self.add_single_model(expr, symbols, p=p, info=info, params=params)
+        elif isinstance(expr, (list, tuple)):
+            if len(expr) == 1:
+                return self.add_single_model(expr[0], symbols, p=p, info=info, params=params)
+            else:
+                return self.add_system(expr, symbols, p=p, params=params, info=info)
+        else:
+            print("Error in add_model: unknown type for input expression. Should be string or a list or tuple of strings.")
+            return False, expr
+
+    def add_system(self, expr_strs, symbols, p=1.0, params=None, info={}):
+        x = [s.strip("'") for s in symbols["x"]]
+        exprs, symbols_params = self.string_to_canonic_system(expr_strs, symbols)
         
-    def add_model (self, expr_str, symbols, grammar, code="0", p=1.0, **kwargs):
+        for expr in exprs:
+            if not self.verify_expression(expr, x, symbols_params):
+                return False, exprs
+        
+        if str(exprs) in self.models_dict:
+            # extend add_tree first
+            if "code" in info:
+                code = info["code"]
+            else:
+                code = ""
+            self.models_dict[str(exprs)].add_tree(code, p)
+        else:
+            if not params:
+                params = [[(np.random.random()-0.5)*10 for _ in range(len(par))] for par in symbols_params]
+            if not self.observed:
+                self.observed = x
+            self.models_dict[str(exprs)] = SystemModel(expr = exprs, sym_vars = x, sym_params = symbols_params, params=params, p=p, info=info, observed=self.observed)
+        
+        return True, str(exprs)
+        
+    def add_single_model(self, expr_str, symbols, p=1.0, info={}, params=None):
         x = [s.strip("'") for s in symbols["x"]]
         expr, symbols_params = self.string_to_canonic_expression(expr_str, symbols)
         
-        if not self.verify_expression(expr, symbols=symbols, grammar=grammar, code=code, 
-                                      p=p, x=x, symbols_params=symbols_params):
+        if not self.verify_expression(expr, x, symbols_params):
             return False, expr
-        
+
+        if "code" in info:
+            code = info["code"]
+        else:
+            code = ""
+        if "grammar" in info:
+            grammar = info["grammar"]
+        else:
+            grammar = ""
+
         if str(expr) in self.models_dict:
             self.models_dict[str(expr)].add_tree(code, p)
         else:
-            if "params" in kwargs:
-                params = kwargs["params"]
-            else:
+            if not params:
                 params = [(np.random.random()-0.5)*10 for i in range(len(symbols_params))]
                 
             self.models_dict[str(expr)] = Model(grammar=grammar, expr = expr, sym_vars = x, sym_params = symbols_params, params=params, code=code, p=p)
         
         return True, str(expr)
     
-    def verify_expression(self, expr, **kwargs):
+    def verify_expression(self, expr, sym_vars, sym_params):
         good = False
         """Sanity test + check for complex infinity"""
-        if len(kwargs["symbols_params"]) > -1 and not "zoo" in str(expr):
+        if len(sym_params) > -1 and not "zoo" in str(expr):
             """Check if expr contains at least one variable"""
-            for xi in kwargs["x"]:
+            for xi in sym_vars:
                 if xi in str(expr):
                     good = True
                     break
         return good
+
+    def enumerate_constants_system(self, expr, symbols):
+        """ Enumerates the constants in a Sympy expression. 
+        Example: C*x**2 + C*x + C -> C0*x**2 + C1*x + C2
+        Input:
+            expr - Sympy expression object
+            symbols - dict of symbols used in the grammar. Required keys: "const", which must be a single character, such as "'C'".
+        Returns:
+            Sympy object with enumerated constants
+            list of enumerated constants"""
+            
+        char_list = np.array(list(str(expr)), dtype='<U16')
+        constind = np.where(char_list == symbols["const"].strip("'"))[0]
+
+        char_lists = [np.array(list(str(ex)), dtype='<U16') for ex in expr]
+        n_consts = [np.sum(cl == symbols["const"].strip("'")) for cl in char_lists]
+
+        """ Rename all constants: c -> cn, where n is the index of the associated term"""
+        constants = [symbols["const"].strip("'")+str(i) for i in range(len(constind))]
+        char_list[constind] = constants
+        exprs_str = "".join(char_list).strip(" []").replace("'","").split(",")
+        split_exprs = [sp.sympify(expr_str) for expr_str in exprs_str]
+        return split_exprs, list(np.split(constants, np.cumsum(n_consts)))
     
     def enumerate_constants(self, expr, symbols):
         """ Enumerates the constants in a Sympy expression. 
@@ -77,78 +144,15 @@ class ModelBox:
         Returns:
             Sympy object with enumerated constants
             list of enumerated constants"""
-        if isinstance(symbols["const"], list):
-            csym = symbols["const"]
-        elif isinstance(symbols["const"], str):
-            csym = [symbols["const"]]
             
-        poly2 = np.array(list(str(expr)), dtype='<U16')
-        for c in csym:
-            constind = np.where(poly2 == symbols["const"].strip("'"))[0]
-            """ Rename all constants: c -> cn, where n is the power of the associated term"""
-            constants = [symbols["const"].strip("'")+str(i) for i in range(len(constind))]
-            poly2[constind] = constants
-        """ Return the sympy object """
-        return sp.sympify("".join(poly2)), tuple(constants)
-    
-    def enumerate_constants_2(self, expr, symbols):
-        """ Enumerates the constants in a Sympy expression. 
-        Example: C*x**2 + C*x + C -> C0*x**2 + C1*x + C2
-        Input:
-            expr - Sympy expression object
-            symbols - dict of symbols used in the grammar. Required keys: "const", which must be a single character, such as "'C'".
-        Returns:
-            Sympy object with enumerated constants
-            list of enumerated constants"""
-        if isinstance(symbols["const"], list):
-            csym = symbols["const"]
-        elif isinstance(symbols["const"], str):
-            csym = [symbols["const"]]
+        char_list = np.array(list(str(expr)), dtype='<U16')
+        constind = np.where(char_list == symbols["const"].strip("'"))[0]
+        """ Rename all constants: c -> cn, where n is the index of the associated term"""
+        constants = [symbols["const"].strip("'")+str(i) for i in range(len(constind))]
+        char_list[constind] = constants
+        return sp.sympify("".join(char_list)), tuple(constants)
             
-        poly2 = np.array(list(str(expr)), dtype='<U16')
-        for c in csym:
-            constind = np.where(poly2 == symbols["const"].strip("'"))[0]
-            """ Rename all constants: c -> cn, where n is the power of the associated term"""
-            constants = [symbols["const"].strip("'")+str(i) for i in range(len(constind))]
-            poly2[constind] = constants
-
-        return "".join(poly2), tuple(constants)
-    
-    def simplify_constants_2 (self, eq, c, var):
-        if len(eq.args) == 0:
-            return eq in var, eq is c, [(eq,eq)]
-        else:
-            has_var, has_c, subs = [], [], []
-            for a in eq.args:
-                a_rec = self.simplify_constants (a, c, var)
-                has_var += [a_rec[0]]; has_c += [a_rec[1]]; subs += [a_rec[2]]
-            if sum(has_var) == 0 and True in has_c:
-                return False, True, [(eq, c)]
-            else:          
-                args = []
-                if isinstance(eq, (sp.add.Add, sp.mul.Mul)):
-                    has_free_c = False
-                    if True in [has_c[i] and not has_var[i] for i in range(len(has_c))]:
-                        has_free_c = True
-                        
-                    for i in range(len(has_var)):
-                        if has_var[i] or (not has_free_c and not has_c[i]):
-                            if len(subs[i]) > 0:
-                                args += [eq.args[i].subs(subs[i])]
-                            else:
-                                args += [eq.args[i]]
-                    if has_free_c:
-                        args += [c]
-                    
-                else:
-                    for i in range(len(has_var)):
-                        if len(subs[i]) > 0:
-                            args += [eq.args[i].subs(subs[i])]
-                        else:
-                            args += [eq.args[i]]
-                return True in has_var, True in has_c, [(eq, eq.func(*args))]
-            
-    def simplify_constants (self, eq, c, var):
+    def simplify_constants(self, eq, c, var):
         if len(eq.args) == 0:
             if eq in var:
                 return True, False, [(eq, eq)]
@@ -186,8 +190,8 @@ class ModelBox:
                         else:
                             args += [eq.args[i]]
                 return True in has_var, True in has_c, [(eq, eq.func(*args))]
-            
-    def string_to_canonic_expression_2 (self, expr_str, symbols={"x":["'x'"], "const":"'C'", "start":"S", "A":"A"}):
+    
+    def string_to_canonic_system (self, expr_strs, symbols={"x":["'x'"], "const":"'C'", "start":"S", "A":"A"}):
         """Convert the string into the canonical Sympy expression.
 
         Input:
@@ -199,11 +203,16 @@ class ModelBox:
         """
         x = [sympy_symbols(s.strip("'")) for s in symbols["x"]]
         c = sympy_symbols(symbols["const"].strip("'"))
-        expr = sp.sympify(expr_str)
-        expr = self.simplify_constants(expr, c, x)[2][0][1]
-        expr, symbols_params = self.enumerate_constants(expr, symbols)
-        return expr, symbols_params
-    
+        
+        exprs = self.enumerate_constants_system(expr_strs, symbols)[0]
+        exprs = [self.simplify_constants(expr, c, x)[2][0][1] for expr in exprs]
+        exprs = self.enumerate_constants_system(exprs, symbols)[0]
+        exprs = [self.simplify_constants(expr, c, x)[2][0][1] for expr in exprs]
+        
+        exprs, symbols_params = self.enumerate_constants_system(exprs, symbols)
+        symbols_params = [tuple(sorted(list([s.name for s in (expr.free_symbols - set(x))]))) for expr in exprs]
+        return exprs, symbols_params
+
     def string_to_canonic_expression (self, expr_str, symbols={"x":["'x'"], "const":"'C'", "start":"S", "A":"A"}):
         """Convert the string into the canonical Sympy expression.
 
@@ -308,11 +317,16 @@ class ModelBox:
     def __str__(self):
         txt = "ModelBox: " + str(len(self.models_dict)) + " models"
         for m in self.models_dict:
-            txt += "\n-> " + str(self.models_dict[m].expr) + ", p = " + str(self.models_dict[m].p)
+            if self.models_dict[m].valid:
+                txt += "\n-> " + str(self.models_dict[m])
+            else: 
+                txt += "\n-> " + str(self.models_dict[m].expr) 
+            txt += ", p = " + str(self.models_dict[m].p)
             txt += ", parse trees = " + str(len(self.models_dict[m].trees))
             txt += ", valid = " + str(self.models_dict[m].valid)
             if self.models_dict[m].valid:
                 txt += ", error = " + str(self.models_dict[m].get_error())
+                txt += ", time = " + str(self.models_dict[m].get_time())
         return txt
     
     def keys(self):

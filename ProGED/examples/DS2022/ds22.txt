@@ -1,0 +1,7 @@
+
+fully obvserved: numericne odvode ... 1) algebraiskih :
+proged, sindy, eql, (end-to-end?)
+2) system (proged)
+
+6 partialy observed scenarijev unobserved:
+    - proged
