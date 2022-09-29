@@ -109,6 +109,7 @@ def test_parameter_estimation():
     grammar = GeneratorGrammar("""S -> S '+' T [0.4] | T [0.6]
                               T -> 'C' [0.6] | T "*" V [0.4]
                               V -> 'x' [0.5] | 'y' [0.5]""")
+                              
     symbols = {"x": ['x'], "start": "S", "const": "C"}
     models = generate_models(grammar, symbols, strategy_settings={"N": 2})
 

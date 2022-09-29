@@ -61,6 +61,7 @@ class ParameterEstimator:
         # setup of the mask for the data columns
         var_mask = np.ones(data.shape[-1], bool)
 
+
         ## a. set parameter estimation for differential equations
         if task_type == "differential":
 
@@ -634,7 +635,6 @@ def hyperopt_fit (model, X, Y, T, p0, **estimation_settings):
     if verbosity >= 3:
         print(result)
     return result
-
 
 
 if __name__ == "__main__":

@@ -113,6 +113,7 @@ def resample_curve (models, data, target_variable_index = -1, resampleN = 100, s
                 err = mse
             joined_probs += [models[m].p]
             joined_errors += [np.log10(err)]
+
         
     joined_probs_norm = np.array(joined_probs)/np.sum(joined_probs)
     #sample_size = np.sum(joined_probs_norm > 0)

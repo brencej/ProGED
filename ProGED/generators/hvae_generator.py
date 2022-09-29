@@ -2,6 +2,7 @@ from enum import Enum
 
 from ProGED.generators.base_generator import BaseExpressionGenerator
 from ProGED.equation_discoverer import EqDisco
+
 import numpy as np
 import torch
 from torch.autograd import Variable
@@ -18,15 +19,21 @@ class SymType(Enum):
     Fun = 4
 
 
-universal_symbols = [{"symbol": 'x', "type": SymType.Var, "precedence": 5},
-                     {"symbol": 'c', "type": SymType.Const, "precedence": 5},
+universal_symbols = [{"symbol": 'x1', "type": SymType.Var, "precedence": 5},
+                     {"symbol": 'x2', "type": SymType.Var, "precedence": 5},
+                     {"symbol": 'x3', "type": SymType.Var, "precedence": 5},
+                     {"symbol": 'x4', "type": SymType.Var, "precedence": 5},
+                     {"symbol": 'x5', "type": SymType.Var, "precedence": 5},
+                     {"symbol": 'C', "type": SymType.Const, "precedence": 5},
                      {"symbol": '+', "type": SymType.Operator, "precedence": 0},
                      {"symbol": '-', "type": SymType.Operator, "precedence": 0},
                      {"symbol": '*', "type": SymType.Operator, "precedence": 1},
                      {"symbol": '/', "type": SymType.Operator, "precedence": 1},
                      {"symbol": '^', "type": SymType.Operator, "precedence": 2},
                      {"symbol": 'sin', "type": SymType.Fun, "precedence": 5},
-                     {"symbol": 'cos', "type": SymType.Fun, "precedence": 5}]
+                     {"symbol": 'cos', "type": SymType.Fun, "precedence": 5},
+                     {"symbol": 'sqrt', "type": SymType.Fun, "precedence": 5},
+                     {"symbol": 'exp', "type": SymType.Fun, "precedence": 5}]
 
 
 class GeneratorHVAE(BaseExpressionGenerator):
@@ -34,6 +41,7 @@ class GeneratorHVAE(BaseExpressionGenerator):
         self.generator_type = "HVAE"
         self.decoding_dict = symbols
         self.precedence = {t["symbol"]: t["precedence"] for t in symbols}
+        self.constant = [t["symbol"] for t in symbols if t["type"]==SymType.Const][0]
         self.variables = variables
         if isinstance(model, str):
             self.model = torch.load(model)
@@ -107,11 +115,14 @@ class GeneratorHVAE(BaseExpressionGenerator):
     def generate_one(self):
         inp = torch.normal(self.input_mean)
         tree = self.model.decode(inp, self.decoding_dict)
-        tree.change_redundant_variables(self.variables, 'c')
+        # print(str(tree))
+        tree.change_redundant_variables(self.variables, self.constant)
         return tree.to_list(with_precedence=True, precedence=self.precedence), 0, str(inp.tolist())
 
-    def generate_similar(self, ):
-        pass
+    def decode_latent(self, latent):
+        tree = self.model.decode(latent, self.decoding_dict)
+        tree.change_redundant_variables(self.variables, self.constant)
+        return tree.to_list(with_precedence=True, precedence=self.precedence)
 
 
 class Node:
@@ -218,6 +229,16 @@ class Node:
         BCE = criterion(pred, target)
         KLD = (lmbda * -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp()))
         return BCE + KLD, BCE, KLD
+
+    def trim_to_height(self, max_height, types, const_symbol="c"):
+        if max_height == 1 and types[self.symbol] is not SymType.Const and types[self.symbol] is not SymType.Var:
+            self.symbol = const_symbol
+            self.left = None
+            self.right = None
+        if self.left is not None and max_height > 1:
+            self.left.trim_to_height(max_height-1, types, const_symbol)
+        if self.right is not None and max_height > 1:
+            self.right.trim_to_height(max_height-1, types, const_symbol)
 
     def change_redundant_variables(self, variables, constant):
         has_child = False
@@ -394,11 +415,11 @@ class Decoder(nn.Module):
     def recursive_decode(self, hidden, symbol_dict):
         prediction = self.h2o(hidden)
         sampled, symbol, stype = self.sample_symbol(prediction, symbol_dict)
-        if stype is SymType.Fun:
+        if stype.value is SymType.Fun.value:
             left, right = self.gru(F.softmax(sampled, dim=2), hidden)
             l_tree = self.recursive_decode(left, symbol_dict)
             r_tree = None
-        elif stype is SymType.Operator:
+        elif stype.value is SymType.Operator.value:
             left, right = self.gru(F.softmax(sampled, dim=2), hidden)
             l_tree = self.recursive_decode(left, symbol_dict)
             r_tree = self.recursive_decode(right, symbol_dict)
@@ -472,14 +493,15 @@ if __name__ == '__main__':
     num_points = 1000
     x = np.random.random(10000)*20 - 10
     y = x**2/8 - x + 12
-    mat = np.stack([x, y]).T
+    mat = np.stack([x, x, x, y]).T
 
-    # eqs = []
-    # with open("../examples/data/eqs_5_4k.txt", "r") as file:
-    #     for l in file:
-    #         eqs.append(l.strip().split(" "))
+    eqs = []
+    with open("../examples/data/eqs_test.txt", "r") as file:
+        for l in file:
+            eqs.append(l.strip().split(" "))
 
-    # generator = GeneratorHVAE.train_and_init(eqs, ["x"], universal_symbols[:-2], epochs=20, model_path="../examples/parameters/params_HVAE.pt")
+    generator = GeneratorHVAE.train_and_init(eqs, ["x1", "x2", "x3"], universal_symbols, epochs=20,
+                                             hidden_size=32, representation_size=32, model_path="../examples/parameters/params_test.pt")
     # for i in range(5):
     #     print(generator.generate_one())
 
@@ -488,9 +510,10 @@ if __name__ == '__main__':
     #     results = json.load(file)
     #     code = json.loads(results[0]["code"])
 
-    generator = GeneratorHVAE("../examples/parameters/params_HVAE.pt", ["x"], universal_symbols[:-2])
+    generator = GeneratorHVAE("/home/sebastian/IJS/ProGED/ProGED/examples/parameters/params_test.pt", ["x"], universal_symbols)
+    # GeneratorHVAE.benchmark_reconstruction(eqs, generator=generator)
 
-    ed = EqDisco(data=mat, variable_names=["x", "y"], generator=generator, sample_size=50, constant_symbol="c")
+    ed = EqDisco(data=mat, variable_names=["x1", "x2", "x3", "y"], generator=generator, sample_size=100, constant_symbol="C")
     ed.generate_models()
     print(ed.models)
     ed.fit_models(estimation_settings={"max_constants": 5})

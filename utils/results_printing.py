@@ -11,7 +11,7 @@ import sys
 import ProGED as pg
 
 if __name__ == "__main__":
-    files = glob.glob("*.pg")
+    files = glob.glob("*fit_models.pg")
     N = int(sys.argv[1])
     
     outfile = sys.argv[2]

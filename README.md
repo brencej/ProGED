@@ -1,46 +1,11 @@
-# Upgrade to systems of ODEs 
-We have two tasks: 1) generalize ProGED to handle systems of ODEs, 2) upgrade it to handle limited observability. 
-We should first do 1), once it is implemented and tested, we move on to 2).
-## Discussion
-- fit_models accepts ModelBox. We can't change to list of ModelBoxes, because a ModelBox is a dict - no ordering, not the same length. We could:
-    - generalize ModelBox to represent vectors of models... or generalize Model to represent vectors of equations
-    - add a temporary alternative fit_models that accepts a list of tuples of models
-- Assuming the second option. I think we need to:
-    - update the entire chain of function calls, which are probably only small changes to handle a list of models
-    - replace the integrator with a scipy function that simulates systems of ODEs
-    - update estimation_settings, especially bounds and starting values, everywhere
-    - update the error calculation, which is just adding a mean or sum over the dimensions (or does it need some normalization?)
-    - update EqDisco to streamline the usage of the new functionality. This probably means a new generate function and a new estimate function, with their according class arguments.
-
-- (Nina) Potential issue to solve: DE wants to update parameters all together, regardless of which eq they belong to. E.g. if there are 2 eq, each with 2 parameters, all 4 parameters will be adjusted together. However, Proged treats each model separately, so the parameters need to be manually separated so they are appropriately assigned to the right equation. Thus, e.g. model's method "set estimate" can't be used.
-Maybe a solution would be that a new object is created, that can also be added to a ModelBox, e.g. "system", which would have its own methods, adapted to the system of ODE? With that approach other objects maybe dont need to change but didn't check for that.
-
-- SystemModel: 
-	- expr: list of sympy expressions
-	- params, sym_params: list of lists of parameter values and parameter symbols
-	- p: same as now, probably just multiplied
-	- trees: probably same as now
-	- valid: same as now
-	- lambdify: elementwise + maybe joined in a function
-	- evaluate: uneeded?
-	- str(model): (expr1, expr2, ... exprN)
-- ModelBox:
-	- add_model: 
-
-##TODO
-###Systems
-
-###Limited observability
-
--------------------------------
-**Pro**babilistic **G**rammar-based **E**quation **D**iscovery
+# **Pro**babilistic **G**enerative **E**quation **D**iscovery
 
 ProGED discovers physical laws in data, expressed in the form of equations. 
 A probabilistic context-free grammar (PCFG) is used to generate candidate equations. 
 Their optimal values of their parameters are estimated and their perfomance evaluated.
 The output of ProGED is a list of equations, ordered according to the likelihood that they represent the best model for the data.
 
-# Features
+## Features
 - algebraic equations
 - 1st order ordinary differential equations
 - construct a grammar from a template or write a custom grammar
@@ -48,19 +13,25 @@ The output of ProGED is a list of equations, ordered according to the likelihood
 
 Details in https://www.sciencedirect.com/science/article/pii/S0950705121003403.
 
-# Dependencies
+## Dependencies
+CORE:
 - numpy
 - scipy
 - sympy
 - NLTK
 
-# Setup
+OPTIONAL:
+- diophantine (for dimensionally-consistent grammars)
+- torch, tqdm (for HVAE generator)
+- botorch (for Bayesian optimization with HVAE)
+
+## Setup
 You can install the package directly from the git repository:
 ```python3
 pip install git+https://github.com/brencej/ProGED
 ```
 
-# Automated testing
+## Automated testing
 To check whether the installation works, run automated tests by calling
 ```
 cd ProGED/tests/
@@ -71,7 +42,7 @@ or alternatively,
 python3 -m pytest
 ```
 
-# Usage example
+## Usage example
 First, generate data for a simple 1-dimensional problem:
 ```python3
 import numpy as np
@@ -106,7 +77,7 @@ print(ED.get_stats())
 ```
 See the paper referenced below for more details.
 
-# Citation
+## Citation
 ```
 @article{brence2021probabilistic,
   title={Probabilistic grammars for equation discovery},
