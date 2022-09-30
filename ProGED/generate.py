@@ -25,7 +25,7 @@ Methods:
 """
 
 
-def generate_models(model_generator, symbols, strategy = "monte-carlo", dimension = 1, observed=None, strategy_settings = {"N":5}, verbosity=0):
+def generate_models(model_generator, symbols, strategy = "monte-carlo", system_size=1, strategy_settings = {"N":5}, verbosity=0):
     """Generate models using given generator and specified strategy.
     
     generate_models is intended as an interface to the generation methods defined in the module.
@@ -47,7 +47,7 @@ def generate_models(model_generator, symbols, strategy = "monte-carlo", dimensio
     """
     if isinstance(strategy, str):
         if strategy in STRATEGY_LIBRARY:
-            return STRATEGY_LIBRARY[strategy](model_generator, symbols, dimension=dimension, observed=None, verbosity=verbosity, **strategy_settings)
+            return STRATEGY_LIBRARY[strategy](model_generator, symbols, system_size=system_size, observed=None, verbosity=verbosity, **strategy_settings)
         else:
             raise KeyError ("Strategy name not found in library.\n"\
                             "Input: " + strategy)
@@ -59,7 +59,7 @@ def generate_models(model_generator, symbols, strategy = "monte-carlo", dimensio
         raise TypeError ("Unknown strategy type. Expecting: string or callable.\n"\
                          "Input: " + str(type(strategy)))
 
-def monte_carlo_sampling (model_generator, symbols, N=5, dimension = 1, max_repeat = 10, max_total_repeats = None, verbosity=0, observed=None):
+def monte_carlo_sampling (model_generator, symbols, N=5, system_size=1, max_repeat=10, max_total_repeats=None, verbosity=0, observed=None):
     """Generate models using the Monte-Carlo approach to sampling.
     
     Randomly sample the stochastic generator until N models have been generated. 
@@ -94,7 +94,7 @@ def monte_carlo_sampling (model_generator, symbols, N=5, dimension = 1, max_repe
             while not good and n < max_repeat:
                 exprs = []; codes = []; p = 1
 
-                for d in range(dimension):
+                for _ in range(system_size):
                     sample, pi, code = model_generator.generate_one()
                     exprs += ["".join(sample)]
                     codes += [code]

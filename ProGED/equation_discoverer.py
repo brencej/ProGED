@@ -47,6 +47,7 @@ class EqDisco:
         constant_symbol (string): String to be used as symbol for constant parameter. Default: "C".
         task_type (string): Specifies type of equation being solved. See ProGED.task.TASK_TYPES for supported equation types. 
             Default: algebraic. Not required if 'task' is provided.
+        system_size (int): if discovering system of equations, system_size defines the number of equations. Default: 1.
         success_threshold (float): Relative root mean squared error (RRMSE), 
             below which a model is considered to be correct. Default: 1e-8.
         generator (ProGED.generators.BaseExpressionGenerator or string): Instance of generator, deriving from BaseExpressionGenerator 
@@ -112,6 +113,7 @@ class EqDisco:
                  variable_names=None,
                  constant_symbol="C",
                  task_type="algebraic",
+                 system_size=1,
                  generator="grammar",
                  generator_template_name="universal",
                  variable_probabilities=None,
@@ -122,7 +124,7 @@ class EqDisco:
                  max_attempts=1,
                  repeat_limit=100,
                  depth_limit=1000,
-                 estimation_settings={},
+                 estimation_settings=None,
                  success_threshold=1e-8,
                  verbosity=1):
         
@@ -160,14 +162,20 @@ class EqDisco:
             raise TypeError ("Invalid generator specification. Expected: class that inherits from "\
                              "generators.base_generator.BaseExpressionGenerator or string, corresponding to template name.\n"\
                              "Input: " + str(type(generator)))
+
+        self.system_size = system_size
             
         self.strategy = strategy
         if not strategy_settings:
             self.strategy_settings = {"N": sample_size, "max_repeat": max_attempts}
         else:
             self.strategy_settings = strategy_settings
-            
-        self.estimation_settings = estimation_settings
+        
+        if not estimation_settings:
+            self.estimation_settings = {"target_variable_index": target_variable_index,
+                                        "time_index": time_index}
+        else:
+            self.estimation_settings = estimation_settings
         
         self.models = None
         self.solution = None
@@ -177,18 +185,19 @@ class EqDisco:
     def generate_models(self, strategy_settings=None):
         if not strategy_settings:
             strategy_settings = self.strategy_settings
-        self.models = generate_models(self.generator, self.task.symbols, self.strategy,
-                                      strategy_settings, verbosity=self.verbosity)
+        self.models = generate_models(self.generator, self.task.symbols, 
+                                    system_size = self.system_size,
+                                    strategy = self.strategy,
+                                    strategy_settings = self.strategy_settings,
+                                    verbosity=self.verbosity)
         return self.models
     
-    def fit_models(self, default_error=10**9, estimation_settings={}, pool_map=map):
+    def fit_models(self, estimation_settings={}, pool_map=map):
         if not estimation_settings:
             estimation_settings = self.estimation_settings
-        self.models = fit_models(self.models, self.task.data, self.task.target_variable_index, 
-                                 time_index=self.task.time_index,
-                                 task_type=self.task.task_type, pool_map=pool_map,
-                                 verbosity=self.verbosity,
-                                 default_error=default_error,
+        self.models = fit_models(self.models, self.task.data, 
+                                 task_type=self.task.task_type, 
+                                 pool_map=pool_map,
                                  estimation_settings=estimation_settings)
         return self.models
     

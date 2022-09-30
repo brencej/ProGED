@@ -198,7 +198,7 @@ def fit_models(models, data, task_type="algebraic", pool_map=map, estimation_set
         "atol": 10 ** (-6),
         "rtol": 10 ** (-4),
         "max_step": 10 ** 3,
-        "use_jacobian": True,
+        "use_jacobian": False,
         "teacher_forcing": False,
         "simulate_separately": False}
 
@@ -215,7 +215,7 @@ def fit_models(models, data, task_type="algebraic", pool_map=map, estimation_set
     }
 
     estimation_settings_preset = {
-        "target_variable_index": None,
+        "target_variable_index": -1,
         "time_index": None,
         "max_constants": 5,
         "optimizer": 'differential_evolution',
@@ -569,7 +569,7 @@ def hyperopt_fit (model, X, Y, T, p0, **estimation_settings):
     from hyperopt import hp, fmin, rand, pyll, Trials
     import hyperopt.pyll.stochastic
     verbosity = estimation_settings["verbosity"]
-    lu_bounds = estimation_settings["lower_upper_bounds"]
+    lu_bounds = estimation_settings["optimizer_settings"]["lower_upper_bounds"]
     lower_bound, upper_bound = lu_bounds[0]+1e-30, lu_bounds[1]+1e-30
 
     space_fn = estimation_settings.get("hyperopt_space_fn", hp.uniform)
