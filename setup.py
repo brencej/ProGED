@@ -6,9 +6,9 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setuptools.setup(
     name="ProGED", # Replace with your own username
     version="0.8.4",
-    author="Jure Brence, Boštjan Gec",
+    author="Jure Brence, Boštjan Gec, Nina Omejc, Sebastian Mežnar",
     author_email="jure.brence@ijs.si",
-    description="Probabilistic grammar-based equation discovery",
+    description="Probabilistic generative equation discovery",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/brencej/ProGED",
