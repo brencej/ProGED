@@ -13,7 +13,7 @@ Class methods serve as an interfance to interact with the model.
 The class is intended to be used as part of an equation discovery algorithm."""
 
 class SystemModel:
-    def __init__(self, expr, p=0, params=[], sym_params=[], sym_vars = [], info=None):
+    def __init__(self, expr, p=0, params=[], sym_params=[], sym_vars=[], info={}, observed=[]):
         """Initialize a SystemModel.
         
         Arguments:
@@ -34,19 +34,30 @@ class SystemModel:
         self.sym_params = sym_params
         self.params = params
         self.n_params = [len(par) for par in sym_params]
+        self.total_eq_params = sum(self.n_params)
 
         """sym_vars should be tuple of tuples of sympy symbols"""
-        self.sym_vars = sym_vars
+        self.sym_vars = sp.symbols(sym_vars)
 
-        self.p = p
+        self.p = 0
+        self.info = info
 
-        """TODO: figure out structure for trees"""
-        #self.trees = {} #trees has form {"code":[p,n]}"
-        #if len(code)>0:
-            #self.add_tree(code, p)
+        """TODO: figure out better structure for trees"""
+        self.trees = {} #trees has form {"code":[p,n]}"
+        if "code" in info:
+            code = info["code"]
+        else:
+            code = ""
+        self.add_tree(code, p)
 
         self.estimated = {}
         self.valid = False
+
+        # list of variables that are (un)observed - used for partially-observed systems
+        self.observed = observed
+        # extra parameters, i.e. initial values
+        self.initials = [(np.random.random()-0.5)*10 for _ in range(len(sym_vars) - len(observed))]
+
 
     def set_estimated(self, result, valid=True):
         """Store results of parameter estimation and set validity of model according to input.
@@ -67,7 +78,8 @@ class SystemModel:
         self.estimated = result
         self.valid = valid
         if valid:
-            self.params = np.split(result["x"], np.cumsum(self.n_params))
+            #self.params = np.split(result["x"], np.cumsum(self.n_params))
+            self.set_params(result["x"], split=True)
 
     def get_error(self, dummy=10**8):
         """Return model error if the model is valid, or dummy if the model is not valid.
@@ -83,11 +95,35 @@ class SystemModel:
         else:
             return dummy
 
+    def get_params(self):
+        return self.params
+
+    def get_all_params(self):
+        params = [par for eq_params in self.params for par in eq_params]
+        params += list(self.initials)
+        return params
+
     def set_params(self, params, split=True):
         if split:
-            self.params = np.split(params, np.cumsum(self.n_params))
+            expr_params = params[:self.total_eq_params]
+            self.initials = params[self.total_eq_params:]
+            self.params = np.split(expr_params, np.cumsum(self.n_params))[:-1]
+            # self.params = list(filter(None, self.params))
         else:
             self.params=params
+
+    def add_tree (self, code, p):
+        """Add a new parse tree to the model.
+        
+        Arguments:
+            code (str): The parse tree code, expressed as a string of integers.
+            p (float): Probability of parse tree.
+        """
+        if code in self.trees:
+            self.trees[code][1] += 1
+        else:
+            self.trees[code] = [p,1]
+            self.p += p
 
     def full_expr (self, params=None):
         """Substitutes parameter symbols in the symbolic expression with given parameter values.
@@ -109,7 +145,16 @@ class SystemModel:
                 
         return fullexprs
 
-    def lambdify (self, params=None, arg="numpy"):
+    def get_jacobian(self):
+        return sp.Matrix(self.full_expr()).jacobian(self.sym_vars)
+    
+    def lambdify_jacobian(self):
+        J = self.get_jacobian()
+        Jf = sp.lambdify(self.sym_vars, J)
+        #return lambda x: Jf(*x.T)
+        return Jf
+
+    def lambdify (self, params=None, list=False, matrix_input = True, arg="numpy"):
         """Produce a callable function from the symbolic expression and the parameter values.
         
         This function is required for the evaluate function. It relies on sympy.lambdify, which in turn 
@@ -127,35 +172,21 @@ class SystemModel:
         if not params:
             params = self.params
         fullexprs = self.full_expr(params)
-        lambdas = [sp.lambdify(self.sym_vars, full_expr, arg) for full_expr in fullexprs]
-        return lambda x: np.transpose([lam(*x.T) for lam in lambdas]), lambdas
-
-
-    def evaluate (self, points, *args):
-        """Evaluate the model for given variable and parameter values.
-        
-        If possible, use this function when you want to do computations with the model.
-        It relies on lambdify so it shares the same issues, but includes some safety checks.
-        Example of use with stored parameter values:
-            predictions = model.evaluate(X, *model.params)
-        
-        Arguments:
-            points (numpy array): Input data, shaped N x M, where N is the number of samples and
-                M the number of variables.
-            args (list of floats): Parameter values.
-            
-        Returns:
-            Numpy array of shape N x D, where N is the number of samples and D the number of output variables.
-        """
-        lamb_expr = sp.lambdify(self.sym_vars, self.full_expr(*args), "numpy")
-        
-        if type(points[0]) != type(np.array([1])):
-            if type(lamb_expr(np.array([1,2,3]))) != type(np.array([1,2,3])):
-                return np.ones(len(points))*lamb_expr(1)
-            return lamb_expr(points)
+        if matrix_input:
+            lambdas = [sp.lambdify(self.sym_vars, full_expr, arg) for full_expr in fullexprs]
+            if list:
+                return lambdas
+            else:
+                return lambda x: np.transpose([lam(*x.T) for lam in lambdas])
         else:
-#            if type(lamb_expr(np.array([np.array([1,2,3])]).T)) != type(np.array([1,2,3])):
-            return lamb_expr(*points.T)
+            system = sp.Matrix(fullexprs)
+            return sp.lambdify((sp.symbols("t"), self.sym_vars), system)
+
+    def get_time(self):
+        if "time" in self.estimated:
+            return self.estimated["time"]
+        else:
+            return 0
 
     def __str__(self):
         return str(self.expr)

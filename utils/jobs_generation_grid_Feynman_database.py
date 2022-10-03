@@ -6,17 +6,14 @@ Created on Tue Oct  5 15:51:27 2021
 """
 
 
+import os
+import sys
+
 import numpy as np
 import pandas as pd
-import sys
-import os
-import pickle
+
 #sys.path.append("../../nltk/")
 
-import ProGED as pg
-from ProGED.generators.grammar_construction import string_to_unit, unit_to_string
-
-import warnings
 #warnings.filterwarnings("ignore")
 
 np.random.seed(0)

@@ -5,12 +5,8 @@ Created on Mon Oct 18 14:32:17 2021
 @author: jureb
 """
 
-import numpy as np
-import pandas as pd
-import sys
-import os
-import pickle
 import glob
+import sys
 
 import ProGED as pg
 
@@ -23,8 +19,8 @@ if __name__ == "__main__":
     
     for file in files:
         print("---" + file)
-        with open(file, "rb") as f:
-            models = pickle.load(f)
+        models = pg.ModelBox()
+        models.load(file)
             
         best_models = models.retrieve_best_models(N)
         if len(best_models) > 0:

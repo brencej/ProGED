@@ -4,12 +4,9 @@ Created on Thu Oct 14 16:04:47 2021
 
 @author: jureb
 """
-import numpy as np
-import pandas as pd
-import sys
 import os
-import pickle
-import multiprocessing as mp
+
+import pandas as pd
 
 if __name__ == "__main__":
     
