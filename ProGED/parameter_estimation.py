@@ -211,7 +211,8 @@ def fit_models(models, data, task_type="algebraic", pool_map=map, estimation_set
         "max_iter": 500,
         "pop_size": 50,
         "atol": 0.01,
-        "tol": 0.01
+        "tol": 0.01,
+        "hyperopt_seed": None
     }
 
     estimation_settings_preset = {
@@ -627,7 +628,7 @@ def hyperopt_fit (model, X, Y, T, p0, **estimation_settings):
         trials=trials,
         timeout=timeout,
         max_evals=max_evals,
-        rstate=np.random,
+        rstate = np.random.default_rng(estimation_settings["optimizer_settings"]["hyperopt_seed"]),
         verbose=(verbosity >= 1),
         )
     params = list(best.values())
