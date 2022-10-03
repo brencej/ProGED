@@ -5,11 +5,15 @@ A probabilistic context-free grammar (PCFG) is used to generate candidate equati
 Their optimal values of their parameters are estimated and their perfomance evaluated.
 The output of ProGED is a list of equations, ordered according to the likelihood that they represent the best model for the data.
 
-## Features
+## Scope
 - algebraic equations
-- 1st order ordinary differential equations
+- systems of ordinary differential equations
+- limited observability
+
+## Features
 - construct a grammar from a template or write a custom grammar
 - intuitive and flexible parametrization of parsimony principle
+- dimensionally-consistent expressions when measurement units are available
 
 Details in https://www.sciencedirect.com/science/article/pii/S0950705121003403.
 
