@@ -1,5 +1,5 @@
 .vscode/
-# .gitignore
+.gitignore
 __pycache__/
 # */__pycache__/
 ProGED.egg-info/
@@ -9,3 +9,4 @@ ProGED.egg-info/
 /data/*
 /proged_singularity.sif
 /venv/*
+/proged_container.sif

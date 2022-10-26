@@ -61,7 +61,6 @@ class ParameterEstimator:
         # setup of the mask for the data columns
         var_mask = np.ones(data.shape[-1], bool)
 
-
         ## a. set parameter estimation for differential equations
         if task_type == "differential":
 
@@ -216,7 +215,7 @@ def fit_models(models, data, task_type="algebraic", pool_map=map, estimation_set
     }
 
     estimation_settings_preset = {
-        "target_variable_index": -1,
+        "target_variable_index": None,
         "time_index": None,
         "max_constants": 5,
         "optimizer": 'differential_evolution',
@@ -396,10 +395,15 @@ def ode(model, params, T, X, Y, **objective_settings):
 
     # b.4 set initial values
     if Y is None:
-        obs_idx = [model.sym_vars.index(sp.symbols(model.observed[i])) for i in range(len(model.observed))]
-        hid_idx = np.full(len(model.sym_vars), True, dtype=bool)
+        if sp.symbols("t") in model.sym_vars:
+            num_eq = len(model.sym_vars) -1 # don't take time info into account when determining initial values
+        else:
+            num_eq = len(model.sym_vars)
+
+        obs_idx = [model.sym_vars.index(sp.symbols(model.observed[i])) for i in range(num_eq)]
+        hid_idx = np.full(num_eq, True, dtype=bool)
         hid_idx[obs_idx] = False
-        inits = np.empty(len(model.sym_vars))
+        inits = np.empty(num_eq)
         inits[obs_idx] = np.array([X[0]])
         inits[hid_idx] = model.initials
     else:
@@ -421,7 +425,10 @@ def ode(model, params, T, X, Y, **objective_settings):
     else:
         if Y is None:           # hasattr(model.expr, '__len__')?
             def dxdt(t, x):
-                return [model_func[i](*x) for i in range(len(model_func))]
+                if sp.symbols("t") in model.sym_vars:
+                    return [model_func[i](*x, t) for i in range(len(model_func))]
+                else:
+                    return [model_func[i](*x) for i in range(len(model_func))]
         else:
             def dxdt(t, x):
                 b = np.concatenate((x, X_interp(t)))
