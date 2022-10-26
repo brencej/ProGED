@@ -4,7 +4,7 @@ import warnings
 
 import numpy as np
 import pandas as pd
-from scipy.integrate import solve_ivp
+from scipy.integrate import solve_ivp, odeint
 
 warnings.filterwarnings("ignore")
 
@@ -39,10 +39,14 @@ def lorenz_stable(t, x, sigma=10, rho=16,  beta=8/3):
         x[0] * x[1] - beta * x[2],
     ]
 
+def custom_func(t, x, sys_func):
+    return [sys_func[i](*x) for i in range(len(sys_func))]
+
+def custom_func_with_time(t, x, sys_func):
+    return [sys_func[i](*x, t) for i in range(len(sys_func))]
+
 # main function
 def generate_ODE_data(system, inits, **generation_settings):
-    if isinstance(system, str):
-        system = eval(system)
 
     generation_settings_preset = {
         "initial_time": 0,            # initial time
@@ -50,7 +54,9 @@ def generate_ODE_data(system, inits, **generation_settings):
         "simulation_time": 50,        # simulation time (final time) /s
         "rtol": 1e-12,
         "atol": 1e-12,
-        "method": 'LSODA'}
+        "method": 'LSODA',
+        "custom_func_type": None,
+        "custom_func": None}
 
     generation_settings_preset.update(generation_settings)
     generation_settings = generation_settings_preset
@@ -60,11 +66,26 @@ def generate_ODE_data(system, inits, **generation_settings):
                   generation_settings["simulation_time"],
                   generation_settings["simulation_step"])
 
+    if isinstance(system, str):
+        system = eval(system)
+    if generation_settings["custom_func_type"] == 'custom_func':
+        system = lambda t, x: custom_func(t, x, generation_settings["custom_func"])
+    elif generation_settings["custom_func_type"] == 'custom_func_with_time':
+        system = lambda t, x: custom_func_with_time(t, x, generation_settings["custom_func"])
+
+    """    
     X = solve_ivp(fun=system,
                   t_span=t_span,
                   y0=inits,
                   t_eval=t,
                   **generation_settings).y.T
+    """
+
+    X = odeint(system, inits, t,
+                 rtol=generation_settings["rtol"],
+                 atol=generation_settings["atol"],
+                 tfirst=True)
+
     return np.column_stack([t.reshape((len(t), 1)), X])
 
 if __name__ == "__main__":
