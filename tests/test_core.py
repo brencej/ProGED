@@ -185,13 +185,13 @@ def test_parameter_estimation_ODE_system():
     system.add_system(["C*y", "C*y - C*x*x*y - C*x"], symbols={"x": ["x", "y"], "const": "C"})
     estimation_settings = {"target_variable_index": None,
                            "time_index": 0,
-                           "max_iter": 6,
-                           "pop_size": 3,
+                           "max_iter": 1,
+                           "pop_size": 1,
                            "objective_settings": {"use_jacobian": False},
                            "verbosity": 0}
     np.random.seed(0)
-    system = fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
-    assert system[0].get_error() < 1e-6
+    system_out = fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
+    assert system_out[0].get_error() < 1e-6
     # true params: [[1.], [-0.5., -1., 0.5]]
 
 
@@ -204,13 +204,13 @@ def test_parameter_estimation_ODE_system_partial_observability():
     system.add_system(["C*y", "C*y - C*x*x*y - C*x"], symbols={"x": ["x", "y"], "const": "C"})
     estimation_settings = {"target_variable_index": None,
                            "time_index": 0,
-                           "max_iter": 6,
-                           "pop_size": 3,
+                           "max_iter": 1,
+                           "pop_size": 1,
                            "objective_settings": {"use_jacobian": False},
                            "verbosity": 0}
 
     system_out = fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
-    assert system_out[0].get_error() < 1e-6
+    assert system_out[0].get_error() < 1e-5
     # true params: [[1.], [-0.5., -1., 0.5]]
 
 def test_equation_discoverer():
