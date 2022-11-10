@@ -269,7 +269,7 @@ def DE_fit (model, X, Y, T, p0, **estimation_settings):
                                   maxiter=estimation_settings["optimizer_settings"]["max_iter"],
                                   strategy=estimation_settings["optimizer_settings"]["strategy"],
                                   popsize=estimation_settings["optimizer_settings"]["pop_size"],
-                                  mutation=(estimation_settings["optimizer_settings"]["f"], 1),
+                                  mutation=estimation_settings["optimizer_settings"]["f"],
                                   recombination=estimation_settings["optimizer_settings"]["cr"],
                                   tol=estimation_settings["optimizer_settings"]["tol"],
                                   atol=estimation_settings["optimizer_settings"]["atol"])
@@ -395,12 +395,9 @@ def ode(model, params, T, X, Y, **objective_settings):
 
     # b.4 set initial values
     if Y is None:
-        if sp.symbols("t") in model.sym_vars:
-            num_eq = len(model.sym_vars) -1 # don't take time info into account when determining initial values
-        else:
-            num_eq = len(model.sym_vars)
+        num_eq = len(model.expr)
 
-        obs_idx = [model.sym_vars.index(sp.symbols(model.observed[i])) for i in range(num_eq)]
+        obs_idx = [model.sym_vars.index(sp.symbols(model.observed[i])) for i in range(len(model.observed))]
         hid_idx = np.full(num_eq, True, dtype=bool)
         hid_idx[obs_idx] = False
         inits = np.empty(num_eq)

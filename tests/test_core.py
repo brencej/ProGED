@@ -209,8 +209,8 @@ def test_parameter_estimation_ODE_system_partial_observability():
                            "objective_settings": {"use_jacobian": False},
                            "verbosity": 0}
 
-    models = fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
-    assert models[0].get_error() < 1e-6
+    system_out = fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
+    assert system_out[0].get_error() < 1e-6
     # true params: [[1.], [-0.5., -1., 0.5]]
 
 def test_equation_discoverer():
