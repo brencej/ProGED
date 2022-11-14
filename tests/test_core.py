@@ -185,17 +185,19 @@ def test_parameter_estimation_ODE_system():
     system.add_system(["C*y", "C*y - C*x*x*y - C*x"], symbols={"x": ["x", "y"], "const": "C"})
     estimation_settings = {"target_variable_index": None,
                            "time_index": 0,
-                           "max_iter": 1,
-                           "pop_size": 1,
                            "objective_settings": {"use_jacobian": False},
+                           "optimizer_settings": {"max_iter": 1,
+                                                  "pop_size": 1},
                            "verbosity": 0}
     np.random.seed(0)
     system_out = fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
-    assert system_out[0].get_error() < 1e-6
+    assert abs(system_out[0].get_error() - 1.3418382524870218e-08) < 1e-12
     # true params: [[1.], [-0.5., -1., 0.5]]
+    # output: error 1.3418382524870218e-08, params [0.99965284  1.86499312 - 2.11898971  0.69400483]. is this possible?!
 
 
 def test_parameter_estimation_ODE_system_partial_observability():
+    np.random.seed(0)
     generation_settings = {"simulation_time": 0.25}
     data = generate_ODE_data(system='VDP', inits=[-0.2, -0.8], **generation_settings)
     data = data[:, (0, 1)]  # y, 2nd column, is not observed
@@ -204,24 +206,25 @@ def test_parameter_estimation_ODE_system_partial_observability():
     system.add_system(["C*y", "C*y - C*x*x*y - C*x"], symbols={"x": ["x", "y"], "const": "C"})
     estimation_settings = {"target_variable_index": None,
                            "time_index": 0,
-                           "max_iter": 1,
-                           "pop_size": 1,
                            "objective_settings": {"use_jacobian": False},
+                           "optimizer_settings": {"max_iter": 1,
+                                                  "pop_size": 1},
                            "verbosity": 0}
 
     system_out = fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
-    assert system_out[0].get_error() < 1e-5
+    assert np.abs(system_out[0].get_error() - 1.8584233983525058e-08) < 1e-14
     # true params: [[1.], [-0.5., -1., 0.5]]
+    #returns params [[-0.15319651], [-7.99031067, 0.86863875, 0.82523763]], error 1.8584233983525058e-08 (is this possible?!!)
 
 def test_equation_discoverer():
     np.random.seed(0)
     def f(x):
         return 2.0 * (x[:, 0] + 0.3)
-	
+
     X = np.linspace(-1, 1, 20).reshape(-1,1)
     Y = f(X).reshape(-1, 1)
     data = np.hstack((X, Y))
-        
+
     ED = EqDisco(data=data,
                  task=None,
                  target_variable_index = -1,
@@ -232,7 +235,7 @@ def test_equation_discoverer():
     ED.fit_models()
     assert np.abs(ED.models[0].get_error() - 0.72842105) < 1e-6
     assert np.abs(ED.models[1].get_error() - 0.59163899) < 1e-6
-    
+
 def test_equation_discoverer_ODE():
     B = -2.56; a = 0.4; ts = np.linspace(0.45, 0.87, 5)
     ys = (ts+B)*np.exp(a*ts); xs = np.exp(a*ts)
