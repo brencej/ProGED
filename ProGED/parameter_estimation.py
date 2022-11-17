@@ -18,10 +18,6 @@ from scipy.optimize import differential_evolution, minimize
 from scipy.interpolate import interp1d
 from scipy.integrate import solve_ivp, odeint
 
-# for persistent homology:  # pip scikit-tda
-import ripser
-import persim
-
 # from sklearn import ensemble #, tree  # Left for gitch_doctor metamodel
 from _io import TextIOWrapper as stdout_type
 import ProGED.mute_so as mt
@@ -37,7 +33,6 @@ from ProGED.task import TASK_TYPES
 # import ProGED.glitch_doctor.model.Model
 
 import warnings
-
 warnings.filterwarnings("ignore", message="divide by zero encountered in divide")
 warnings.filterwarnings("ignore", message="divide by zero encountered in true_divide")
 warnings.filterwarnings("ignore", message="invalid value encountered in power")
@@ -284,7 +279,6 @@ def DE_fit (model, X, Y, T, p0, ph_diagram, **estimation_settings):
         else:
             return False
 
-
     return differential_evolution(func=estimation_settings["objective_function"],
                                   bounds=bounds,
                                   callback=diff_evol_timeout,
@@ -344,7 +338,6 @@ def model_ode_error(params, model, X, Y, T, ph_diagram, estimation_settings):
             simX = run_ode()
         if change_std2tee:
             sys.stdout = tee_object  # Change it back to fake stdout (tee).
-
 
         # b. calculate the objective (MSE of the fit)
         if estimation_settings["objective_settings"]["simulate_separately"]:
@@ -541,6 +534,9 @@ def ph_error(trajectory: np.ndarray, diagram_truth: list[np.ndarray]) -> float:
         - float: bottleneck distance between the two diagrams
     """
 
+    # for persistent homology:  # pip scikit-tda
+    import persim
+
     size = diagram_truth[0].shape[0]
     diagram = ph_diag(trajectory, size)
     distance_bottleneck = persim.bottleneck(diagram[1], diagram_truth[1])
@@ -559,6 +555,9 @@ def ph_diag(trajectory: np.ndarray, size: int) -> list[np.ndarray]:
         - diagram [list of length 2]: as output of
         ripser.ripser(*trajectory*)['dgms']
     """
+
+    # for persistent homology:  # pip scikit-tda
+    import ripser
 
     def downsample(lorenz: np.ndarray) -> np.ndarray:
         m = int(lorenz.shape[0] / size)

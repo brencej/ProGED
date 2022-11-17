@@ -1,0 +1,179 @@
+Summary:
+max_iter = 1000, 20 popsize default diff_evol settings:
+
+no ph:
+consumed time: 3467.74 secs or 57.8 mins,
+full found expr: [-4.22950670538346*x + 4.22950670538346*y, x*(26.5218765150121 - z) - y, x*y - 0.463579644733843*z]
+
+ph solo:
+consumed time: 47.56 secs or 0.79 mins,
+full found expr: [-27.3193629776497*x + 27.3193629776497*y, x*(24.1829535041217 - z) - y, x*y - 6.28646011001688*z]
+
+ph 50-50 (balanced 50% ph, 50% mse):
+consumed time: 11330.32 secs or 188.84 mins,
+full found expr: [-8.16873686682862*x + 8.16873686682862*y, x*(27.3532357968686 - z) - y, x*y - 2.29508884478781*z]
+
+full ground expr:[-10.0000000000000*x + 10.0000000000000*y, x*(28.0000000000000 - z) - y, x*y - 2.66666666666666*z]
+
+- -  - [NO ph] - - -
+
+consumed time: 3467.74 secs or 57.8 mins,
+ph: False, ph solo: False, size: 20
+ inits:[1.0, 1.0, 1.0]
+full found expr: [-4.22950670538346*x + 4.22950670538346*y, x*(26.5218765150121 - z) - y, x*y - 0.463579644733843*z]
+found error: 66.24756047402326
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2
+
+
+ph: False, ph solo: True, size: 10
+consumed time: 712.07 secs or 11.87 mins,
+ph: False, ph solo: True, size: 10
+full found expr: [-2.31051319186803*x + 2.31051319186803*y, x*(25.4356985867933 - z) - y, x*y - 0.151370896487755*z]
+found error: 67.69769536613826
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2
+
+consumed time: 79.42 secs or 1.32 mins,
+ph: False, ph solo: True, size: 5
+full found expr: [-27.9388297697586*x + 27.9388297697586*y, x*(22.8968036740085 - z) - y, x*y - 1.4719694049193*z]
+found error: 80.36735924099877
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2
+
+consumed time: 30.88 secs or 0.51 mins,
+ph: False, ph solo: True, size: 1
+full found expr: [-18.0055057410273*x + 18.0055057410273*y, x*(19.0131910765531 - z) - y, x*y - 1.47260339789386*z]
+found error: 87.86996387584917
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2
+
+
+
+
+
+=== ==  [ SOLO: ]  ======
+
+ph: True, ph solo: True, size: 40
+Killed
+
+consumed time: 47.56 secs or 0.79 mins,
+ph: True, ph solo: True, size: 20
+ inits:[1.0, 1.0, 1.0]
+full found expr: [-27.3193629776497*x + 27.3193629776497*y, x*(24.1829535041217 - z) - y, x*y - 6.28646011001688*z]
+found error: 2.696124725180961
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2
+
+consumed time: 12.82 secs or 0.21 mins,
+ph: True, ph solo: True, size: 10
+ inits:[1.0, 1.0, 1.0]
+full found expr: [-25.3243227145189*x + 25.3243227145189*y, x*(5.90111110005199 - z) - y, x*y - 3.83833692010603*z]
+found error: 2.6961671514832037
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2
+
+(unchecked if inits 1,1,1)
+consumed time: 529.8 secs or 8.83 mins,
+ph: True, ph solo: True, size: 9
+full found expr: [2.4345985239683*x - 2.4345985239683*y, x*(6.93139736555587 - z) - y, x*y - 21.9951423085299*z]
+found error: 0.8325756583589229
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2
+
+
+ph: True, ph solo: True, size: 1
+consumed time: 2.43 secs or 0.04 mins,
+full found expr: [-9.86615282023006*x + 9.86615282023006*y, x*(-z - 13.8156702577722) - y, x*y - 1.88659672004685*z]
+found error: 2.6962344637303364
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+
+
+
+
+
+=== ==  [ PH combo: ]  ======
+
+Input contains NaN, infinity or a value too large for dtype('float64').
+consumed time: 46.99 secs or 0.78 mins,
+ph: True, ph solo: False, size: 1
+ inits:[1.0, 1.0, 1.0]
+full found expr: [-7.99184354569323*x + 7.99184354569323*y, x*(26.2582767655552 - z) - y, x*y - 2.05486615992205*z]
+found error: 2.3547189195631297
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+
+
+Input contains NaN, infinity or a value too large for dtype('float64').
+consumed time: 83.59 secs or 1.39 mins,
+ph: True, ph solo: False, size: 2
+ inits:[1.0, 1.0, 1.0]
+full found expr: [-9.12493150849085*x + 9.12493150849085*y, x*(26.7360817044518 - z) - y, x*y - 0.636470306684991*z]
+found error: 2.2701541717584677
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+
+
+consumed time: 540.53 secs or 9.01 mins,
+ph: True, ph solo: False, size: 5
+ inits:[1.0, 1.0, 1.0]
+full found expr: [2.52115713490456*x - 2.52115713490456*y, x*(7.51745580529993 - z) - y, x*y - 22.4472279541322*z]
+found error: 2.099663882772171
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2
+
+
+consumed time: 653.65 secs or 10.89 mins,
+ph: True, ph solo: False, size: 10
+ inits:[1.0, 1.0, 1.0]
+full found expr: [-9.07879828693085*x + 9.07879828693085*y, x*(23.9806536713747 - z) - y, x*y - 0.173792542777366*z]
+found error: 2.6155532929751697
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2
+
+consumed time: 11276.25 secs or 187.94 mins,
+ph: True, ph solo: False, size: 20
+ inits:[1.0, 1.0, 1.0]
+full found expr: [-11.5169973129929*x + 11.5169973129929*y, x*(27.7522008860117 - z) - y, x*y - 2.6709795952421*z]
+found error: 1.623879536504639
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2
+
+consumed time: 11330.32 secs or 188.84 mins,
+ph: True, ph solo: False, size: 20
+ inits:[1.0, 1.0, 1.0]
+full found expr: [-8.16873686682862*x + 8.16873686682862*y, x*(27.3532357968686 - z) - y, x*y - 2.29508884478781*z]
+found error: 1.8429978716107591
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2
+
+
+ph: True, ph solo: True, size: 20
+Killed
+(( I think reason for killing was CTRL+Shift+C for copying previous results. ))

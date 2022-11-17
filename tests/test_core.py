@@ -297,20 +297,19 @@ def test_persistent_homology_ODE_system():
     system_out = fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
     assert abs(system_out[0].get_error() - 7.109684194930149) < 1e-6
 
-
 if __name__ == "__main__":
 
-    test_grammar_general()
-    test_grammar_templates()
-    test_generate_models()
-    test_model()
-    test_model_box()
-    test_parameter_estimation()
-    test_parameter_estimation_2D()
-    test_equation_discoverer()
-    test_parameter_estimation_ODE()
-    test_equation_discoverer_ODE()
-    test_parameter_estimation_ODE_system()
+    # test_grammar_general()
+    # test_grammar_templates()
+    # test_generate_models()
+    # test_model()
+    # test_model_box()
+    # test_parameter_estimation()
+    # test_parameter_estimation_2D()
+    # test_equation_discoverer()
+    # test_parameter_estimation_ODE()
+    # test_equation_discoverer_ODE()
+    # test_parameter_estimation_ODE_system()
     test_parameter_estimation_ODE_system_partial_observability()
-    test_persistent_homology_partial_observability()
-    test_persistent_homology_ODE_system()
+    # test_persistent_homology_partial_observability()
+    # test_persistent_homology_ODE_system()
