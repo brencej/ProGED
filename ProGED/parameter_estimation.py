@@ -356,7 +356,8 @@ def model_ode_error(params, model, X, Y, T, ph_diagram, estimation_settings):
                 persistent_homology_error = ph_error(trajectory, ph_diagram)
                 res = math.tan(math.atan(res) * w1 + math.atan(persistent_homology_error) * w2)
             except Exception as error:
-                print("\nError from Persistent Homology metric when calculating"
+                if estimation_settings["verbosity"] > 1:
+                    print("\nError from Persistent Homology metric when calculating"
                       " bottleneck distance.\n", error)
 
         if np.isnan(res) or np.isinf(res) or not np.isreal(res):
