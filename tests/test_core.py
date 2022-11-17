@@ -167,7 +167,7 @@ def test_parameter_estimation_ODE():
     def assert_line(models, i, expr, error, tol=1e-9, n=100):
         #assert str(models[i].get_full_expr())[:n] == expr[:n]
         assert abs(models[i].get_error() - error) < tol
-    assert_line(models, 0, "4.65716206980249*y", 4.60039764161529)
+    assert_line(models, 0, "4.65716206980249*y", 4.600397641615483)
     assert_line(models, 1, "-10.0*x", 8.256188274283515)
     assert_line(models, 2, "y", 10.044322790817118, n=8)
 
@@ -191,10 +191,8 @@ def test_parameter_estimation_ODE_system():
                            "verbosity": 0}
     np.random.seed(0)
     system_out = fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
-    assert abs(system_out[0].get_error() - 1.3418382524870218e-08) < 1e-12
+    assert abs(system_out[0].get_error() - 7.141695877290627e-06) < 1e-12  # 15.11.2022
     # true params: [[1.], [-0.5., -1., 0.5]]
-    # output: error 1.3418382524870218e-08, params [0.99965284  1.86499312 - 2.11898971  0.69400483]. is this possible?!
-
 
 def test_parameter_estimation_ODE_system_partial_observability():
     np.random.seed(0)
@@ -212,9 +210,8 @@ def test_parameter_estimation_ODE_system_partial_observability():
                            "verbosity": 0}
 
     system_out = fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
-    assert np.abs(system_out[0].get_error() - 1.8584233983525058e-08) < 1e-14
+    assert abs(system_out[0].get_error() - 1.624031121298028e-09) < 1e-15  # 15.11.2022
     # true params: [[1.], [-0.5., -1., 0.5]]
-    #returns params [[-0.15319651], [-7.99031067, 0.86863875, 0.82523763]], error 1.8584233983525058e-08 (is this possible?!!)
 
 def test_equation_discoverer():
     np.random.seed(0)
@@ -260,6 +257,45 @@ def test_equation_discoverer_ODE():
     assert_line(ED.models, 1, "0.400266188520229*x + y", 4.773528915588122, n=6)
     return
 
+def test_persistent_homology_partial_observability():
+    np.random.seed(0)
+    generation_settings = {"simulation_time": 0.25}
+    data = generate_ODE_data(system='VDP', inits=[-0.2, -0.8], **generation_settings)
+    data = data[:, (0, 1)]  # y, 2nd column, is not observed
+
+    system = ModelBox(observed=["x"])
+    system.add_system(["C*y", "C*y - C*x*x*y - C*x"], symbols={"x": ["x", "y"], "const": "C"})
+    estimation_settings = {"target_variable_index": None,
+                           "time_index": 0,
+                           "objective_settings": {"use_jacobian": False},
+                           "optimizer_settings": {"max_iter": 1,
+                                                  "pop_size": 1},
+                           "verbosity": 0,
+                           "persistent_homology": True,
+                           }
+    system_out = fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
+    assert abs(system_out[0].get_error() - 1.624031121298028e-09) < 1e-15  # 15.11.2022
+    # true params: [[1.], [-0.5., -1., 0.5]]
+
+def test_persistent_homology_ODE_system():
+    data = generate_ODE_data(system='lorenz', inits=[0.2, 0.8, 0.5])
+
+    system = ModelBox(observed=["x", "y", "z"])
+    system.add_system(["C*(y-x)", "x*(C-z) - y", "x*y - C*z"], symbols={"x": ["x", "y", "z"], "const": "C"})
+    estimation_settings = {"target_variable_index": None,
+                           "time_index": 0,
+                           "optimizer_settings": {"max_iter": 1,
+                                                  "pop_size": 1,
+                                                  "lower_upper_bounds": (-28, 28),
+                                                  },
+                           "objective_settings": {"use_jacobian": False},
+                           "verbosity": 0,
+                           "persistent_homology": True,
+                           }
+
+    np.random.seed(0)
+    system_out = fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
+    assert abs(system_out[0].get_error() - 7.109684194930149) < 1e-6
 
 if __name__ == "__main__":
 
@@ -275,3 +311,5 @@ if __name__ == "__main__":
     # test_equation_discoverer_ODE()
     # test_parameter_estimation_ODE_system()
     test_parameter_estimation_ODE_system_partial_observability()
+    # test_persistent_homology_partial_observability()
+    # test_persistent_homology_ODE_system()

@@ -1,0 +1,109 @@
+ [-9.33465268723235 * x + 9.33465268723235 * y, x * (6.26027961658288 - z) - y, x * y - 2.57148765076742 * z]
+ assert abs(system_out[0].get_error() - 0) < 1e-6
+ [-0.17912909  4.39808796 - 1.71474011]
+  sigma=10, rho=28, beta=2.66667):
+ [ sigma * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+
+ with size (=popsize, maxiter=5*10) = 5:
+ [-9.39057203121008 * x + 9.39057203121008 * y, x * (25.4218661828293 - z) - y, x * y - 2.30400661222897 * z]
+ with size (=popsize, maxiter=5*10) = 20:
+ [-10.6675198563835 * x + 10.6675198563835 * y, x * (26.2693899626468 - z) - y, x * y - 3.89296267553082 * z]
+
+ ph: True, size: 1
+ consumed time: 26.61 secs or 0.44 mins,
+ full found expr:
+ [-10.6547799773229 * x + 10.6547799773229 * y, x * (19.2306504396799 - z) - y, x * y - 2.37730311870262 * z]
+ found error: 6.829248589726909
+
+ consumed time: 119.11 secs or 1.99 mins,
+ ph: True, size: 2
+ full found expr: [10.4537978384329*x - 10.4537978384329*y, x*(8.57406622606231 - z) - y, x*y - 13.8156702577722*z]
+ found error: 5.711466204268346
+ exprs of ground truth:
+ ['sigma 10', 'rho 28', 'beta 2.666']
+ [ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+
+consumed time: 30.08 secs or 0.5 mins,
+ph: True, size: 3
+full found expr: [-19.6547397184951*x + 19.6547397184951*y, x*(24.4214323643586 - z) - y, x*y - 2.17764474462842*z]
+found error: 6.760155411500694
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2
+
+
+ph: True, size: 5
+consumed time: 806.02 secs or 13.43 mins,
+full found expr: [-9.58127351813291*x + 9.58127351813291*y, x*(22.5977393622882 - z) - y, x*y - 2.12669456650529*z]
+found error: 2.27804877544331
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2
+
+consumed time: 2424.74 secs or 40.41 mins,
+ph: True, size: 10
+full found expr: [-26.5368763167093*x + 26.5368763167093*y, x*(24.8554705201136 - z) - y, x*y - 1.43706213750765*z]
+found error: 1.3594288346965673
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2
+
+
+
+
+= = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+[no ph]!!!!
+
+ph: False, size: 1
+consumed time: 15.82 secs or 0.26 mins,
+ph: False, size: 1
+full found expr: [-1.3243135275375*x + 1.3243135275375*y, x*(24.9664537448862 - z) - y, x*y - 0.716957257072219*z]
+found error: 59.09842679384993
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2
+
+ph: False, size: 3
+consumed time: 27.13 secs or 0.45 mins,
+ph: False, size: 3
+full found expr: [-2.56101120556992*x + 2.56101120556992*y, x*(24.9144510531202 - z) - y, x*y - 1.24116280389359*z]
+found error: 56.95660871873099
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2
+
+
+ph: False, size: 5
+consumed time: 117.1 secs or 1.95 mins,
+ph: False, size: 5
+full found expr: [-15.3826350895084*x + 15.3826350895084*y, x*(24.1962783977986 - z) - y, x*y - 2.30455714163426*z]
+found error: 54.567359654647746
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2
+
+
+ph: False, size: 10
+consumed time: 422.63 secs or 7.04 mins,
+ph: False, size: 10
+full found expr: [-15.5923787175155*x + 15.5923787175155*y, x*(23.3968787968147 - z) - y, x*y - 2.05754979999836*z]
+found error: 51.42724368716912
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2
+
+consumed time: 279.48 secs or 4.66 mins,
+ph: False, size: 20
+full found expr: [-14.637178441663*x + 14.637178441663*y, x*(24.6236082077282 - z) - y, x*y - 2.50210188807812*z]
+found error: 54.583718364345785
+exprs of ground truth:
+['sigma 10', 'rho 28', 'beta 2.666']
+[ 10 * (x[1] - x[0]), x[0] * (rho - x[2]) - x[1], x[0] * x[1] - beta * x[2], ]
+2

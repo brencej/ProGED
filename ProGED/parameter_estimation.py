@@ -10,6 +10,7 @@ Methods:
 import os
 import sys
 import time
+import math
 import numpy as np
 import sympy as sp
 
@@ -61,6 +62,9 @@ class ParameterEstimator:
         # setup of the mask for the data columns
         var_mask = np.ones(data.shape[-1], bool)
 
+        # case of disabled persistent homology
+        self.persistent_diagram = None
+
         ## a. set parameter estimation for differential equations
         if task_type == "differential":
 
@@ -79,6 +83,12 @@ class ParameterEstimator:
                 self.Y = data[:, estimation_settings["target_variable_index"]]
             else:
                 self.Y = None
+
+            # take care of persistent homology case, i.e. if using topological distance
+            if estimation_settings["persistent_homology"] == True:
+                size = estimation_settings["persistent_homology_size"]
+                trajectory = np.vstack(np.vstack((self.X, self.Y))) if self.Y is not None else self.X
+                self.persistent_diagram = ph_diag(trajectory, size=size)
 
         ## b. set parameter estimation for algebraic and integer-algebraic equations
         elif task_type == "algebraic" or task_type == "integer-algebraic":
@@ -127,7 +137,8 @@ class ParameterEstimator:
                 pass
             elif len(model.params) < 1:
                 model.set_estimated({"x":[], "fun": model_error_general(
-                    [], model, self.X, self.Y, self.T, **self.estimation_settings)})
+                    [], model, self.X, self.Y, self.T, self.persistent_diagram,
+                    **self.estimation_settings)})
 
             ## b. estimate parameters
             else:
@@ -135,7 +146,9 @@ class ParameterEstimator:
                 # (info) include all parameters, including potential initial values in the partially observed scenarios.
                 model_params = model.get_all_params()
                 t1 = time.time()
-                res = optimizer(model, self.X, self.Y, self.T, p0=model_params, **self.estimation_settings)
+                res = optimizer(model, self.X, self.Y, self.T, p0=model_params,
+                                ph_diagram=self.persistent_diagram,
+                                **self.estimation_settings)
                 t2 = time.time()
                 res["time"] = t2-t1
                 model.set_estimated(res)
@@ -227,6 +240,9 @@ def fit_models(models, data, task_type="algebraic", pool_map=map, estimation_set
         "timeout": np.inf,
         "verbosity": 1,
         "iter": 0,
+        "persistent_homology": False,
+        "persistent_homology_size": 200,
+        "persistent_homology_weights": (0.5,0.5),
         }
 
     estimation_settings_preset.update(estimation_settings)
@@ -246,7 +262,7 @@ def fit_models(models, data, task_type="algebraic", pool_map=map, estimation_set
     return ModelBox(dict(zip(models.keys(), list(pool_map(estimator.fit_one, models.values())))))
 
 
-def DE_fit (model, X, Y, T, p0, **estimation_settings):
+def DE_fit (model, X, Y, T, p0, ph_diagram, **estimation_settings):
     """Calls scipy.optimize.differential_evolution."""
 
     lu_bounds = estimation_settings['optimizer_settings']['lower_upper_bounds']
@@ -266,7 +282,7 @@ def DE_fit (model, X, Y, T, p0, **estimation_settings):
     return differential_evolution(func=estimation_settings["objective_function"],
                                   bounds=bounds,
                                   callback=diff_evol_timeout,
-                                  args=[model, X, Y, T, estimation_settings],
+                                  args=[model, X, Y, T, ph_diagram, estimation_settings],
                                   maxiter=estimation_settings["optimizer_settings"]["max_iter"],
                                   strategy=estimation_settings["optimizer_settings"]["strategy"],
                                   popsize=estimation_settings["optimizer_settings"]["pop_size"],
@@ -275,7 +291,7 @@ def DE_fit (model, X, Y, T, p0, **estimation_settings):
                                   tol=estimation_settings["optimizer_settings"]["tol"],
                                   atol=estimation_settings["optimizer_settings"]["atol"])
 
-def model_ode_error(params, model, X, Y, T, estimation_settings):
+def model_ode_error(params, model, X, Y, T, ph_diagram, estimation_settings):
     """Defines mean squared error of solution to differential equation as the error metric.
 
         Input:
@@ -291,7 +307,6 @@ def model_ode_error(params, model, X, Y, T, estimation_settings):
         estimation_settings["iter"] += 1
         print('Iter ' + str(estimation_settings["iter"]))
         print(params)
-
     try:
         # simulate
         # Next few lines strongly suppress any warnning messages
@@ -329,6 +344,20 @@ def model_ode_error(params, model, X, Y, T, estimation_settings):
             res = np.mean((Y - simX.reshape(-1))**2)
         else:
             res = np.mean((X - simX)**2)
+
+        # c. calculate the persistent_diagram of simulated trajectory
+        if estimation_settings["persistent_homology"] and ph_diagram is not None:
+            w1, w2 = estimation_settings["persistent_homology_weights"]
+            if estimation_settings["objective_settings"]["simulate_separately"]:
+                trajectory = np.vstack((X, simX))
+            else:
+                trajectory = simX
+            try:
+                persistent_homology_error = ph_error(trajectory, ph_diagram)
+                res = math.tan(math.atan(res) * w1 + math.atan(persistent_homology_error) * w2)
+            except Exception as error:
+                print("\nError from Persistent Homology metric when calculating"
+                      " bottleneck distance.\n", error)
 
         if np.isnan(res) or np.isinf(res) or not np.isreal(res):
             if estimation_settings["verbosity"] > 1:
@@ -444,7 +473,7 @@ def ode(model, params, T, X, Y, **objective_settings):
     return sim
 
 
-def model_error(params, model, X, Y, _T=None, estimation_settings=None):
+def model_error(params, model, X, Y, _T=None, _ph_metric=None, estimation_settings=None):
     """Defines mean squared error as the error metric."""
 
     try:
@@ -468,7 +497,7 @@ def model_error(params, model, X, Y, _T=None, estimation_settings=None):
         return estimation_settings['default_error']
 
 
-def model_error_general(params, model, X, Y, T, **estimation_settings):
+def model_error_general(params, model, X, Y, T, ph_diagram, **estimation_settings):
     """Calculate error of model with given parameters in general with type of error given.
         Input = TODO:
     - X are columns without features that are derived.
@@ -482,14 +511,65 @@ def model_error_general(params, model, X, Y, T, **estimation_settings):
         return model_error(params, model, X, Y, _T=None,
                             estimation_settings=estimation_settings)
     elif task_type == "differential":
-        return model_ode_error(params, model, X, Y, T, estimation_settings)
+        return model_ode_error(params, model, X, Y, T, ph_diagram,
+                               estimation_settings)
     else:
         types_string = "\", \"".join(TASK_TYPES)
         raise ValueError("Variable task_type has unsupported value "
                 f"\"{task_type}\", while list of possible values: "
                 f"\"{types_string}\".")
 
+def ph_error(trajectory: np.ndarray, diagram_truth: list[np.ndarray]) -> float:
+    """Calculates persistent homology metric between given trajectory
+    and ground truth trajectory based on topological properties of both.
+    See ph_test.py in  examples/DS2022/persistent_homology.
 
+    Inputs:
+        - trajectory: of shape (many, few), i.e. many time points of few dimensions.
+        - diagram_truth: persistence diagram of ED dataset, i.e. ground
+        truth trajectory. To speed up costly computation of persistent
+        diagram, we can calculate it once at the beginning of ED and
+        then always reuse the already calculated one.
+    Output:
+        - float: bottleneck distance between the two diagrams
+    """
+
+    # for persistent homology:  # pip scikit-tda
+    import persim
+
+    size = diagram_truth[0].shape[0]
+    diagram = ph_diag(trajectory, size)
+    distance_bottleneck = persim.bottleneck(diagram[1], diagram_truth[1])
+    return distance_bottleneck
+
+def ph_diag(trajectory: np.ndarray, size: int) -> list[np.ndarray]:
+    """Returns persistent diagram of given trajectory. See ph_test.py in examples.
+
+    Inputs:
+        - trajectory: of shape (many, few), i.e. many time points of few dimensions.
+        - size: Number of point clouds taken into the account when
+        calculating persistent diagram. I.e. trajectory is
+        down-sampled by averaging to get to desired number of time
+        points. Rule of thumb of time complexity: 200 points ~ 0.02 seconds
+    Output:
+        - diagram [list of length 2]: as output of
+        ripser.ripser(*trajectory*)['dgms']
+    """
+
+    # for persistent homology:  # pip scikit-tda
+    import ripser
+
+    def downsample(lorenz: np.ndarray) -> np.ndarray:
+        m = int(lorenz.shape[0] / size)
+        lorenz = lorenz[:(m * size), :]
+        def aggregate(array: np.ndarray) -> np.ndarray:
+            return array.reshape(-1, m).mean(axis=1)
+        lor = np.apply_along_axis(aggregate, 0, lorenz)
+        return lor
+
+    P1 = downsample(trajectory) if size < trajectory.shape[0] else trajectory
+    diagrams1 = ripser.ripser(P1)['dgms']
+    return diagrams1
 
 def min_fit (model, X, Y):
     """Calls scipy.optimize.minimize. Exists to make passing arguments to the objective function easier."""
