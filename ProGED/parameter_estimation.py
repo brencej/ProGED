@@ -11,6 +11,7 @@ import os
 import sys
 import time
 import math
+from typing import List
 import numpy as np
 import sympy as sp
 
@@ -520,7 +521,7 @@ def model_error_general(params, model, X, Y, T, ph_diagram, **estimation_setting
                 f"\"{task_type}\", while list of possible values: "
                 f"\"{types_string}\".")
 
-def ph_error(trajectory: np.ndarray, diagram_truth: list[np.ndarray]) -> float:
+def ph_error(trajectory: np.ndarray, diagram_truth: List[np.ndarray]) -> float:
     """Calculates persistent homology metric between given trajectory
     and ground truth trajectory based on topological properties of both.
     See ph_test.py in  examples/DS2022/persistent_homology.
@@ -543,7 +544,7 @@ def ph_error(trajectory: np.ndarray, diagram_truth: list[np.ndarray]) -> float:
     distance_bottleneck = persim.bottleneck(diagram[1], diagram_truth[1])
     return distance_bottleneck
 
-def ph_diag(trajectory: np.ndarray, size: int) -> list[np.ndarray]:
+def ph_diag(trajectory: np.ndarray, size: int) -> List[np.ndarray]:
     """Returns persistent diagram of given trajectory. See ph_test.py in examples.
 
     Inputs:

@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="ProGED", # Replace with your own username
-    version="0.8.4",
+    version="0.8.5",
     author="Jure Brence, Boštjan Gec, Nina Omejc, Sebastian Mežnar",
     author_email="jure.brence@ijs.si",
     description="Probabilistic generative equation discovery",
@@ -24,6 +24,7 @@ setuptools.setup(
                         "scipy", 
                         "sympy", 
                         "nltk",
+                        "Diophantine",
                         # "scikit-tda",
                         # "scikit-learn",
                         # "hyperopt",
