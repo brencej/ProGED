@@ -77,7 +77,11 @@ class ParameterEstimator:
 
             # set parameter estimator values
             estimation_settings["objective_function"] = model_ode_error
-            var_mask[[time_index, target_index]] = False
+            if target_index is not None:
+                var_mask[[time_index, target_index]] = False
+            else:
+                var_mask[time_index] = False
+
             self.X = data[:, var_mask]
             self.T = data[:, time_index]
             if estimation_settings["objective_settings"]["simulate_separately"] or estimation_settings["target_variable_index"]:
@@ -241,6 +245,7 @@ def fit_models(models, data, task_type="algebraic", pool_map=map, estimation_set
         "timeout": np.inf,
         "verbosity": 1,
         "iter": 0,
+        "get_optimization_curve": False,
         "persistent_homology": False,
         "persistent_homology_size": 200,
         "persistent_homology_weights": (0.5,0.5),
@@ -360,6 +365,10 @@ def model_ode_error(params, model, X, Y, T, ph_diagram, estimation_settings):
                 if estimation_settings["verbosity"] > 1:
                     print("\nError from Persistent Homology metric when calculating"
                       " bottleneck distance.\n", error)
+
+        # save errors for optimization curve
+        if estimation_settings["get_optimization_curve"]:
+            model.optimization_curve.append(res)
 
         if np.isnan(res) or np.isinf(res) or not np.isreal(res):
             if estimation_settings["verbosity"] > 1:

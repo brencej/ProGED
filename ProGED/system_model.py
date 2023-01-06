@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+import pandas as pd
 import sympy as sp
 
 """Module implementing the SystemModel class that represents a system of equations 
@@ -57,7 +58,8 @@ class SystemModel:
         self.observed = observed
         # extra parameters, i.e. initial values
         self.initials = [(np.random.random()-0.5)*10 for _ in range(len(sym_vars) - len(observed))]
-
+        # save errors at every iteration in a list
+        self.optimization_curve = []
 
     def set_estimated(self, result, valid=True):
         """Store results of parameter estimation and set validity of model according to input.
