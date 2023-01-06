@@ -430,7 +430,8 @@ def ode(model, params, T, X, Y, **objective_settings):
 
     # b.3 get model function
     if objective_settings["simulate_separately"]:
-        model_func = model.lambdify(list=True)[0]
+        # model_func = model.lambdify(list=True)[0]
+        model_func = model.lambdify(list=True)
     else:
         model_func = model.lambdify(list=True)
 
@@ -449,7 +450,8 @@ def ode(model, params, T, X, Y, **objective_settings):
         inits = np.array([Y[0]])
 
     # b.5 interpolate data matrix
-        X_interp = interp1d(T, X, axis=0, kind='cubic', fill_value="extrapolate")
+    #     X_interp = interp1d(T, X, axi[s=0, kind='cubic', fill_value="extrapolate")
+        X_interp = interp1d(T, X, axis=0, kind='cubic', fill_value="extrapolate") if X.shape[1] != 0 else ( lambda t: np.array([]))
 
     # b.6 set derivative functions either for or without teacher forcing
     if objective_settings["teacher_forcing"]:
