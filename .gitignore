@@ -10,3 +10,4 @@ ProGED.egg-info/
 /proged_singularity.sif
 /venv/*
 /proged_container.sif
+/proged_container_310.sif

@@ -1,8 +1,17 @@
 # -*- coding: utf-8 -*-
-"""
-Methods for estimating model parameters. Currently implemented for algebraic and differential equations.
-Optimization methods available are differential evolution, hyperopt.
 
+##################################################################################################
+##                               EQUATION PARAMETER ESTIMATION
+##################################################################################################
+
+"""
+Methods for estimating model parameters.
+Possible optimization methods: a) differential evolution from pymoo,
+                               b) differential evolution from scipy,
+                               c) hyperopt
+Possible objective functions:  a) trajectory rmse for ode
+                               b) mse for algebraic equations (or numerical differentiation of ode)
+                               c) persistent homology calculation (for ode)
 Methods:
     fit_models: Performs parameter estimation on given models. Main interface to the module.
 """
@@ -26,8 +35,6 @@ from ProGED.examples.tee_so import Tee
 from ProGED.model_box import ModelBox
 from ProGED.task import TASK_TYPES
 
-
-# from ProGED.optimizers import DE_fit, DE_fit_metamodel, hyperopt_fit, min_fit
 # glitch-doctor downloaded from github:
 # from ProGED.glitch_doctor.metamodel import Metamodel
 # import ProGED.glitch_doctor.metamodel.Metamodel
@@ -42,6 +49,102 @@ warnings.filterwarnings("ignore", message="invalid value encountered in double_s
 warnings.filterwarnings("ignore", message="overflow encountered in exp")
 warnings.filterwarnings("ignore", message="overflow encountered in square")
 warnings.filterwarnings("ignore", message="overflow encountered in double_scalars")
+
+def fit_models(models, data, task_type="algebraic", pool_map=map, estimation_settings={}):
+    """
+    Performs parameter estimation on given models. Main interface to the module.
+    Supports parallelization by passing it a pooled map callable.
+
+    Arguments:
+        models (ModelBox): Instance of ModelBox, containing the models to be fitted.
+        data (numpy.array): Input data of shape N x M, where N is the number of samples
+            and M is the number of variables.
+        task_type (str): Type of equations, e.g. "algebraic" or "differential", that
+            equation discovery algorithm tries to discover.
+
+        pool_map (function): Map function for parallelization. Example use with 8 workers:
+                from multiprocessing import Pool
+                pool = Pool(8)
+                fit_models (models, data, -1, pool_map = pool.map)
+
+        estimation_settings (dict): Dictionary where majority of optional arguments is stored
+                and where additional optional arguments can be passed to lower level parts of
+                equation discovery.
+
+            arguments that can be passed via estimation_settings dictionary:
+                target_variable_index (int): Index of column in data that belongs to the target variable. If None,
+                         all variables are considered targets (e.g. for systems ODE).
+                time_index (int): Index of column in data that belongs to measurement of time.
+                        Required for differential equations, None otherwise.
+                max_constants (int): Maximum number of free constants allowed. For the sake of computational
+                    efficiency, models exceeding this constraint are ignored. Default: 5.
+                timeout (float): Maximum time in seconds consumed for whole
+                    minimization optimization process, e.g. for differential evolution, that
+                    is performed for each model.
+                lower_upper_bounds (tuple[float]): Pair, i.e. tuple of lower and upper
+                    bound used to specify the boundaries of optimization, e.g. of
+                    differential evolution.
+                default_error: if the error for objective function could not be calculated, use this default.
+                objective_settings: settings for odeint (scipy.integrate documentation)
+                optimizer_settings: settings for differential_evolution (scipy.optimize documentation)
+                verbosity (int): Level of printout desired. 0: none, 1: info, 2+: debug.
+    """
+
+    objective_settings_preset = {
+        "atol": 10 ** (-6),
+        "rtol": 10 ** (-4),
+        "max_step": 10 ** 3,
+        "use_jacobian": False,
+        "teacher_forcing": False,
+        "simulate_separately": False,
+    }
+
+    optimizer_settings_preset = {
+        "lower_upper_bounds": (-10, 10),
+        "default_error": 10 ** 9,
+        "strategy": 'best1bin',
+        "f": (0.5, 1),
+        "cr": 0.7,
+        "max_iter": 1000,
+        "pop_size": 20,
+        "atol": 0.001,
+        "tol": 0.001,
+        "hyperopt_seed": None,
+    }
+
+    estimation_settings_preset = {
+        "target_variable_index": None,
+        "time_index": None,
+        "max_constants": 5,
+        "optimizer": 'DE_pymoo',
+        "observed": models.observed,
+        "optimizer_settings": optimizer_settings_preset,
+        "objective_settings": objective_settings_preset,
+        "default_error": 10 ** 9,
+        "timeout": np.inf,
+        "verbosity": 1,
+        "iter": 0,
+        "get_optimization_curve": False,
+        "persistent_homology": False,
+        "persistent_homology_size": 200,
+        "persistent_homology_weights": (0.5,0.5),
+        }
+
+    estimation_settings_preset.update(estimation_settings)
+
+    if "objective_settings" in estimation_settings:
+        objective_settings_preset.update(estimation_settings["objective_settings"])
+        estimation_settings_preset["objective_settings"] = dict(objective_settings_preset)
+    if "optimizer_settings" in estimation_settings:
+        optimizer_settings_preset.update(estimation_settings["optimizer_settings"])
+        estimation_settings_preset["optimizer_settings"] = dict(optimizer_settings_preset)
+
+    estimation_settings = dict(estimation_settings_preset)
+    estimation_settings["objective_settings"]["verbosity"] = estimation_settings["verbosity"]
+    estimation_settings["task_type"] = task_type
+    estimator = ParameterEstimator(data, task_type, estimation_settings)
+
+    return ModelBox(dict(zip(models.keys(), list(pool_map(estimator.fit_one, models.values())))))
 
 
 class ParameterEstimator:
@@ -130,7 +233,7 @@ class ParameterEstimator:
     def fit_one (self, model):
         # fits one model within the models dictionary
 
-        OPTIMIZER_TYPES = {"differential_evolution": DE_fit, "hyperopt": hyperopt_fit, "minimize": min_fit}
+        OPTIMIZER_TYPES = {"DE_pymoo":DE_pymoo, "DE_scipy": DE_scipy, "hyperopt": hyperopt_fit}
 
         if self.verbosity > 0:
             print("Estimating model: " + str(model.expr))
@@ -147,7 +250,13 @@ class ParameterEstimator:
 
             ## b. estimate parameters
             else:
-                optimizer = OPTIMIZER_TYPES[self.estimation_settings['optimizer']]
+                try:
+                    optimizer = OPTIMIZER_TYPES[self.estimation_settings['optimizer']]
+                except:
+                    Warning(f"Optimization method not recognized. Choose among: {list(OPTIMIZER_TYPES.keys())}."
+                            f"The default method was used: DE_pymoo.")
+                    optimizer = OPTIMIZER_TYPES["DE_pymoo"]
+
                 # (info) include all parameters, including potential initial values in the partially observed scenarios.
                 model_params = model.get_all_params()
                 t1 = time.time()
@@ -155,7 +264,7 @@ class ParameterEstimator:
                                 ph_diagram=self.persistent_diagram,
                                 **self.estimation_settings)
                 t2 = time.time()
-                res["time"] = t2-t1
+                res["duration"] = t2-t1
                 model.set_estimated(res)
                 if self.estimation_settings["verbosity"] >= 2:
                     print(res, type(res["x"]), type(res["x"][0]))
@@ -171,104 +280,14 @@ class ParameterEstimator:
         return model
 
 
-def fit_models(models, data, task_type="algebraic", pool_map=map, estimation_settings={}):
-    """
-    Performs parameter estimation on given models. Main interface to the module.
-    Supports parallelization by passing it a pooled map callable.
-
-    Arguments:
-        models (ModelBox): Instance of ModelBox, containing the models to be fitted.
-        data (numpy.array): Input data of shape N x M, where N is the number of samples
-            and M is the number of variables.
-        task_type (str): Type of equations, e.g. "algebraic" or "differential", that
-            equation discovery algorithm tries to discover.
-
-        pool_map (function): Map function for parallelization. Example use with 8 workers:
-                from multiprocessing import Pool
-                pool = Pool(8)
-                fit_models (models, data, -1, pool_map = pool.map)
-
-        estimation_settings (dict): Dictionary where majority of optional arguments is stored
-                and where additional optional arguments can be passed to lower level parts of
-                equation discovery.
-
-            arguments that can be passed via estimation_settings dictionary:
-                target_variable_index (int): Index of column in data that belongs to the target variable. If None,
-                         all variables are considered targets (e.g. for systems ODE).
-                time_index (int): Index of column in data that belongs to measurement of time.
-                        Required for differential equations, None otherwise.
-                max_constants (int): Maximum number of free constants allowed. For the sake of computational
-                    efficiency, models exceeding this constraint are ignored. Default: 5.
-                timeout (float): Maximum time in seconds consumed for whole
-                    minimization optimization process, e.g. for differential evolution, that
-                    is performed for each model.
-                lower_upper_bounds (tuple[float]): Pair, i.e. tuple of lower and upper
-                    bound used to specify the boundaries of optimization, e.g. of
-                    differential evolution.
-                default_error: if the error for objective function could not be calculated, use this default.
-                objective_settings: settings for odeint (scipy.integrate documentation)
-                optimizer_settings: settings for differential_evolution (scipy.optimize documentation)
-                verbosity (int): Level of printout desired. 0: none, 1: info, 2+: debug.
-    """
-
-    objective_settings_preset = {
-        "atol": 10 ** (-6),
-        "rtol": 10 ** (-4),
-        "max_step": 10 ** 3,
-        "use_jacobian": False,
-        "teacher_forcing": False,
-        "simulate_separately": False,
-    }
-
-    optimizer_settings_preset = {
-        "lower_upper_bounds": (-10, 10),
-        "default_error": 10 ** 9,
-        "strategy": 'best1bin',
-        "f": (0.5, 1),
-        "cr": 0.7,
-        "max_iter": 1000,
-        "pop_size": 20,
-        "atol": 0,
-        "tol": 0.001,
-        "hyperopt_seed": None,
-    }
-
-    estimation_settings_preset = {
-        "target_variable_index": None,
-        "time_index": None,
-        "max_constants": 5,
-        "optimizer": 'differential_evolution',
-        "observed": models.observed,
-        "optimizer_settings": optimizer_settings_preset,
-        "objective_settings": objective_settings_preset,
-        "default_error": 10 ** 9,
-        "timeout": np.inf,
-        "verbosity": 1,
-        "iter": 0,
-        "get_optimization_curve": False,
-        "persistent_homology": False,
-        "persistent_homology_size": 200,
-        "persistent_homology_weights": (0.5,0.5),
-        }
-
-    estimation_settings_preset.update(estimation_settings)
-
-    if "objective_settings" in estimation_settings:
-        objective_settings_preset.update(estimation_settings["objective_settings"])
-        estimation_settings_preset["objective_settings"] = dict(objective_settings_preset)
-    if "optimizer_settings" in estimation_settings:
-        optimizer_settings_preset.update(estimation_settings["optimizer_settings"])
-        estimation_settings_preset["optimizer_settings"] = dict(optimizer_settings_preset)
-
-    estimation_settings = dict(estimation_settings_preset)
-    estimation_settings["objective_settings"]["verbosity"] = estimation_settings["verbosity"]
-    estimation_settings["task_type"] = task_type
-    estimator = ParameterEstimator(data, task_type, estimation_settings)
-
-    return ModelBox(dict(zip(models.keys(), list(pool_map(estimator.fit_one, models.values())))))
+##################################################################################################
+##                               OPTIMIZATION ALGORITHMS
+##################################################################################################
 
 
-def DE_fit (model, X, Y, T, p0, ph_diagram, **estimation_settings):
+#---------------- 1. DIFFERENTIAL EVOLUTION BASED ON SCIPY LIBRARY -------------------------------
+
+def DE_scipy(model, X, Y, T, p0, ph_diagram, **estimation_settings):
     """Calls scipy.optimize.differential_evolution."""
 
     lu_bounds = estimation_settings['optimizer_settings']['lower_upper_bounds']
@@ -285,7 +304,7 @@ def DE_fit (model, X, Y, T, p0, ph_diagram, **estimation_settings):
         else:
             return False
 
-    return differential_evolution(func=estimation_settings["objective_function"],
+    output = differential_evolution(func=estimation_settings["objective_function"],
                                   bounds=bounds,
                                   callback=diff_evol_timeout,
                                   args=[model, X, Y, T, ph_diagram, estimation_settings],
@@ -297,6 +316,180 @@ def DE_fit (model, X, Y, T, p0, ph_diagram, **estimation_settings):
                                   tol=estimation_settings["optimizer_settings"]["tol"],
                                   atol=estimation_settings["optimizer_settings"]["atol"])
 
+    return {"x": output.x, "fun": output.fun, "all_results": output}
+
+#---------------- 2. DIFFERENTIAL EVOLUTION BASED ON PYMOO LIBRARY -------------------------------
+
+from pymoo.core.problem import Problem
+from pymoo.algorithms.soo.nonconvex.de import DE
+from pymoo.operators.sampling.lhs import LHS
+from pymoo.optimize import minimize
+from pymoo.termination.default import DefaultSingleObjectiveTermination
+
+class PymooProblem(Problem):
+
+    def __init__(self, params, model, data, target, time, ph_diagram, estimation_settings):
+
+        xl = np.full(len(params), estimation_settings['optimizer_settings']['lower_upper_bounds'][0])
+        xu = np.full(len(params), estimation_settings['optimizer_settings']['lower_upper_bounds'][1])
+        super().__init__(n_var=len(params), n_obj=1, n_constr=0, xl=xl, xu=xu)
+        self.params = params
+        self.model = model
+        self.data = data
+        self.target = target
+        self.time = time
+        self.ph_diagram = ph_diagram
+        self.estimation_settings = estimation_settings
+
+    def _evaluate(self, x, out, *args, **kwargs):
+        out["F"] = np.asarray(
+            [self.estimation_settings["objective_function"](
+                x[i,:],
+                self.model,
+                self.data,
+                self.target,
+                self.time,
+                self.ph_diagram,
+                self.estimation_settings) for i in range(len(x))]
+        )
+def DE_pymoo(model, X, Y, T, p0, ph_diagram, **estimation_settings):
+
+    pymoo_problem = PymooProblem(p0, model, X, Y, T, ph_diagram, estimation_settings)
+
+    strategy = "DE/best/1/bin" if estimation_settings["optimizer_settings"]["strategy"] == 'best1bin' else "DE/rand/1/bin"
+    algorithm = DE(
+        pop_size=estimation_settings["optimizer_settings"]["pop_size"],
+        sampling=LHS(),
+        variant=strategy,
+        CR=estimation_settings["optimizer_settings"]["cr"],
+        dither="vector",
+        jitter=False
+    )
+
+    termination = DefaultSingleObjectiveTermination(
+        xtol=estimation_settings["optimizer_settings"]["cr"],
+        cvtol=1e-6,
+        ftol=1e-6,
+        period=20,
+        n_max_gen=estimation_settings["optimizer_settings"]["max_iter"],
+    )
+
+    output = minimize(pymoo_problem,
+                      algorithm,
+                      termination,
+                      seed=1,
+                      verbose=False,
+                      save_history=estimation_settings["get_optimization_curve"])
+
+    return {"x": output.X, "fun": output.F, "all_results": output}
+
+#----------------------------- 3. HYPEROPT  -------------------------------
+
+def hyperopt_fit(model, X, Y, T, p0, ph_diagram, **estimation_settings):
+    """Calls Hyperopt.
+    Exists to make passing arguments to the objective function easier.
+
+    Arguments:
+        model, X, Y, T, p0, estimation_settings: Just like other
+            optimizers, see DE_fit.
+        estimation_settings (dict): Optional. Arguments to be passed
+                to the parameter estimation. See the documentation of
+                ProGED.fit_models for details about more generally
+                available options (keys).
+            Options specific for hyperopt_fit only (See Hyperopt's
+                    documentation for more details.):
+                hyperopt_algo (function): The search algorithom used
+                    by Hyperopt. See 'algo' argument in hyperopt.fmin.
+                    Defult: rand.suggest.
+                hyperopt_max_evals (int): The maximum number of
+                    evaluations of the objective function.
+                    See 'max_evals' argument in hyperopt.fmin.
+                    Default: 500.
+                hyperopt_space_fn (function): Function used in
+                    search space expression.
+                    Read below for more info. Default: hp.uniform.
+                hyperopt_space_args (hyperopt.pyll.base.Apply):
+                    Arguments used in conjunction with
+                    hyperopt_space_fn function call when specifying
+                    the search space.
+                    Default: (lower_bound, upper_bound).
+                hyperopt_space_kwargs (hyperopt.pyll.base.Apply): Same
+                    as hyperopt_space_args except that it is dictionary
+                    for optional arguments. Default: {}.
+
+    In context to ProGED, I currently see possible personal
+    configuration in one dimension only. This is because user cannot
+    predict how many and which parameters will the random generator
+    generate.
+
+    """
+
+    from hyperopt import hp, fmin, rand, pyll, Trials
+    import hyperopt.pyll.stochastic
+    verbosity = estimation_settings["verbosity"]
+    lu_bounds = estimation_settings["optimizer_settings"]["lower_upper_bounds"]
+    lower_bound, upper_bound = lu_bounds[0]+1e-30, lu_bounds[1]+1e-30
+
+    space_fn = estimation_settings.get("hyperopt_space_fn", hp.uniform)
+    if space_fn not in {hp.randint, hp.uniform, hp.loguniform}:
+        if verbosity >= 1:
+            print(
+                f"hyperopt_fit's warnings: "
+                f"Input estimation_settings[\"hyperopt_space_fn\"]={space_fn} "
+                f"should be used carefully, since it is not recognized as the"
+                f" member of the default configuration of the form"
+                f" space_fn('label', low, high).\n"
+                f"Therefore make sure the function is compatible with search"
+                f" space arguments ( hyperopt_space_(kw)args ).\n"
+                f"In doubt use one of:\n  - hp.randint\n  - hp.uniform\n"
+                f"  - hp.loguniform")
+
+    # User can specify one dimensional search space, which is then replicated.
+    args = estimation_settings.get("hyperopt_space_args", ())
+    kwargs = estimation_settings.get("hyperopt_space_kwargs", {})
+    if args != () or kwargs != {}:
+        space = [space_fn('C'+str(i), *args, **kwargs) for i in range(len(p0))]
+    else:
+        space = [space_fn('C'+str(i), lower_bound, upper_bound) for i in range(len(p0))]
+    def objective(params):
+        # First way for solution:
+        params = [float(i) for i in params]  # Use float instead of np.int32.
+        return estimation_settings["objective_function"](params, model, X, Y, T, ph_diagram, estimation_settings)
+
+    # Use user's hyperopt specifications or use the default ones:
+    algo = estimation_settings.get("hyperopt_algo", rand.suggest)
+    max_evals = estimation_settings.get("hyperopt_max_evals", 500)
+    timeout = estimation_settings["timeout"]
+
+    if verbosity >= 3:
+        print(f"Hyperopt will run with specs:\n"
+              f"  - search space:\n" + "".join([str(i)+"\n" for i in space])
+              # + f"  - algorithm: {algo}\n"
+              + f"  - timeout: {timeout}\n  - max_evals: {max_evals}")
+        print("A few points generated from the space specified:")
+        for i in range(10):
+            print(hyperopt.pyll.stochastic.sample(space))
+
+    trials = Trials()
+    best = fmin(
+        fn=objective,
+        space=space,
+        algo=algo,
+        trials=trials,
+        timeout=timeout,
+        max_evals=max_evals,
+        rstate = np.random.default_rng(estimation_settings["optimizer_settings"]["hyperopt_seed"]),
+        verbose=(verbosity >= 1),
+        )
+    params = list(best.values())
+
+    return {"x": params, "fun": min(trials.losses()), "all_results": trials}
+
+########################################################################################################
+##                                          OBJECTIVE FUNCTIONS
+########################################################################################################
+
+## -------------------------------------- 1. ODE RMSE ----------------------------------------------------
 def model_ode_error(params, model, X, Y, T, ph_diagram, estimation_settings):
     """Defines mean squared error of solution to differential equation as the error metric.
 
@@ -349,9 +542,9 @@ def model_ode_error(params, model, X, Y, T, ph_diagram, estimation_settings):
 
         # b. calculate the objective (MSE of the fit)
         if estimation_settings["objective_settings"]["simulate_separately"]:
-            res = np.mean((Y - simX.reshape(-1))**2)
+            res = np.sqrt(np.mean((Y - simX.reshape(-1))**2))
         else:
-            res = np.mean((X - simX)**2)
+            res = np.sqrt(np.mean((X - simX)**2))
 
         # c. calculate the persistent_diagram of simulated trajectory
         if estimation_settings["persistent_homology"] and ph_diagram is not None:
@@ -487,7 +680,7 @@ def ode(model, params, T, X, Y, **objective_settings):
 
     return sim
 
-
+## -------------------------------------- 2. ALGEBRAIC MSE ----------------------------------------------------
 def model_error(params, model, X, Y, _T=None, _ph_metric=None, estimation_settings=None):
     """Defines mean squared error as the error metric."""
 
@@ -511,7 +704,7 @@ def model_error(params, model, X, Y, _T=None, _ph_metric=None, estimation_settin
             print(f"Program is returning default_error: {estimation_settings['default_error']}")
         return estimation_settings['default_error']
 
-
+## ------------------------ 3. GENERAL - CHOOSES BETWEEN ODE OR ALGEBRAIC --------------------------
 def model_error_general(params, model, X, Y, T, ph_diagram, **estimation_settings):
     """Calculate error of model with given parameters in general with type of error given.
         Input = TODO:
@@ -533,6 +726,8 @@ def model_error_general(params, model, X, Y, T, ph_diagram, **estimation_setting
         raise ValueError("Variable task_type has unsupported value "
                 f"\"{task_type}\", while list of possible values: "
                 f"\"{types_string}\".")
+
+## ------------------------ 4. PERSISTENT HOMOLOGY ERROR (for ODE)  --------------------------
 
 def ph_error(trajectory: np.ndarray, diagram_truth: List[np.ndarray]) -> float:
     """Calculates persistent homology metric between given trajectory
@@ -585,186 +780,4 @@ def ph_diag(trajectory: np.ndarray, size: int) -> List[np.ndarray]:
     P1 = downsample(trajectory) if size < trajectory.shape[0] else trajectory
     diagrams1 = ripser.ripser(P1)['dgms']
     return diagrams1
-
-def min_fit (model, X, Y):
-    """Calls scipy.optimize.minimize. Exists to make passing arguments to the objective function easier."""
-    return minimize(optimization_wrapper, model.params, args=(model, X, Y))
-
-def hyperopt_fit (model, X, Y, T, p0, **estimation_settings):
-    """Calls Hyperopt.
-    Exists to make passing arguments to the objective function easier.
-
-    Arguments:
-        model, X, Y, T, p0, estimation_settings: Just like other
-            optimizers, see DE_fit.
-        estimation_settings (dict): Optional. Arguments to be passed
-                to the parameter estimation. See the documentation of
-                ProGED.fit_models for details about more generally
-                available options (keys).
-            Options specific for hyperopt_fit only (See Hyperopt's
-                    documentation for more details.):
-                hyperopt_algo (function): The search algorithom used
-                    by Hyperopt. See 'algo' argument in hyperopt.fmin.
-                    Defult: rand.suggest.
-                hyperopt_max_evals (int): The maximum number of
-                    evaluations of the objective function.
-                    See 'max_evals' argument in hyperopt.fmin.
-                    Default: 500.
-                hyperopt_space_fn (function): Function used in
-                    search space expression.
-                    Read below for more info. Default: hp.uniform.
-                hyperopt_space_args (hyperopt.pyll.base.Apply):
-                    Arguments used in conjunction with
-                    hyperopt_space_fn function call when specifying
-                    the search space.
-                    Default: (lower_bound, upper_bound).
-                hyperopt_space_kwargs (hyperopt.pyll.base.Apply): Same
-                    as hyperopt_space_args except that it is dictionary
-                    for optional arguments. Default: {}.
-
-    In context to ProGED, I currently see possible personal
-    configuration in one dimension only. This is because user cannot
-    predict how many and which parameters will the random generator
-    generate.
-
-    One-dimensional configuration of search space is here specified
-    by function called in the stochastic space parameter expression
-    and by this expression's (also optional) arguments as described at:
-    https://github.com/hyperopt/hyperopt/wiki/FMin#21-parameter-expressions
-    at 0b49cde7c0.
-    The function is specified via the `hyperopt_space_fn` setting and
-    (optional) arguments are similarly specified via
-    the `hyperopt_space_(kw)args` settings. As a result, this is
-    called:
-        hyperopt_space_fn('label_i-th_dim', *hyperopt_space_args,
-                        **hyperopt_space_kwargs)
-    to produce the 1-D search space which is then copied a few times
-    into a n-dim list with distinct labels to avoid hyperopt error.
-        E.g. if passing settings:
-      estimation_settings["hyperopt_space_fn"]=hp.randint and
-      estimation_settings["hyperopt_space_args"]=(lower_bound, upper_bound)
-    in case of p0=(2.45, 6.543, 6.5),
-    the search space will be:
-    [hp.randint('C0', upper_bound),
-     hp.randint('C1', upper_bound),
-     hp.randint('C2', upper_bound)], since p0 is 3-D.
-
-    When omitting arguments in stochastic expression, it defaults
-    to arguments=(lower_bound, upper_bound), which are allways
-    present inside of estimation_settings input. This default
-    behaviour is prone to errors in combination of unknown space
-    functions.
-
-    List of space functions behaving well without specifying arguments:
-        - hp.randint
-        - hp.uniform (default)
-        - hp.loguniform
-
-    Defaults:
-        If search space function or arguments are unspecified, then
-        the 1-D space:
-            hp.uniform('Ci', lower_bound, upper_bound)
-        is used.
-    """
-
-    from hyperopt import hp, fmin, rand, pyll, Trials
-    import hyperopt.pyll.stochastic
-    verbosity = estimation_settings["verbosity"]
-    lu_bounds = estimation_settings["optimizer_settings"]["lower_upper_bounds"]
-    lower_bound, upper_bound = lu_bounds[0]+1e-30, lu_bounds[1]+1e-30
-
-    space_fn = estimation_settings.get("hyperopt_space_fn", hp.uniform)
-    if space_fn not in {hp.randint, hp.uniform, hp.loguniform}:
-        if verbosity >= 1:
-            print(
-                f"hyperopt_fit's warnings: "
-                f"Input estimation_settings[\"hyperopt_space_fn\"]={space_fn} "
-                f"should be used carefully, since it is not recognized as the"
-                f" member of the default configuration of the form"
-                f" space_fn('label', low, high).\n"
-                f"Therefore make sure the function is compatible with search"
-                f" space arguments ( hyperopt_space_(kw)args ).\n"
-                f"In doubt use one of:\n  - hp.randint\n  - hp.uniform\n"
-                f"  - hp.loguniform")
-
-    # User can specify one dimensional search space, which is then replicated.
-    args = estimation_settings.get("hyperopt_space_args", ())
-    kwargs = estimation_settings.get("hyperopt_space_kwargs", {})
-    if args != () or kwargs != {}:
-        space = [space_fn('C'+str(i), *args, **kwargs) for i in range(len(p0))]
-    else:
-        space = [space_fn('C'+str(i), lower_bound, upper_bound) for i in range(len(p0))]
-
-    def objective(params):
-        # First way for solution:
-        params = [float(i) for i in params]  # Use float instead of np.int32.
-        return estimation_settings["objective_function"](
-            params, model, X, Y, T, estimation_settings)
-    # Use user's hyperopt specifications or use the default ones:
-    algo = estimation_settings.get("hyperopt_algo", rand.suggest)
-    max_evals = estimation_settings.get("hyperopt_max_evals", 500)
-    timeout = estimation_settings["timeout"]
-
-    # My testing code. Delete this block:
-    # if str(model.expr) == "C0*exp(C1*n)":
-    #     estimation_settings["timeout"] = estimation_settings["timeout_privilege"]
-    #     max_evals = max_evals*10
-    #     print("This model is privileged.")
-
-    if verbosity >= 3:
-        print(f"Hyperopt will run with specs:\n"
-              f"  - search space:\n" + "".join([str(i)+"\n" for i in space])
-              # + f"  - algorithm: {algo}\n"
-              + f"  - timeout: {timeout}\n  - max_evals: {max_evals}")
-        print("A few points generated from the space specified:")
-        for i in range(10):
-            print(hyperopt.pyll.stochastic.sample(space))
-
-    trials = Trials()
-    best = fmin(
-        fn=objective,
-        space=space,
-        algo=algo,
-        trials=trials,
-        timeout=timeout,
-        max_evals=max_evals,
-        rstate = np.random.default_rng(estimation_settings["optimizer_settings"]["hyperopt_seed"]),
-        verbose=(verbosity >= 1),
-        )
-    params = list(best.values())
-    result = {"x": params, "fun": min(trials.losses())}
-    if verbosity >= 3:
-        print(result)
-    return result
-
-
-if __name__ == "__main__":
-
-    # 1. test (older)
-    print("--- parameter_estimation.py test --- ")
-    np.random.seed(2)
-
-    from pyDOE import lhs
-    from generators.grammar import GeneratorGrammar
-    from generate import generate_models
-
-    def testf (x):
-        return 3*x[:,0]*x[:,1]**2 + 0.5
-
-    X = lhs(2, 10)*5
-    X = X.reshape(-1, 2)
-    y = testf(X).reshape(-1,1)
-    data = np.hstack((X, y))
-
-    grammar = GeneratorGrammar("""S -> S '+' T [0.4] | T [0.6]
-                              T -> 'C' [0.6] | T "*" V [0.4]
-                              V -> 'x' [0.5] | 'y' [0.5]""")
-    symbols = {"x":['x', 'y'], "start": "S", "const": "C"}
-    N = 10
-
-    models = generate_models(grammar, symbols, strategy_settings={"N": 10})
-    models = fit_models(models, data, task_type="algebraic")
-    print(models)
-
-
 

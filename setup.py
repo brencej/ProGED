@@ -25,6 +25,7 @@ setuptools.setup(
                         "sympy", 
                         "nltk",
                         "Diophantine",
+                        "pymoo",
                         # "scikit-tda",
                         # "scikit-learn",
                         # "hyperopt",

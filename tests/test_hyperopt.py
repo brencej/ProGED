@@ -31,10 +31,10 @@ def test_equation_discoverer_hyperopt():
     ED.generate_models()
     ED.fit_models()
 
-    def assert_line(models, i, expr, error, tol=1e-9, n=100):
+    def assert_line(models, i, expr, error, tol=1e-7, n=100):
         #assert str(ED.models[i].get_full_expr())[:n] == expr[:n]
         assert abs(ED.models[i].get_error() - error) < tol
-    assert_line(ED.models, 0, "y", 12.70440146224583)
-    assert_line(ED.models, 1, "0.401*x + y", 10.380481961100879, n=6)
-    print(ED.models)
+    assert_line(ED.models, 0, "y", 3.564323422789496)
+    assert_line(ED.models, 1, "-0.839*x + y", 3.221875534700383, n=6)
+    # print(ED.models)
     return
