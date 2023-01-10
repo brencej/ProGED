@@ -332,11 +332,13 @@ def model_ode_error(params, model, X, Y, T, ph_diagram, estimation_settings):
             return ode(model, params, T, X, Y, **estimation_settings["objective_settings"])
 
         # Next line works only when sys.stdout is real. Thats why above.
-        if isinstance(sys.stdout, stdout_type):
+        if isinstance(sys.stdout, stdout_type) and (estimation_settings["verbosity"] < 2):
             with open(os.devnull, 'w') as f, mt.stdout_redirected(f):
                 try:
                     simX = run_ode()
                 except Exception as error:
+                    # Next error message should be theoretically impossible to witness, since all output is
+                    # forwarded into fake output (black hole).
                     if estimation_settings["verbosity"] >= 1:
                         print("Inside ode(), preventing tee/IO error. Params at error:",
                               params, f"and {type(error)} with message:", error)

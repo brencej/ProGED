@@ -170,12 +170,18 @@ class EqDisco:
             self.strategy_settings = {"N": sample_size, "max_repeat": max_attempts}
         else:
             self.strategy_settings = strategy_settings
-        
-        if not estimation_settings:
-            self.estimation_settings = {"target_variable_index": target_variable_index,
-                                        "time_index": time_index}
-        else:
-            self.estimation_settings = estimation_settings
+
+        self.estimation_settings = {"target_variable_index": target_variable_index,
+                                    "time_index": time_index,
+                                    "verbosity": verbosity}
+        # if not estimation_settings:
+        #     self.estimation_settings = {"target_variable_index": target_variable_index,
+        #                                 "time_index": time_index,
+        #                                 "verbosity": verbosity}
+        #     print(verbosity, 'verb')
+        # else:
+        estimation_settings = {} if estimation_settings is None else estimation_settings
+        self.estimation_settings.update(estimation_settings)
         
         self.models = None
         self.solution = None
@@ -183,22 +189,27 @@ class EqDisco:
         self.verbosity = verbosity
 
     def generate_models(self, strategy_settings=None):
-        if not strategy_settings:
-            strategy_settings = self.strategy_settings
-        self.models = generate_models(self.generator, self.task.symbols, 
-                                    system_size = self.system_size,
-                                    strategy = self.strategy,
-                                    strategy_settings = self.strategy_settings,
-                                    verbosity=self.verbosity)
+        strategy_settings = {} if strategy_settings is None else strategy_settings
+        # if not strategy_settings:
+        #     strategy_settings = self.strategy_settings.update(strategy_settings)
+        strategy_settings_preset = dict(self.strategy_settings)
+        strategy_settings_preset.update(strategy_settings)
+        self.models = generate_models(self.generator, self.task.symbols,
+                                      system_size = self.system_size,
+                                      strategy = self.strategy,
+                                      strategy_settings = strategy_settings_preset,
+                                      verbosity=self.verbosity)
         return self.models
     
     def fit_models(self, estimation_settings={}, pool_map=map):
-        if not estimation_settings:
-            estimation_settings = self.estimation_settings
-        self.models = fit_models(self.models, self.task.data, 
+        # if not estimation_settings:
+        #     estimation_settings = self.estimation_settings
+        estimation_settings_preset = dict(self.estimation_settings)
+        estimation_settings_preset.update(estimation_settings)
+        self.models = fit_models(self.models, self.task.data,
                                  task_type=self.task.task_type, 
                                  pool_map=pool_map,
-                                 estimation_settings=estimation_settings)
+                                 estimation_settings=estimation_settings_preset)
         return self.models
     
     def get_results(self, N=3):

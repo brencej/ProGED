@@ -28,6 +28,8 @@ OPTIONAL:
 - diophantine (for dimensionally-consistent grammars)
 - torch, tqdm (for HVAE generator)
 - botorch (for Bayesian optimization with HVAE)
+- scikim-tda (for persistent homology metric)
+- hyperopt (for alternative optimization algorithm)
 
 ## Setup
 You can install the package directly from the git repository:
