@@ -95,9 +95,11 @@ class Model:
         self.valid = False
 
         # extra parameters, i.e. initial values
-        self.initials = [(np.random.random()-0.5)*10 for _ in range(len(sym_vars) - len(self.observed))]
+        self.initials = np.array(np.random.random()*5)
 
-        
+        # observability mask, to know which initial values are observable and which not
+        self.obs_mask = np.full(len(self.sym_vars), False, dtype=bool)
+
     def add_tree (self, code, p):
         """Add a new parse tree to the model.
         
@@ -146,12 +148,12 @@ class Model:
         else:
             return dummy
 
-    def get_all_params(self):
-        return self.params
-        
     def set_params(self, params, split=False):
         self.params=params
-        
+
+    def get_params(self, flatten=False):
+        return self.params
+
     def lambdify (self, *params, arg="numpy", list=False):
         """Produce a callable function from the symbolic expression and the parameter values.
         

@@ -103,19 +103,20 @@ def fit_models(models, data, task_type="algebraic", pool_map=map, estimation_set
         "lower_upper_bounds": (-10, 10),
         "default_error": 10 ** 9,
         "strategy": 'best1bin',
-        "f": (0.5, 1),
+        "f": 0.5,
         "cr": 0.7,
         "max_iter": 1000,
         "pop_size": 20,
         "atol": 0.001,
         "tol": 0.001,
+        "pymoo_min_f": 10 ** (-6),
         "hyperopt_seed": None,
     }
 
     estimation_settings_preset = {
         "target_variable_index": None,
         "time_index": None,
-        "max_constants": 5,
+        "max_constants": 15,
         "optimizer": 'DE_pymoo',
         "observed": models.observed,
         "optimizer_settings": optimizer_settings_preset,
@@ -123,8 +124,6 @@ def fit_models(models, data, task_type="algebraic", pool_map=map, estimation_set
         "default_error": 10 ** 9,
         "timeout": np.inf,
         "verbosity": 1,
-        "iter": 0,
-        "get_optimization_curve": False,
         "persistent_homology": False,
         "persistent_homology_size": 200,
         "persistent_homology_weights": (0.5,0.5),
@@ -253,12 +252,19 @@ class ParameterEstimator:
                 try:
                     optimizer = OPTIMIZER_TYPES[self.estimation_settings['optimizer']]
                 except:
-                    Warning(f"Optimization method not recognized. Choose among: {list(OPTIMIZER_TYPES.keys())}."
-                            f"The default method was used: DE_pymoo.")
+                    print(f"*** Warning: \nOptimization method not recognized. Choose among: {list(OPTIMIZER_TYPES.keys())}.\n"
+                                  f"The default method was used: DE_pymoo. ***")
                     optimizer = OPTIMIZER_TYPES["DE_pymoo"]
 
-                # (info) include all parameters, including potential initial values in the partially observed scenarios.
-                model_params = model.get_all_params()
+                # include all parameters, including unknown initial values in the partially observed scenarios.
+                obs_idx = [model.sym_vars.index(sp.symbols(model.observed[i])) for i in range(len(model.observed))]
+                model.obs_mask[obs_idx] = True
+                if np.any(model.obs_mask == False):
+                    model_params = model.get_params(flatten=True) + list(model.initials[~model.obs_mask])
+                else:
+                    model_params = model.get_params(flatten=True)
+
+                # parameter estimation
                 t1 = time.time()
                 res = optimizer(model, self.X, self.Y, self.T, p0=model_params,
                                 ph_diagram=self.persistent_diagram,
@@ -325,7 +331,8 @@ from pymoo.algorithms.soo.nonconvex.de import DE
 from pymoo.operators.sampling.lhs import LHS
 from pymoo.optimize import minimize
 from pymoo.termination.default import DefaultSingleObjectiveTermination
-
+from pymoo.core.termination import Termination
+from pymoo.termination.default import MaximumGenerationTermination
 class PymooProblem(Problem):
 
     def __init__(self, params, model, data, target, time, ph_diagram, estimation_settings):
@@ -340,6 +347,8 @@ class PymooProblem(Problem):
         self.time = time
         self.ph_diagram = ph_diagram
         self.estimation_settings = estimation_settings
+        self.best_f = estimation_settings['optimizer_settings']['default_error']
+        self.opt_curve = []
 
     def _evaluate(self, x, out, *args, **kwargs):
         out["F"] = np.asarray(
@@ -352,34 +361,54 @@ class PymooProblem(Problem):
                 self.ph_diagram,
                 self.estimation_settings) for i in range(len(x))]
         )
+        self.best_f = np.min(out["F"])
+        self.opt_curve.append(self.best_f)
+
+class BestTermination(Termination):
+    def __init__(self, min_f=1e-3, n_max_gen=500) -> None:
+        super().__init__()
+        self.min_f = min_f
+        self.max_gen = MaximumGenerationTermination(n_max_gen)
+    def _update(self, algorithm):
+        if algorithm.problem.best_f < self.min_f:
+            self.terminate()
+        return self.max_gen.update(algorithm)
+
 def DE_pymoo(model, X, Y, T, p0, ph_diagram, **estimation_settings):
 
     pymoo_problem = PymooProblem(p0, model, X, Y, T, ph_diagram, estimation_settings)
 
     strategy = "DE/best/1/bin" if estimation_settings["optimizer_settings"]["strategy"] == 'best1bin' else "DE/rand/1/bin"
+
     algorithm = DE(
         pop_size=estimation_settings["optimizer_settings"]["pop_size"],
         sampling=LHS(),
         variant=strategy,
         CR=estimation_settings["optimizer_settings"]["cr"],
+        F=estimation_settings["optimizer_settings"]["f"],
         dither="vector",
         jitter=False
     )
 
-    termination = DefaultSingleObjectiveTermination(
-        xtol=estimation_settings["optimizer_settings"]["cr"],
-        cvtol=1e-6,
-        ftol=1e-6,
-        period=20,
-        n_max_gen=estimation_settings["optimizer_settings"]["max_iter"],
-    )
+    # Defaul termination
+    # termination = DefaultSingleObjectiveTermination(
+    #     xtol=1e-8,
+    #     cvtol=1e-6,
+    #     ftol=1e-6,
+    #     period=20,
+    #     n_max_gen=1000, #estimation_settings["optimizer_settings"]["max_iter"],
+    #     n_max_evals=100000
+    # )
+
+    termination = BestTermination(min_f = estimation_settings["optimizer_settings"]["pymoo_min_f"],
+                                  n_max_gen = estimation_settings["optimizer_settings"]["max_iter"])
 
     output = minimize(pymoo_problem,
                       algorithm,
                       termination,
                       seed=1,
                       verbose=False,
-                      save_history=estimation_settings["get_optimization_curve"])
+                      save_history=False)
 
     return {"x": output.X, "fun": output.F, "all_results": output}
 
@@ -498,14 +527,6 @@ def model_ode_error(params, model, X, Y, T, ph_diagram, estimation_settings):
         - X are columns of data (without potential target variables/columns).
         - Y are columns of data that correspond to target variables: features that are derived via ode fitting.
     """
-
-    model.set_params(params, split=True)
-
-    # check the parameter estimation process if needed
-    if estimation_settings["verbosity"] > 1:
-        estimation_settings["iter"] += 1
-        print('Iter ' + str(estimation_settings["iter"]))
-        print(params)
     try:
         # simulate
         # Next few lines strongly suppress any warnning messages
@@ -561,10 +582,6 @@ def model_ode_error(params, model, X, Y, T, ph_diagram, estimation_settings):
                     print("\nError from Persistent Homology metric when calculating"
                       " bottleneck distance.\n", error)
 
-        # save errors for optimization curve
-        if estimation_settings["get_optimization_curve"]:
-            model.optimization_curve.append(res)
-
         if np.isnan(res) or np.isinf(res) or not np.isreal(res):
             if estimation_settings["verbosity"] > 1:
                 print("Objective error is nan, inf or unreal. Returning default error.")
@@ -574,7 +591,6 @@ def model_ode_error(params, model, X, Y, T, ph_diagram, estimation_settings):
         print("\nError within model_ode_error().\n", error)
 
     return res
-
 
 
 def ode(model, params, T, X, Y, **objective_settings):
@@ -598,63 +614,42 @@ def ode(model, params, T, X, Y, **objective_settings):
     elif not T.shape[0] == X.shape[0]:
         raise IndexError("Number of samples in time column and data matrix does not match.")
 
+    # Update params
+    model.set_params(params, split=True)
 
-    # b. Settings for simulations
-
-    # b.1 Set min_step
-    """  optional: Set min_step via prescribing maximum number of steps:
-    if "max_steps" in objective_settings:
-        max_steps = objective_settings["max_steps"]
-    else:
-        # max_steps = 10**6  # On laptop, this would need less than 3 seconds.
-        max_steps = T.shape[0] * 10 ** 3  # Set to |timepoints|*1000.
-    # Convert max_steps to min_step:
-    min_step_from_max_steps = abs(T[-1] - T[0]) / max_steps
-    # The minimal min_step to avoid min step error in LSODA:
-    min_step_error = 10 ** (-15)
-    min_step = max(min_step_from_max_steps, min_step_error)  # Force them both.
-    """
-
-
-    # b.2 set jacobian
+    # Set jacobian
     Jf = None
     if objective_settings["use_jacobian"]:
         J = model.lambdify_jacobian()
         def Jf(t, x):
             return J(*x)
 
-    # b.3 get model function
+    # Set model function
     if objective_settings["simulate_separately"]:
         # model_func = model.lambdify(list=True)[0]
         model_func = model.lambdify(list=True)
     else:
         model_func = model.lambdify(list=True)
 
-    # b.4 set initial values
+    # Set initial values
     if Y is None:
-        num_eq = len(model.expr)
-
-        obs_idx = [model.sym_vars.index(sp.symbols(model.observed[i])) for i in range(len(model.observed))]
-        hid_idx = np.full(num_eq, True, dtype=bool)
-        hid_idx[obs_idx] = False
-        inits = np.empty(num_eq)
-        inits[obs_idx] = np.array([X[0]])
-        inits[hid_idx] = model.initials
+        model.initials[model.obs_mask] = X[0]
+        model.initials[~model.obs_mask] = params[model.total_eq_params:]
     else:
-        hid_idx = np.full(Y.ndim, False, dtype=bool)
-        inits = np.array([Y[0]])
+        model.obs_mask = np.full(Y.ndim, True, dtype=bool)
+        model.initials = Y[0]
 
-    # b.5 interpolate data matrix
-    #     X_interp = interp1d(T, X, axi[s=0, kind='cubic', fill_value="extrapolate")
-        X_interp = interp1d(T, X, axis=0, kind='cubic', fill_value="extrapolate") if X.shape[1] != 0 else ( lambda t: np.array([]))
+    # Interpolate data matrix
+    # X_interp = interp1d(T, X, axi[s=0, kind='cubic', fill_value="extrapolate")
+    X_interp = interp1d(T, X, axis=0, kind='cubic', fill_value="extrapolate") if X.shape[1] != 0 else (lambda t: np.array([]))
 
-    # b.6 set derivative functions either for or without teacher forcing
+    # Set derivative functions either for or without teacher forcing
     if objective_settings["teacher_forcing"]:
 
         def dxdt(t, x):
             b = np.empty(len(model.sym_vars))
-            b[hid_idx] = x[hid_idx]
-            b[~hid_idx] = X_interp(t)
+            b[~model.obs_mask] = x[~model.obs_mask]
+            b[model.obs_mask] = X_interp(t)
             return [model_func[i](*b) for i in range(len(model_func))]
 
     else:
@@ -669,14 +664,14 @@ def ode(model, params, T, X, Y, **objective_settings):
                 b = np.concatenate((x, X_interp(t)))
                 return [model_func(*b)]
 
-    # c. simulate
-    sim = odeint(dxdt, inits, T,
+    # Simulate
+    sim = odeint(dxdt, model.initials, T,
                 rtol=objective_settings['rtol'], atol=objective_settings['atol'],
                 Dfun=Jf, tfirst=True)
 
-    # d. return simulation only for the observed state variables
+    # Return simulation only for the observed state variables
     if not objective_settings["simulate_separately"]:
-        sim = sim[:, ~hid_idx]
+        sim = sim[:, model.obs_mask]
 
     return sim
 
@@ -688,7 +683,7 @@ def model_error(params, model, X, Y, _T=None, _ph_metric=None, estimation_settin
         verbosity = estimation_settings['verbosity']
 
         testY = model.evaluate(X, *params)
-        res = np.mean((Y-testY)**2)
+        res = np.sqrt(np.mean((Y-testY)**2))
 
         if np.isnan(res) or np.isinf(res) or not np.isreal(res):
             if verbosity > 1:

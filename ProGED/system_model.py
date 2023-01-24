@@ -56,10 +56,13 @@ class SystemModel:
 
         # list of variables that are (un)observed - used for partially-observed systems
         self.observed = observed
+
+        # observability mask, to know which initial values are observable and which not
+        self.obs_mask = np.full(len(self.sym_vars), False, dtype=bool)
+
         # extra parameters, i.e. initial values
-        self.initials = [(np.random.random()-0.5)*10 for _ in range(len(sym_vars) - len(observed))]
-        # save errors at every iteration in a list
-        self.optimization_curve = []
+        self.initials = np.random.random(len(self.expr))*5
+
 
     def set_estimated(self, result, valid=True):
         """Store results of parameter estimation and set validity of model according to input.
@@ -97,18 +100,16 @@ class SystemModel:
         else:
             return dummy
 
-    def get_params(self):
-        return self.params
-
-    def get_all_params(self):
-        params = [par for eq_params in self.params for par in eq_params]
-        params += list(self.initials)
-        return params
+    def get_params(self, flatten=False):
+        if flatten:
+            return [par for eq_params in self.params for par in eq_params]
+        else:
+            return self.params
 
     def set_params(self, params, split=True):
         if split:
             expr_params = params[:self.total_eq_params]
-            self.initials = params[self.total_eq_params:]
+            # self.initials = params[self.total_eq_params:] # removed
             self.params = np.split(expr_params, np.cumsum(self.n_params))[:-1]
             # self.params = list(filter(None, self.params))
         else:
