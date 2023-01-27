@@ -63,6 +63,10 @@ class SystemModel:
         # extra parameters, i.e. initial values
         self.initials = np.random.random(len(self.expr))*5
 
+        # number of successful persistent homology comparisons vs. pure rmse
+        self.all_iters = 0
+        self.ph_used = 0
+
 
     def set_estimated(self, result, valid=True):
         """Store results of parameter estimation and set validity of model according to input.

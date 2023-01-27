@@ -97,6 +97,9 @@ def fit_models(models, data, task_type="algebraic", pool_map=map, estimation_set
         "use_jacobian": False,
         "teacher_forcing": False,
         "simulate_separately": False,
+        "persistent_homology": False,
+        "persistent_homology_size": 200,
+        "persistent_homology_weight": 0.5,
     }
 
     optimizer_settings_preset = {
@@ -124,9 +127,6 @@ def fit_models(models, data, task_type="algebraic", pool_map=map, estimation_set
         "default_error": 10 ** 9,
         "timeout": np.inf,
         "verbosity": 1,
-        "persistent_homology": False,
-        "persistent_homology_size": 200,
-        "persistent_homology_weights": (0.5,0.5),
         }
 
     estimation_settings_preset.update(estimation_settings)
@@ -192,10 +192,19 @@ class ParameterEstimator:
                 self.Y = None
 
             # take care of persistent homology case, i.e. if using topological distance
-            if estimation_settings["persistent_homology"] == True:
-                size = estimation_settings["persistent_homology_size"]
+            if estimation_settings["objective_settings"]["persistent_homology"]:
+                weight = estimation_settings["objective_settings"]["persistent_homology_weight"]
+                if (not isinstance(weight, (float, int, np.float))) or weight < 0 or weight > 1:
+                    raise TypeError("ERROR: Persistent homology weight should be of type float and in range [0,1]!")
+                size = estimation_settings["objective_settings"]["persistent_homology_size"]
                 trajectory = np.vstack(np.vstack((self.X, self.Y))) if self.Y is not None else self.X
-                self.persistent_diagram = ph_diag(trajectory, size=size)
+                try:
+                    self.persistent_diagram = ph_diag(trajectory, size=size)
+                except Exception as error:
+                    if self.estimation_settings["verbosity"] >= 1:
+                        print(f"WARNNING: Excepted an error when constructing ph_diagram of the original dataset "
+                              f"of type {type(error)} and message:{error}!")
+                    self.persistent_diagram = None
 
         ## b. set parameter estimation for algebraic and integer-algebraic equations
         elif task_type == "algebraic" or task_type == "integer-algebraic":
@@ -259,6 +268,8 @@ class ParameterEstimator:
                 # include all parameters, including unknown initial values in the partially observed scenarios.
                 obs_idx = [model.sym_vars.index(sp.symbols(model.observed[i])) for i in range(len(model.observed))]
                 model.obs_mask[obs_idx] = True
+                if sp.symbols('t') in model.sym_vars:
+                    model.obs_mask = model.obs_mask[:-1]
                 if np.any(model.obs_mask == False):
                     model_params = model.get_params(flatten=True) + list(model.initials[~model.obs_mask])
                 else:
@@ -410,7 +421,7 @@ def DE_pymoo(model, X, Y, T, p0, ph_diagram, **estimation_settings):
                       verbose=False,
                       save_history=False)
 
-    return {"x": output.X, "fun": output.F, "all_results": output}
+    return {"x": output.X, "fun": output.F[0], "all_results": output}
 
 #----------------------------- 3. HYPEROPT  -------------------------------
 
@@ -568,15 +579,16 @@ def model_ode_error(params, model, X, Y, T, ph_diagram, estimation_settings):
             res = np.sqrt(np.mean((X - simX)**2))
 
         # c. calculate the persistent_diagram of simulated trajectory
-        if estimation_settings["persistent_homology"] and ph_diagram is not None:
-            w1, w2 = estimation_settings["persistent_homology_weights"]
+        if estimation_settings["objective_settings"]["persistent_homology"] and ph_diagram is not None:
+            weight = estimation_settings["objective_settings"]["persistent_homology_weight"]
             if estimation_settings["objective_settings"]["simulate_separately"]:
                 trajectory = np.vstack((X, simX))
             else:
                 trajectory = simX
             try:
                 persistent_homology_error = ph_error(trajectory, ph_diagram)
-                res = math.tan(math.atan(res) * w1 + math.atan(persistent_homology_error) * w2)
+                res = math.tan(math.atan(res) * weight + math.atan(persistent_homology_error) * (1-weight))
+                model.ph_used += 1
             except Exception as error:
                 if estimation_settings["verbosity"] > 1:
                     print("\nError from Persistent Homology metric when calculating"
@@ -589,6 +601,8 @@ def model_ode_error(params, model, X, Y, T, ph_diagram, estimation_settings):
 
     except Exception as error:
         print("\nError within model_ode_error().\n", error)
+
+    model.all_iters += 1
 
     return res
 

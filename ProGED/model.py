@@ -100,6 +100,10 @@ class Model:
         # observability mask, to know which initial values are observable and which not
         self.obs_mask = np.full(len(self.sym_vars), False, dtype=bool)
 
+        # number of successful persistent homology comparisons vs. pure rmse
+        self.all_iters = 0
+        self.ph_used = 0
+
     def add_tree (self, code, p):
         """Add a new parse tree to the model.
         

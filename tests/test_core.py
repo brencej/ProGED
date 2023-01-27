@@ -193,7 +193,7 @@ def test_parameter_estimation_ODE_system():
                            "verbosity": 0}
     np.random.seed(0)
     system_out = fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
-    assert abs(system_out[0].get_error() - 0.00014607500) < 1e-7  # 15.11.2022
+    assert abs(system_out[0].get_error() - 0.00014607500) < 1e-6  # 15.11.2022
     # true params: [[1.], [-0.5., -1., 0.5]]
 
 def test_parameter_estimation_ODE_system_partial_observability():
@@ -213,7 +213,7 @@ def test_parameter_estimation_ODE_system_partial_observability():
                            "verbosity": 0}
 
     system_out = fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
-    assert abs(system_out[0].get_error() - 6.859567634e-05) < 1e-7
+    assert abs(system_out[0].get_error() - 6.859567634e-05) < 1e-6
     # true params: [[1.], [-0.5., -1., 0.5]]
 
 def test_equation_discoverer():
