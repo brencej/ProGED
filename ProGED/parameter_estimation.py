@@ -200,8 +200,11 @@ class ParameterEstimator:
                 trajectory = np.vstack(np.vstack((self.X, self.Y))) if self.Y is not None else self.X
                 try:
                     self.persistent_diagram = ph_diag(trajectory, size=size)
+                    if (self.persistent_diagram[1].shape == (0, 2)) and estimation_settings["verbosity"] >= 1:
+                        print("INFO: persistent diagram of the ground truth is trivial (empty), "
+                              "i.e. no interesting 2D-property is present.")
                 except Exception as error:
-                    if self.estimation_settings["verbosity"] >= 1:
+                    if estimation_settings["verbosity"] >= 1:
                         print(f"WARNNING: Excepted an error when constructing ph_diagram of the original dataset "
                               f"of type {type(error)} and message:{error}!")
                     self.persistent_diagram = None
@@ -580,19 +583,22 @@ def model_ode_error(params, model, X, Y, T, ph_diagram, estimation_settings):
 
         # c. calculate the persistent_diagram of simulated trajectory
         if estimation_settings["objective_settings"]["persistent_homology"] and ph_diagram is not None:
+            if estimation_settings["verbosity"] >= 2:
+                print(f'iters vs. ph_used till now: {model.all_iters}, ph_iters:{model.ph_used}')
             weight = estimation_settings["objective_settings"]["persistent_homology_weight"]
+            size = estimation_settings["objective_settings"]["persistent_homology_size"]
             if estimation_settings["objective_settings"]["simulate_separately"]:
                 trajectory = np.vstack((X, simX))
             else:
                 trajectory = simX
             try:
-                persistent_homology_error = ph_error(trajectory, ph_diagram)
+                persistent_homology_error = ph_error(trajectory, ph_diagram, size, estimation_settings["verbosity"])
                 res = math.tan(math.atan(res) * weight + math.atan(persistent_homology_error) * (1-weight))
                 model.ph_used += 1
             except Exception as error:
-                if estimation_settings["verbosity"] > 1:
+                if estimation_settings["verbosity"] >= 2:
                     print("\nError from Persistent Homology metric when calculating"
-                      " bottleneck distance.\n", error)
+                          " bottleneck distance.\n", error)
 
         if np.isnan(res) or np.isinf(res) or not np.isreal(res):
             if estimation_settings["verbosity"] > 1:
@@ -603,7 +609,6 @@ def model_ode_error(params, model, X, Y, T, ph_diagram, estimation_settings):
         print("\nError within model_ode_error().\n", error)
 
     model.all_iters += 1
-
     return res
 
 
@@ -738,7 +743,7 @@ def model_error_general(params, model, X, Y, T, ph_diagram, **estimation_setting
 
 ## ------------------------ 4. PERSISTENT HOMOLOGY ERROR (for ODE)  --------------------------
 
-def ph_error(trajectory: np.ndarray, diagram_truth: List[np.ndarray]) -> float:
+def ph_error(trajectory: np.ndarray, diagram_truth: List[np.ndarray], size: int, verbosity: int) -> float:
     """Calculates persistent homology metric between given trajectory
     and ground truth trajectory based on topological properties of both.
     See ph_test.py in  examples/DS2022/persistent_homology.
@@ -756,9 +761,17 @@ def ph_error(trajectory: np.ndarray, diagram_truth: List[np.ndarray]) -> float:
     # for persistent homology:  # pip scikit-tda
     import persim
 
-    size = diagram_truth[0].shape[0]
+    # size = diagram_truth[0].shape[0]
     diagram = ph_diag(trajectory, size)
-    distance_bottleneck = persim.bottleneck(diagram[1], diagram_truth[1])
+    if diagram[1].shape == (0, 2) and diagram_truth[1].shape == (0, 2):
+        if verbosity >= 2:
+            print("Both ground truth and candidate trajectory have trivial persistence diagram of dim 1")
+        return 0
+    # try:
+    else:
+        distance_bottleneck = persim.bottleneck(diagram[1], diagram_truth[1])
+    # except IndexError(" index -1 is out of bounds for axis 0 with size 0") as error:
+    #     distance_bottleneck = 0
     return distance_bottleneck
 
 def ph_diag(trajectory: np.ndarray, size: int) -> List[np.ndarray]:
@@ -787,6 +800,6 @@ def ph_diag(trajectory: np.ndarray, size: int) -> List[np.ndarray]:
         return lor
 
     P1 = downsample(trajectory) if size < trajectory.shape[0] else trajectory
-    diagrams1 = ripser.ripser(P1)['dgms']
-    return diagrams1
+    diagrams = ripser.ripser(P1)['dgms']
+    return diagrams
 
