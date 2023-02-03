@@ -166,7 +166,7 @@ class ParameterEstimator:
         var_mask = np.ones(data.shape[-1], bool)
 
         # case of disabled persistent homology
-        self.persistent_diagram = None
+        self.persistent_diagrams = None
 
         ## a. set parameter estimation for differential equations
         if task_type == "differential":
@@ -194,20 +194,35 @@ class ParameterEstimator:
             # take care of persistent homology case, i.e. if using topological distance
             if estimation_settings["objective_settings"]["persistent_homology"]:
                 weight = estimation_settings["objective_settings"]["persistent_homology_weight"]
-                if (not isinstance(weight, (float, int, np.float))) or weight < 0 or weight > 1:
+                if (not isinstance(weight, (float, int, np.float64))) or weight < 0 or weight > 1:
                     raise TypeError("ERROR: Persistent homology weight should be of type float and in range [0,1]!")
                 size = estimation_settings["objective_settings"]["persistent_homology_size"]
                 trajectory = np.vstack(np.vstack((self.X, self.Y))) if self.Y is not None else self.X
                 try:
-                    self.persistent_diagram = ph_diag(trajectory, size=size)
-                    if (self.persistent_diagram[1].shape == (0, 2)) and estimation_settings["verbosity"] >= 1:
-                        print("INFO: persistent diagram of the ground truth is trivial (empty), "
-                              "i.e. no interesting 2D-property is present.")
+                    persistent_diagrams = ph_diag(trajectory, size, estimation_settings["verbosity"])
+                    if persistent_diagrams[1].shape == (0, 2):
+                        if estimation_settings["verbosity"] >= 1:
+                            print("INFO: persistent diagram of the ground truth is trivial (empty), "
+                                  "i.e. no interesting 2D-property is present. Therefore, I will use diagrams regarding "
+                                  "persistent homology dimension 0, i.e. H_0 homology group.")
+                                  # "and marbuse maximum size, since its fast.")
+                        self.persistent_diagrams = (persistent_diagrams, 0)
+                    else:
+                        self.persistent_diagrams = (persistent_diagrams, 1)
+                    if estimation_settings["verbosity"] >= 3:
+                        print("verbosity is forcing plotting:")
+                        try:
+                            import matplotlib.pyplot as plt
+                            import persim
+                            dim = self.persistent_diagrams[1]
+                            persim.plot_diagrams(persistent_diagrams[dim], show=True, title="init")
+                        except Exception as error:
+                            print(f"Error when PLOTTING of type {type(error)} and message:{error}!")
                 except Exception as error:
                     if estimation_settings["verbosity"] >= 1:
-                        print(f"WARNNING: Excepted an error when constructing ph_diagram of the original dataset "
+                        print(f"WARNING: Excepted an error when constructing ph_diagram of the original dataset "
                               f"of type {type(error)} and message:{error}!")
-                    self.persistent_diagram = None
+                    self.persistent_diagrams = None
 
         ## b. set parameter estimation for algebraic and integer-algebraic equations
         elif task_type == "algebraic" or task_type == "integer-algebraic":
@@ -256,7 +271,7 @@ class ParameterEstimator:
                 pass
             elif len(model.params) < 1:
                 model.set_estimated({"x":[], "fun": model_error_general(
-                    [], model, self.X, self.Y, self.T, self.persistent_diagram,
+                    [], model, self.X, self.Y, self.T, self.persistent_diagrams,
                     **self.estimation_settings)})
 
             ## b. estimate parameters
@@ -281,7 +296,7 @@ class ParameterEstimator:
                 # parameter estimation
                 t1 = time.time()
                 res = optimizer(model, self.X, self.Y, self.T, p0=model_params,
-                                ph_diagram=self.persistent_diagram,
+                                ph_diagrams=self.persistent_diagrams,
                                 **self.estimation_settings)
                 t2 = time.time()
                 res["duration"] = t2-t1
@@ -307,7 +322,7 @@ class ParameterEstimator:
 
 #---------------- 1. DIFFERENTIAL EVOLUTION BASED ON SCIPY LIBRARY -------------------------------
 
-def DE_scipy(model, X, Y, T, p0, ph_diagram, **estimation_settings):
+def DE_scipy(model, X, Y, T, p0, ph_diagrams, **estimation_settings):
     """Calls scipy.optimize.differential_evolution."""
 
     lu_bounds = estimation_settings['optimizer_settings']['lower_upper_bounds']
@@ -327,7 +342,7 @@ def DE_scipy(model, X, Y, T, p0, ph_diagram, **estimation_settings):
     output = differential_evolution(func=estimation_settings["objective_function"],
                                   bounds=bounds,
                                   callback=diff_evol_timeout,
-                                  args=[model, X, Y, T, ph_diagram, estimation_settings],
+                                  args=[model, X, Y, T, ph_diagrams, estimation_settings],
                                   maxiter=estimation_settings["optimizer_settings"]["max_iter"],
                                   strategy=estimation_settings["optimizer_settings"]["strategy"],
                                   popsize=estimation_settings["optimizer_settings"]["pop_size"],
@@ -349,7 +364,7 @@ from pymoo.core.termination import Termination
 from pymoo.termination.default import MaximumGenerationTermination
 class PymooProblem(Problem):
 
-    def __init__(self, params, model, data, target, time, ph_diagram, estimation_settings):
+    def __init__(self, params, model, data, target, time, ph_diagrams, estimation_settings):
 
         xl = np.full(len(params), estimation_settings['optimizer_settings']['lower_upper_bounds'][0])
         xu = np.full(len(params), estimation_settings['optimizer_settings']['lower_upper_bounds'][1])
@@ -359,7 +374,7 @@ class PymooProblem(Problem):
         self.data = data
         self.target = target
         self.time = time
-        self.ph_diagram = ph_diagram
+        self.ph_diagrams = ph_diagrams
         self.estimation_settings = estimation_settings
         self.best_f = estimation_settings['optimizer_settings']['default_error']
         self.opt_curve = []
@@ -372,7 +387,7 @@ class PymooProblem(Problem):
                 self.data,
                 self.target,
                 self.time,
-                self.ph_diagram,
+                self.ph_diagrams,
                 self.estimation_settings) for i in range(len(x))]
         )
         self.best_f = np.min(out["F"])
@@ -388,9 +403,9 @@ class BestTermination(Termination):
             self.terminate()
         return self.max_gen.update(algorithm)
 
-def DE_pymoo(model, X, Y, T, p0, ph_diagram, **estimation_settings):
+def DE_pymoo(model, X, Y, T, p0, ph_diagrams, **estimation_settings):
 
-    pymoo_problem = PymooProblem(p0, model, X, Y, T, ph_diagram, estimation_settings)
+    pymoo_problem = PymooProblem(p0, model, X, Y, T, ph_diagrams, estimation_settings)
 
     strategy = "DE/best/1/bin" if estimation_settings["optimizer_settings"]["strategy"] == 'best1bin' else "DE/rand/1/bin"
 
@@ -428,7 +443,7 @@ def DE_pymoo(model, X, Y, T, p0, ph_diagram, **estimation_settings):
 
 #----------------------------- 3. HYPEROPT  -------------------------------
 
-def hyperopt_fit(model, X, Y, T, p0, ph_diagram, **estimation_settings):
+def hyperopt_fit(model, X, Y, T, p0, ph_diagrams, **estimation_settings):
     """Calls Hyperopt.
     Exists to make passing arguments to the objective function easier.
 
@@ -497,7 +512,7 @@ def hyperopt_fit(model, X, Y, T, p0, ph_diagram, **estimation_settings):
     def objective(params):
         # First way for solution:
         params = [float(i) for i in params]  # Use float instead of np.int32.
-        return estimation_settings["objective_function"](params, model, X, Y, T, ph_diagram, estimation_settings)
+        return estimation_settings["objective_function"](params, model, X, Y, T, ph_diagrams, estimation_settings)
 
     # Use user's hyperopt specifications or use the default ones:
     algo = estimation_settings.get("hyperopt_algo", rand.suggest)
@@ -533,7 +548,7 @@ def hyperopt_fit(model, X, Y, T, p0, ph_diagram, **estimation_settings):
 ########################################################################################################
 
 ## -------------------------------------- 1. ODE RMSE ----------------------------------------------------
-def model_ode_error(params, model, X, Y, T, ph_diagram, estimation_settings):
+def model_ode_error(params, model, X, Y, T, ph_diagrams, estimation_settings):
     """Defines mean squared error of solution to differential equation as the error metric.
 
         Input:
@@ -582,7 +597,7 @@ def model_ode_error(params, model, X, Y, T, ph_diagram, estimation_settings):
             res = np.sqrt(np.mean((X - simX)**2))
 
         # c. calculate the persistent_diagram of simulated trajectory
-        if estimation_settings["objective_settings"]["persistent_homology"] and ph_diagram is not None:
+        if estimation_settings["objective_settings"]["persistent_homology"] and ph_diagrams is not None:
             if estimation_settings["verbosity"] >= 2:
                 print(f'iters vs. ph_used till now: {model.all_iters}, ph_iters:{model.ph_used}')
             weight = estimation_settings["objective_settings"]["persistent_homology_weight"]
@@ -592,8 +607,10 @@ def model_ode_error(params, model, X, Y, T, ph_diagram, estimation_settings):
             else:
                 trajectory = simX
             try:
-                persistent_homology_error = ph_error(trajectory, ph_diagram, size, estimation_settings["verbosity"])
-                res = math.tan(math.atan(res) * weight + math.atan(persistent_homology_error) * (1-weight))
+                dim = ph_diagrams[1]
+                truth_diags = ph_diagrams[0]
+                persistent_homology_error = ph_error(trajectory, truth_diags, dim, size, estimation_settings["verbosity"], model)
+                res = math.tan(math.atan(res)*weight + math.atan(persistent_homology_error)*(1-weight))
                 model.ph_used += 1
             except Exception as error:
                 if estimation_settings["verbosity"] >= 2:
@@ -719,7 +736,7 @@ def model_error(params, model, X, Y, _T=None, _ph_metric=None, estimation_settin
         return estimation_settings['default_error']
 
 ## ------------------------ 3. GENERAL - CHOOSES BETWEEN ODE OR ALGEBRAIC --------------------------
-def model_error_general(params, model, X, Y, T, ph_diagram, **estimation_settings):
+def model_error_general(params, model, X, Y, T, ph_diagrams, **estimation_settings):
     """Calculate error of model with given parameters in general with type of error given.
         Input = TODO:
     - X are columns without features that are derived.
@@ -733,7 +750,7 @@ def model_error_general(params, model, X, Y, T, ph_diagram, **estimation_setting
         return model_error(params, model, X, Y, _T=None,
                             estimation_settings=estimation_settings)
     elif task_type == "differential":
-        return model_ode_error(params, model, X, Y, T, ph_diagram,
+        return model_ode_error(params, model, X, Y, T, ph_diagrams,
                                estimation_settings)
     else:
         types_string = "\", \"".join(TASK_TYPES)
@@ -743,7 +760,8 @@ def model_error_general(params, model, X, Y, T, ph_diagram, **estimation_setting
 
 ## ------------------------ 4. PERSISTENT HOMOLOGY ERROR (for ODE)  --------------------------
 
-def ph_error(trajectory: np.ndarray, diagram_truth: List[np.ndarray], size: int, verbosity: int) -> float:
+def ph_error(trajectory: np.ndarray, diagrams_truth: List[np.ndarray], diagram_dimension: int,
+             size: int, verbosity: int, model) -> float:
     """Calculates persistent homology metric between given trajectory
     and ground truth trajectory based on topological properties of both.
     See ph_test.py in  examples/DS2022/persistent_homology.
@@ -762,19 +780,39 @@ def ph_error(trajectory: np.ndarray, diagram_truth: List[np.ndarray], size: int,
     import persim
 
     # size = diagram_truth[0].shape[0]
-    diagram = ph_diag(trajectory, size)
-    if diagram[1].shape == (0, 2) and diagram_truth[1].shape == (0, 2):
+    diagrams = ph_diag(trajectory, size, verbosity)
+    if diagrams[diagram_dimension].shape == (0, 2) and diagrams_truth[diagram_dimension].shape == (0, 2):
+        model.zerovszero += 1
         if verbosity >= 2:
-            print("Both ground truth and candidate trajectory have trivial persistence diagram of dim 1")
+            print(f"Both ground truth and candidate trajectory have trivial persistence diagram "
+                  f"of dim {diagram_dimension}.")
         return 0
     # try:
     else:
-        distance_bottleneck = persim.bottleneck(diagram[1], diagram_truth[1])
+        distance_bottleneck = persim.bottleneck(diagrams[diagram_dimension], diagrams_truth[diagram_dimension])
+        if verbosity >= 3:
+            try:
+                import matplotlib.pyplot as plt
+                persim.plot_diagrams(diagrams, show=True, title=f"candidate: {model.full_expr()}")
+                distance_bottleneck, matching = persim.bottleneck(diagrams[diagram_dimension],
+                                                                  diagrams_truth[diagram_dimension], matching=True)
+                print(f'bottleneck distance: {distance_bottleneck}')
+                plt.close()
+                persim.bottleneck_matching(diagrams[diagram_dimension],
+                                           diagrams_truth[diagram_dimension],
+                                           # matching,
+                                           matching=matching,
+                                           labels=['orignal; bottleneck distance:', f'candidate; {distance_bottleneck:.3f}', ],
+                                           )
+                plt.show()
+            except Exception as error:
+                print(f"Error when PLOTTING of type {type(error)} and message:{error}!")
+            print("Both ground truth and candidate trajectory have trivial persistence diagram of dim 1")
     # except IndexError(" index -1 is out of bounds for axis 0 with size 0") as error:
     #     distance_bottleneck = 0
     return distance_bottleneck
 
-def ph_diag(trajectory: np.ndarray, size: int) -> List[np.ndarray]:
+def ph_diag(trajectory: np.ndarray, size: int, verbosity: int) -> List[np.ndarray]:
     """Returns persistent diagram of given trajectory. See ph_test.py in examples.
 
     Inputs:

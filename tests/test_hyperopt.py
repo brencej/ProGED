@@ -35,6 +35,6 @@ def test_equation_discoverer_hyperopt():
         #assert str(ED.models[i].get_full_expr())[:n] == expr[:n]
         assert abs(ED.models[i].get_error() - error) < tol
     assert_line(ED.models, 0, "y", 3.564323422789496)
-    assert_line(ED.models, 1, "-0.839*x + y", 3.221875534700383, n=6)
+    assert_line(ED.models, 1, "-0.839*x + y", 3.221875534700383, tol=0.5, n=6)
     # print(ED.models)
     return

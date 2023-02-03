@@ -33,9 +33,9 @@ setuptools.setup(
                        ],
     extras_require={
         "dev": ["pytest",
-                "hyperopt"
-                "scikit-tda"
-                "scikit-learn"
+                "hyperopt",
+                "scikit-tda",
+                "scikit-learn",
                 ],
     },
 )

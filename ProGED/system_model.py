@@ -66,6 +66,7 @@ class SystemModel:
         # number of successful persistent homology comparisons vs. pure rmse
         self.all_iters = 0
         self.ph_used = 0
+        self.zerovszero = 0
 
 
     def set_estimated(self, result, valid=True):
