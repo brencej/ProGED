@@ -73,13 +73,12 @@ class Estimator():
             print("Model skipped. More model parameters than allowed (check max constant).")
             pass
 
-        # if there is no parameters:
-        # elif len(model.params) == 0:
-        #     if
-        #         model.set_estimated({"x": [],
-        #                              "fun": objective_algebraic([], model, self)})
-        #
-        # else do parameter estimation
+        #if there is no parameters:
+        elif len(model.params) == 0:
+            model.set_estimated({"x": [],
+                                 "fun": objective_general([], model, self)})
+
+        #else do parameter estimation
         else:
             model = self.check_observability(model)
             optmizers_dict = {"DE": DEwrapper, "hyperopt": "hyperopt_fit"}
@@ -256,6 +255,11 @@ def simulate_ode(estimator, model):
 
     return simulation
 
+def objective_general(params, model, estimator):
+    if estimator.settings['parameter_estimation']['task_type'] in ("algebraic", "integer-algebraic"):
+        return objective_algebraic(params, model, estimator)
+    elif estimator.settings['parameter_estimation']['task_type'] == "differential":
+        return objective_differential(params, model, estimator)
 
 
 ##
