@@ -24,9 +24,9 @@ def test_persistent_homology_partial_observability():
                            }
     np.random.seed(0)
     system_out = fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
-    print(f"All iters (as saved to system_model object): {system_out[0].all_iters}")
+    print(f"All iters (as saved to system_model object): {system_out[0].ph_all_iters}")
     print(f"Iters when PH was used: {system_out[0].ph_used}")
-    print(f"Iters when zero vs zero: {system_out[0].zerovszero}")
+    print(f"Iters when zero vs zero: {system_out[0].ph_zerovszero}")
     # print(abs(system_out[0].get_error()))
     assert abs(system_out[0].get_error()) < 1  # 3.2.2023
     # true params: [[1.], [-0.5., -1., 0.5]]
@@ -52,9 +52,9 @@ def test_persistent_homology_ODE_system():
 
     np.random.seed(0)
     system_out = fit_models(system, data, task_type='differential', estimation_settings=estimation_settings)
-    print(f"All iters (as saved to system_model object): {system_out[0].all_iters}")
+    print(f"All iters (as saved to system_model object): {system_out[0].ph_all_iters}")
     print(f"Iters when PH was used: {system_out[0].ph_used}")
-    print(f"Iters when zero vs zero: {system_out[0].zerovszero}")
+    print(f"Iters when zero vs zero: {system_out[0].ph_zerovszero}")
     # print(abs(system_out[0].get_error()))
     assert abs(system_out[0].get_error()) < 1.0  # 3.2.2023
 

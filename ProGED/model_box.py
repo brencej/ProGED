@@ -7,7 +7,6 @@ from sympy import symbols as sympy_symbols
 import pickle
 
 from ProGED.model import Model
-from ProGED.system_model import SystemModel
 
 """Implements ModelBox, an class that stores and manages a collection of Model instances."""
 
@@ -35,30 +34,25 @@ class ModelBox:
         values: Return the Model instances in models_dict.
         items: Return the key and value pairs in models_dict.
     """
-    def __init__ (self, models_dict = {}, observed = None):
+    def __init__ (self, models_dict = {}):
         self.models_dict = dict(models_dict)
-        self.observed = observed
 
-    def add_model(self, expr, symbols, p=1.0, params=None, info={}):
-        if isinstance(expr, str):
-            return self.add_single_model(expr, symbols, p=p, info=info, params=params)
-        elif isinstance(expr, (list, tuple)):
-            if len(expr) == 1:
-                return self.add_single_model(expr[0], symbols, p=p, info=info, params=params)
-            else:
-                return self.add_system(expr, symbols, p=p, params=params, info=info)
-        else:
-            print("Error in add_model: unknown type for input expression. Should be string or a list or tuple of strings.")
-            return False, expr
+    def add_model(self, expr_strs, symbols, p=1.0, params=None, info={}, **kwargs):
 
-    def add_system(self, expr_strs, symbols, p=1.0, params=None, info={}):
-        x = [s.strip("'") for s in symbols["x"]]
+        sym_vars = [s.strip("'") for s in symbols["x"]]
+
         exprs, symbols_params = self.string_to_canonic_system(expr_strs, symbols)
-        
         for expr in exprs:
-            if not self.verify_expression(expr, x, symbols_params):
+            if not self.verify_expression(expr, sym_vars, symbols_params):
                 return False, exprs
-        
+
+        lhs_vars = kwargs.get('lhs_vars', sym_vars)
+        kwargs.pop("lhs_vars") if 'lhs_vars' in kwargs.keys() else []
+
+        if len(lhs_vars) != len(exprs):
+            raise ValueError("The number of left hand side variables (lhs_vars) do not match number of expressions. "
+                             "Set lhs_vars accordingly.")
+
         if str(exprs) in self.models_dict:
             # extend add_tree first
             if "code" in info:
@@ -67,40 +61,17 @@ class ModelBox:
                 code = ""
             self.models_dict[str(exprs)].add_tree(code, p)
         else:
-            if not params:
-                params = [[(np.random.random()-0.5)*10 for _ in range(len(par))] for par in symbols_params]
-            if not self.observed:
-                self.observed = x
-            self.models_dict[str(exprs)] = SystemModel(expr = exprs, sym_vars = x, sym_params = symbols_params, params=params, p=p, info=info, observed=self.observed)
-        
+            self.models_dict[str(exprs)] = Model(expr=exprs,
+                                                 sym_vars=sym_vars,
+                                                 lhs_vars=lhs_vars,
+                                                 sym_params=symbols_params,
+                                                 params=params,
+                                                 p=p,
+                                                 info=info,
+                                                 **kwargs)
+
         return True, str(exprs)
-        
-    def add_single_model(self, expr_str, symbols, p=1.0, info={}, params=None):
-        x = [s.strip("'") for s in symbols["x"]]
-        expr, symbols_params = self.string_to_canonic_expression(expr_str, symbols)
-        
-        if not self.verify_expression(expr, x, symbols_params):
-            return False, expr
 
-        if "code" in info:
-            code = info["code"]
-        else:
-            code = ""
-        if "grammar" in info:
-            grammar = info["grammar"]
-        else:
-            grammar = ""
-
-        if str(expr) in self.models_dict:
-            self.models_dict[str(expr)].add_tree(code, p)
-        else:
-            if not params:
-                params = [(np.random.random()-0.5)*10 for i in range(len(symbols_params))]
-                
-            self.models_dict[str(expr)] = Model(grammar=grammar, expr = expr, sym_vars = x, sym_params = symbols_params, params=params, code=code, p=p)
-        
-        return True, str(expr)
-    
     def verify_expression(self, expr, sym_vars, sym_params):
         good = False
         """Sanity test + check for complex infinity"""
@@ -210,30 +181,9 @@ class ModelBox:
         exprs = [self.simplify_constants(expr, c, x)[2][0][1] for expr in exprs]
         
         exprs, symbols_params = self.enumerate_constants_system(exprs, symbols)
-        symbols_params = [tuple(sorted(list([s.name for s in (expr.free_symbols - set(x))]))) for expr in exprs]
+        symbols_params = [sorted(list([s.name for s in (expr.free_symbols - set(x))])) for expr in exprs]
+        symbols_params = tuple([par for sym_params in symbols_params for par in sym_params])
         return exprs, symbols_params
-
-    def string_to_canonic_expression (self, expr_str, symbols={"x":["'x'"], "const":"'C'", "start":"S", "A":"A"}):
-        """Convert the string into the canonical Sympy expression.
-
-        Input:
-            expr_str -- String expression e.g. joined sample string
-                generated from grammar.
-        Output:
-            expr -- Sympy expression object in canonical form.
-            symbols_params -- Tuple of enumerated constants.
-        """
-        x = [sympy_symbols(s.strip("'")) for s in symbols["x"]]
-        c = sympy_symbols(symbols["const"].strip("'"))
-        
-        expr = self.enumerate_constants(expr_str, symbols)[0]
-        expr = self.simplify_constants(expr, c, x)[2][0][1]
-        expr = self.enumerate_constants(expr, symbols)[0]
-        expr = self.simplify_constants(expr, c, x)[2][0][1]
-        
-        expr, symbols_params = self.enumerate_constants(expr, symbols)
-        symbols_params = tuple(sorted(list([s.name for s in (expr.free_symbols - set(x))])))
-        return expr, symbols_params
     
     def retrieve_best_models (self, N = 3):
         """Returns the top N models, according to their error.

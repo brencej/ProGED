@@ -9,6 +9,7 @@ from ProGED.generators.base_generator import BaseExpressionGenerator
 from ProGED.generators.grammar_construction import grammar_from_template
 from ProGED.task import EDTask
 from ProGED.postprocessing import models_statistics
+from ProGED.configs import settings
 
 """
 User-facing module for straightforward equation discovery tasks.
@@ -108,9 +109,8 @@ class EqDisco:
     def __init__(self,
                  task=None,
                  data=None,
-                 target_variable_index=-1,
-                 time_index=None,
-                 variable_names=None,
+                 rhs_vars=None,
+                 lhs_vars=None,
                  constant_symbol="C",
                  task_type="algebraic",
                  system_size=1,
@@ -133,9 +133,8 @@ class EqDisco:
                 raise TypeError("Missing inputs. Either task object or data required.")
             else:
                 self.task = EDTask(data=data,
-                                   target_variable_index=target_variable_index,
-                                   time_index=time_index,
-                                   variable_names=variable_names,
+                                   lhs_vars=lhs_vars,
+                                   rhs_vars=rhs_vars,
                                    constant_symbol=constant_symbol,
                                    success_threshold=success_threshold,
                                    task_type=task_type)
@@ -146,7 +145,8 @@ class EqDisco:
             raise TypeError("Missing task information!")
         
         if not variable_probabilities:
-            variable_probabilities = [1/len(self.task.var_names)]*np.sum(self.task.variable_mask)
+            # variable_probabilities = [1/len(self.task.var_names)]*np.sum(self.task.variable_mask)
+            variable_probabilities = [1/len(self.task.rhs_vars)]*len(self.task.rhs_vars)
         generator_settings.update({"variables":self.task.symbols["x"], "p_vars": variable_probabilities})
         if isinstance(generator, BaseExpressionGenerator):
             self.generator = generator
@@ -171,8 +171,7 @@ class EqDisco:
         else:
             self.strategy_settings = strategy_settings
 
-        self.estimation_settings = {"target_variable_index": target_variable_index,
-                                    "time_index": time_index,
+        self.estimation_settings = {"lhs_vars": self.task.lhs_vars,
                                     "verbosity": verbosity}
         # if not estimation_settings:
         #     self.estimation_settings = {"target_variable_index": target_variable_index,
@@ -195,21 +194,21 @@ class EqDisco:
         strategy_settings_preset = dict(self.strategy_settings)
         strategy_settings_preset.update(strategy_settings)
         self.models = generate_models(self.generator, self.task.symbols,
+                                      lhs_vars=self.task.lhs_vars,
                                       system_size = self.system_size,
                                       strategy = self.strategy,
                                       strategy_settings = strategy_settings_preset,
                                       verbosity=self.verbosity)
         return self.models
     
-    def fit_models(self, estimation_settings={}, pool_map=map):
-        # if not estimation_settings:
-        #     estimation_settings = self.estimation_settings
-        estimation_settings_preset = dict(self.estimation_settings)
-        estimation_settings_preset.update(estimation_settings)
+    def fit_models(self, settings=settings, pool_map=map):
+
+        estimation_settings_preset = dict(settings)
+        estimation_settings_preset.update(settings)
+
         self.models = fit_models(self.models, self.task.data,
-                                 task_type=self.task.task_type, 
                                  pool_map=pool_map,
-                                 estimation_settings=estimation_settings_preset)
+                                 settings=estimation_settings_preset)
         return self.models
     
     def get_results(self, N=3):
@@ -218,7 +217,7 @@ class EqDisco:
     def get_stats (self):
         return models_statistics(self.models, 
                                  self.task.data, 
-                                 self.task.target_variable_index,
+                                 self.task.lhs_vars,
                                  self.task.success_thr)
 
     def write_results(self, filename=None, dummy=10**8):
@@ -241,6 +240,7 @@ class EqDisco:
 
 if __name__ == "__main__":
     print("--- equation_discoverer.py test --- ")
+    import pandas as pd
     np.random.seed(1)
     
     def f(x):
@@ -249,13 +249,9 @@ if __name__ == "__main__":
     Y = f(X)
     X = X.reshape(-1, 1)
     Y = Y.reshape(-1, 1)
-    data = np.hstack((X, Y))
+    data = pd.DataFrame(np.hstack((X, Y)), columns=["x", "y"])
         
-    ED = EqDisco(task=None, data=data, target_variable_index=-1, sample_size=100, verbosity=1)
-    
-    #print(ED.generate_models())
-    #print(ED.fit_models())
-    
+    ED = EqDisco(task=None, data=data, rhs_vars=["x"], lhs_vars=["y"], sample_size=100, verbosity=1)
     ED.generate_models()
     ED.fit_models()
     print(ED.get_results())

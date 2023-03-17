@@ -25,7 +25,8 @@ Methods:
 """
 
 
-def generate_models(model_generator, symbols, strategy = "monte-carlo", system_size=1, strategy_settings = {"N":5}, verbosity=0):
+def generate_models(model_generator, symbols, strategy = "monte-carlo", system_size=1,
+                    strategy_settings = {"N":5}, verbosity=0, **kwargs):
     """Generate models using given generator and specified strategy.
     
     generate_models is intended as an interface to the generation methods defined in the module.
@@ -47,19 +48,21 @@ def generate_models(model_generator, symbols, strategy = "monte-carlo", system_s
     """
     if isinstance(strategy, str):
         if strategy in STRATEGY_LIBRARY:
-            return STRATEGY_LIBRARY[strategy](model_generator, symbols, system_size=system_size, observed=None, verbosity=verbosity, **strategy_settings)
+            return STRATEGY_LIBRARY[strategy](model_generator, symbols, system_size=system_size,
+                                              verbosity=verbosity, **strategy_settings, **kwargs)
         else:
             raise KeyError ("Strategy name not found in library.\n"\
                             "Input: " + strategy)
                 
     elif isinstance(strategy, lambda x: x):
-        return strategy(model_generator, symbols, **strategy_settings)
+        return strategy(model_generator, symbols, **strategy_settings, **kwargs)
     
     else:
         raise TypeError ("Unknown strategy type. Expecting: string or callable.\n"\
                          "Input: " + str(type(strategy)))
 
-def monte_carlo_sampling (model_generator, symbols, N=5, system_size=1, max_repeat=10, max_total_repeats=None, verbosity=0, observed=None):
+def monte_carlo_sampling (model_generator, symbols, N=5, system_size=1, max_repeat=10,
+                          max_total_repeats=None, verbosity=0, **kwargs):
     """Generate models using the Monte-Carlo approach to sampling.
     
     Randomly sample the stochastic generator until N models have been generated. 
@@ -81,7 +84,7 @@ def monte_carlo_sampling (model_generator, symbols, N=5, system_size=1, max_repe
     Returns:
         ModelBox instance containing the generated models.
     """
-    models = ModelBox(observed=observed)
+    models = ModelBox()
     
     if not max_total_repeats:
         max_total_repeats = N*max_repeat
@@ -104,7 +107,9 @@ def monte_carlo_sampling (model_generator, symbols, N=5, system_size=1, max_repe
                 if verbosity > 1:
                     print("-> ", exprs, p, codes)
                     
-                valid, expr = models.add_model(exprs, symbols, p=p, info = {"grammar": model_generator, "code": codes})
+                valid, expr = models.add_model(exprs, symbols, p=p,
+                                               info = {"grammar": model_generator, "code": codes},
+                                               **kwargs)
                 
                 if verbosity > 1:
                     print("---> ", valid, expr)
@@ -122,7 +127,8 @@ def monte_carlo_sampling (model_generator, symbols, N=5, system_size=1, max_repe
         
     return models
 
-def monte_carlo_sampling_2 (model_generator, symbols, N=5, max_repeat = 10, max_total_repeats = None, verbosity=0):
+def monte_carlo_sampling_2 (model_generator, symbols, N=5, max_repeat = 10, max_total_repeats = None,
+                            verbosity=0, **kwargs):
     """Generate models using the Monte-Carlo approach to sampling.
     
     Randomly sample the stochastic generator until N models have been generated. 
@@ -161,7 +167,7 @@ def monte_carlo_sampling_2 (model_generator, symbols, N=5, max_repeat = 10, max_
                 if verbosity > 1:
                     print("-> ", expr_str, p, code)
                     
-                valid, expr = models.add_model(expr_str, symbols, model_generator, code=code, p=p)
+                valid, expr = models.add_model(expr_str, symbols, model_generator, code=code, p=p, **kwargs)
                 
                 if verbosity > 1:
                     print("---> ", valid, expr)

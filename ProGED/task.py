@@ -4,15 +4,15 @@ Class for defining the equation discovery task.
 """
 
 import numpy as np
+import pandas as pd
 
 TASK_TYPES = ("algebraic", "differential")
 
 class EDTask:
     def __init__(self, 
                  data = None, 
-                 target_variable_index = -1, 
-                 time_index = None,
-                 variable_names = None,
+                 rhs_vars = None,
+                 lhs_vars = None,
                  constant_symbol = None,
                  symbols = None,
                  success_threshold = 1e-8, 
@@ -37,41 +37,28 @@ class EDTask:
                 algebraic
                 differential
         """
-        
-        self.variable_mask = np.ones(data.shape[-1], bool)
-        
-        if task_type == "differential":
-            if time_index is None:
-                raise TypeError ("Missing temporal data. Temporal data is required for differential equation task type."\
-                                 "Specify index of temporal data column as time_index.")
-            self.variable_mask[time_index] = False
-        self.time_index = time_index
-        
-        self.variable_mask[target_variable_index] = False
 
-        self.task_type = task_type
-        self.target_variable_index = target_variable_index
+        if not isinstance(data, pd.DataFrame):
+            raise ValueError("The data should be in the form of Pandas DataFrame.")
+        if task_type == "differential" and 't' not in data.columns:
+            raise TypeError ("Missing temporal data. Temporal data is required for differential equation task type."
+                             "Specify temporal data column with column name 't'.")
+
         self.data = data
+        self.task_type = task_type
+        self.lhs_vars = lhs_vars
+        self.rhs_vars = rhs_vars
         self.success_thr = success_threshold
         
         if not symbols:
-            if not variable_names:
-               self.var_names = np.array([chr(ord("a")+i) for i in range(data.shape[-1])])
-            else:
-                self.var_names = np.array(variable_names)
             if not constant_symbol:
                 self.constant_symbol = "C"
             else:
                 self.constant_symbol = constant_symbol
 
-            self.symbols_mask = self.variable_mask
-            if task_type == "differential":
-                self.symbols_mask[target_variable_index] = True
-            self.symbols = {"start":"E", "const": self.constant_symbol, "x": ["'" + v + "'" for v in self.var_names[self.symbols_mask]]}
+            self.symbols = {"start":"E", "const": self.constant_symbol, "x": ["'" + v + "'" for v in self.rhs_vars]}
         else:
             self.symbols = symbols
-            self.var_names = [s.strip("'") for s in symbols["x"]]
-        
         
         
 if __name__ == "__main__":
@@ -80,7 +67,7 @@ if __name__ == "__main__":
     
     X = np.array([[0, 0], [1, 1]])
     y = np.array([1, 5]).reshape(2,1)
-    data = np.hstack((X,y))
+    data = pd.DataFrame(np.hstack((X,y)), columns=["x", "y"])
     
     task = EDTask(data, -1, ["x", "y", "f"])
     
