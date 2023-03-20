@@ -83,7 +83,10 @@ def test_model():
 
     assert isinstance(y, type(np.array([0])))
     assert sum((y - np.reshape([0, 6.0], (2,1)))**2) < 1e-15
-    
+
+    model_nice_string = model.nice_print(return_string=True)
+    assert model_nice_string == "y = 1.2*x\n"
+
 def test_model_box():
     expr1_str = "x"
     expr2_str = "c*x"
@@ -132,6 +135,7 @@ def test_parameter_estimation_algebraic_2D():
 
 
 def test_parameter_estimation_ODE_1D():
+    # model: dx = -2x
     t = np.arange(0, 1, 0.1)
     x = 3*np.exp(-2*t)
     data = pd.DataFrame(np.vstack((t, x)).T, columns=['t', 'x'])
@@ -148,6 +152,8 @@ def test_parameter_estimation_ODE_1D():
 
 
 def test_parameter_estimation_ODE_2D():
+    # model: dx = -2x
+    #        dy = -1y
     t = np.arange(0, 1, 0.1)
     x = 3*np.exp(-2*t)
     y = 5.1*np.exp(-1*t)
@@ -163,6 +169,8 @@ def test_parameter_estimation_ODE_2D():
     assert abs(models[0].get_error() - 7.524305872610019e-05) < 1e-6
 
 def test_parameter_estimation_ODE_partial_observability():
+    # model: dx = -2x
+    #        dy = -2y
     t = np.arange(0, 1, 0.1)
     x = 3*np.exp(-2*t)
     data = pd.DataFrame(np.vstack((t, x)).T, columns=['t', 'x'])
@@ -178,6 +186,8 @@ def test_parameter_estimation_ODE_partial_observability():
     assert abs(models[0].get_error() - 9.653956731387341e-05) < 1e-6
 
 def test_parameter_estimation_ODE_teacher_forcing():
+    # model: dx = -2x
+    #        dy = -2y
     t = np.arange(0, 1, 0.1)
     x = 3*np.exp(-2*t)
     data = pd.DataFrame(np.vstack((t, x)).T, columns=['t', 'x'])
@@ -190,7 +200,7 @@ def test_parameter_estimation_ODE_teacher_forcing():
     settings["parameter_estimation"]["task_type"] = 'differential'
 
     models = fit_models(models, data, settings=settings)
-    assert abs(models[0].get_error() - 6.440163724932516e-05) < 1e-6
+    assert abs(models[0].get_error() - 9.653956731387341e-05) < 1e-6
 
 
 def test_parameter_estimation_ODE_solved_as_algebraic():

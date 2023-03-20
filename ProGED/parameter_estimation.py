@@ -76,7 +76,7 @@ class Estimator():
         #if there is no parameters:
         elif len(model.params) == 0:
             model.set_estimated({"x": [],
-                                 "fun": objective_general([], model, self)})
+                                 "fun": directly_calculate_objective([], model, self)})
 
         #else do parameter estimation
         else:
@@ -92,7 +92,7 @@ class Estimator():
         return model
 
     def check_observability(self, model):
-        unobserved_vars = [str(item) for item in model.sym_vars if str(item) not in model.observed_vars]
+        unobserved_vars = [str(item) for item in model.rhs_vars if str(item) not in model.observed_vars]
         if unobserved_vars:
             model.unobserved_vars = unobserved_vars
             for ivar in unobserved_vars:
@@ -100,9 +100,9 @@ class Estimator():
                     model.params[ivar] = model.initials[ivar]
                 else:
                     raise ValueError("Unobserved variables need to have inital state. Otherwise not possible to solve.")
-
-
         return model
+
+
 ### OPTIMIZER ###
 
 def DEwrapper(estimator, model):
@@ -182,7 +182,7 @@ def objective_algebraic(params, model, estimator):
 
     model.set_params(params)
     lhs = [str(i) for i in model.lhs_vars]
-    rhs = [str(i) for i in model.sym_vars]
+    rhs = [str(i) for i in model.rhs_vars]
     if lhs == rhs:
         raise ValueError("Left and right hand side variables are the same. This should not happen in algebraic models.")
     X = np.array(estimator.data[rhs])
@@ -223,6 +223,9 @@ def simulate_ode(estimator, model):
     # Make model function
     model_function = model.lambdify(list=True, add_time=True)
 
+    # Interpolate the data of extra variables
+    X_extras = interp1d(estimator.data['t'], estimator.data[model.extra_vars], axis=0, kind='cubic', fill_value="extrapolate") if model.extra_vars != [] else (lambda t: np.array([]))
+
     # Set jacobian
     Jf = None
     if estimator.settings['objective_function']["use_jacobian"]:
@@ -230,19 +233,22 @@ def simulate_ode(estimator, model):
         def Jf(t, x):
             return J(*x)
 
+
     # Make function 'rhs' either with or without teacher forcing
     if estimator.settings['objective_function']["teacher_forcing"]:
         observability_mask = np.array([item in model.observed_vars for item in model.lhs_vars])
         X_interp = interp1d(estimator.data['t'], estimator.data.loc[:, estimator.data.columns != 't'],
-                    axis=0, kind='cubic', fill_value="extrapolate") if estimator.data.shape[1] != 0 else (lambda t: np.array([]))
+                            axis=0, kind='cubic', fill_value="extrapolate") if estimator.data.shape[1] != 0 else (lambda t: np.array([]))
+
         def rhs(t, x):
-            b = np.empty(len(model.sym_vars))
+            b = np.empty(len(model.rhs_vars))
             b[observability_mask] = X_interp(t)
             b[~observability_mask] = x[~observability_mask]
             return [model_function[i](t, *b) for i in range(len(model_function))]
     else:
         def rhs(t, x):
-            return [model_function[i](t, *x) for i in range(len(model_function))]
+            b = np.concatenate((x, X_extras(t)))
+            return [model_function[i](t, *b) for i in range(len(model_function))]
 
     # Simulate
     simulation = odeint(rhs,
@@ -255,7 +261,7 @@ def simulate_ode(estimator, model):
 
     return simulation
 
-def objective_general(params, model, estimator):
+def directly_calculate_objective(params, model, estimator):
     if estimator.settings['parameter_estimation']['task_type'] in ("algebraic", "integer-algebraic"):
         return objective_algebraic(params, model, estimator)
     elif estimator.settings['parameter_estimation']['task_type'] == "differential":

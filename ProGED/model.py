@@ -14,7 +14,7 @@ class Model:
 
     Attributes:
         expr        (SymPy expression)       The canonical expression defining the model.
-        sym_vars    (list of Sympy symbols)  The symbols appearing in expr that are to be interpreted as variables.
+        rhs_vars    (list of Sympy symbols)  The symbols appearing in expr that are to be interpreted as variables.
         sym_params  (list of strings)        Symbols appearing in expr that are to be interpreted as free constants.
         params      (list of floats)         The values for the parameters, initial or estimated.
         estimated   (dict)                   Results of optimization. Required items:
@@ -52,7 +52,9 @@ class Model:
 
         # set system and target variables
         self.lhs_vars = lhs_vars
-        self.sym_vars = sp.symbols(sym_vars)
+        expr_symbols = [iexpr.free_symbols for iexpr in self.expr]
+        self.rhs_vars =  [item for item in sp.symbols(sym_vars) if item in list(set.union(*expr_symbols))]
+        self.extra_vars = [str(item) for item in self.rhs_vars if str(item) not in self.lhs_vars]
 
         # transform sym_params to sympy symbols
         try:
@@ -87,7 +89,7 @@ class Model:
         self.initials = dict(zip(self.lhs_vars, np.random.uniform(low=-5, high=5, size=len(self.lhs_vars))))
 
         # observability info (whether data for all state variables is present)
-        self.observed_vars = kwargs.get('observed_vars', [s.strip("'") for s in sym_vars])
+        self.observed_vars = kwargs.get('observed_vars', [str(i) for i in self.rhs_vars])
         self.unobserved_vars = kwargs.get('unobserved_vars', [])
 
         # grammar info
@@ -131,7 +133,7 @@ class Model:
                         would refuse to fit the parameters and set valid = False.
                         Invalid models are typically excluded from post-analysis.
         """
-        
+
         self.estimated = result
         self.valid = valid
         if valid:
@@ -200,28 +202,31 @@ class Model:
         """
         # if not params:
         #     params = self.params
-        # return sp.lambdify(self.sym_vars, self.full_expr(*params), "numpy")
+        # return sp.lambdify(self.rhs_vars, self.full_expr(*params), "numpy")
 
         if not params:
             params = self.params
 
         fullexprs = self.full_expr(params)
-        if matrix_input:
-            if add_time:
-                lambdas = [sp.lambdify([sp.symbols("t")] + self.sym_vars, full_expr, arg) for full_expr in fullexprs]
-            else:
-                lambdas = [sp.lambdify(self.sym_vars, full_expr, arg) for full_expr in fullexprs]
 
-            if list:
-                return lambdas
-            else:
-                return lambda x: np.transpose([lam(*x.T) for lam in lambdas])
+        # if matrix_input:
+
+        if add_time:
+            lambdas = [sp.lambdify([sp.symbols("t")] + self.rhs_vars, full_expr, arg) for full_expr in fullexprs]
         else:
-            system = sp.Matrix(fullexprs)
-            if add_time:
-                return sp.lambdify([sp.symbols("t")] + self.sym_vars, system)
-            else:
-                return sp.lambdify(self.sym_vars, system)
+            lambdas = [sp.lambdify(self.rhs_vars, full_expr, arg) for full_expr in fullexprs]
+
+        if list:
+            return lambdas
+        else:
+            return lambda x: np.transpose([lam(*x.T) for lam in lambdas])
+
+        # else:
+        #     system = sp.Matrix(fullexprs)
+        #     if add_time:
+        #         return sp.lambdify([sp.symbols("t")] + self.rhs_vars, system)
+        #     else:
+        #         return sp.lambdify(self.rhs_vars, system)
 
 
     def evaluate(self, points, params=None):
@@ -271,6 +276,22 @@ class Model:
     def get_full_expr(self):
         return self.full_expr(self.params)
 
+    def nice_print(self, return_string=False, round_params=2):
+
+        def round_constants(expr, n=3):
+            for a in sp.preorder_traversal(expr):
+                if isinstance(a, sp.Float):
+                    expr = expr.subs(a, round(a, n))
+            return expr
+
+        string_to_print = ""
+        for i, iexpr in enumerate(self.expr):
+            string_to_print += f"{self.lhs_vars[i]} = {round_constants(self.full_expr(self.params)[i], n=round_params)}\n"
+        print(string_to_print)
+
+        if return_string:
+            return string_to_print
+
     def get_time(self):
         if "duration" in self.estimated:
             return self.estimated["duration"]
@@ -297,12 +318,14 @@ if __name__ == '__main__':
                   lhs_vars=["x"],
                   sym_params=['C0'])
     print("--- model.py test 0 finished ---")
+    model0.nice_print()
 
     model1 = Model(expr=["C0 * sin(x-y) - sin(x)", "C1 * sin(x-y) - sin(y)"],
                   sym_vars=["x", "y"],
                   lhs_vars=["x", "y"],
                   sym_params=['C0', 'C1'])
     print("--- model.py test 1 finished ---")
+    model1.nice_print()
 
     from ProGED import ModelBox
     model2 = ModelBox()
@@ -334,7 +357,7 @@ if __name__ == '__main__':
                   sym_params = symbols_params,
                   sym_vars = symbols_variables,
                   lhs_vars = symbols_variables)
-    print(model)
+    model.nice_print()
     assert str(model.expr[0]) == expression_str
     
     print("Try to print the model error before it thas been estimated."\
