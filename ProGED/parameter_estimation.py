@@ -21,8 +21,21 @@ import ProGED as pg
 from ProGED.model_box import ModelBox
 from ProGED.configs import settings
 
-##
+## FIRST FUNCTION
 def fit_models(models, data=None, settings=settings, pool_map=map):
+    """
+    Main function that accepts the models, checks the settings and fits them one by one (parallelization possible).
+
+    Arguments:
+        models    (ProGED ModelBox)   a dictionary of Model objects. See ModelBox and Model
+        data      (pandas DataFrame)  each column should have a variable name and represent data of that variable
+        settings  (dict)              settings for the fitting
+        pool_map  (function)          a function that allows to process (fit) the models in parrallel.
+                                        Default is a map() function from Pool library.
+    Returns:
+        ModelBox of fitted models
+
+    """
 
     check_inputs(settings)
     estimator = Estimator(data=data, settings=settings)
@@ -30,6 +43,7 @@ def fit_models(models, data=None, settings=settings, pool_map=map):
     return pg.ModelBox(dict(zip(models.keys(), fitted)))
 
 def check_inputs(settings):
+    """Checks if correct settings were set. TODO: Should be extended."""
 
     task_types = ["algebraic", "differential"]
     if settings['parameter_estimation']['task_type'] not in task_types:
@@ -40,24 +54,42 @@ def check_inputs(settings):
         raise ValueError(f"The setting 'optimizer' has unsupported value. Allowed options: {optimizers}.")
 
 
-### ESTIMATOR CLASS ###
-
+## ESTIMATOR CLASS ##
 class Estimator():
+    """
+    Estimator class contains all the relevant information needed for fitting, except the model. It is created
+    to ease the parallelization process. Also does some validity checks.
+
+    Arguments:
+        data      (pandas DataFrame)  each column should have a variable name and represent data of that variable.
+                                      If data is not present, it can be alternatively loaded, if path is provided
+                                      in the settings dictionary.
+        settings  (dict)              Settings for the fitting. See configs.py for a detailed explanation.
+    Methods:
+        fit_one:                fits one model.
+        check observability:    checks if data are only partial. If so, adds additional parameters (initial states) to
+                                the vector of unknown parameters that will be optimized.
+
+    """
 
     def __init__(self, data=None, settings=settings):
 
+        # set data, either from DataFrame or, alternatively, load it if path is provided
         if isinstance(data, pd.DataFrame):
             self.data = data
         else:
             self.data = pd.read_csv(settings['parameter_estimation']['data'])
 
+        # set settings
         self.settings = settings
 
+        # set objective function based on settings and task type
         if self.settings['parameter_estimation']['task_type'] == 'algebraic':
             settings['parameter_estimation']['objective_function'] = objective_algebraic
         else:
             settings['parameter_estimation']['objective_function'] = objective_differential
 
+            # if task is differential, check if the time is included in the data.
             if 't' not in self.data.columns:
                 if 'time' in self.data.columns:
                     self.data.rename(columns={"time": "t"})
@@ -106,6 +138,16 @@ class Estimator():
 ### OPTIMIZER ###
 
 def DEwrapper(estimator, model):
+    """
+    Function that wrappes the Pymoo's differential evolution function (DE). It sets up the Pymoo's Problem object,
+    an algorithm DE, the Termination object. Then, it optimizes the unknown parameters using minimize function.
+
+    Returns:
+        result (dict): Results of parameter estimation. Includes:
+                            "x": solution of optimization, i.e. optimal parameter values (list of floats)
+                            "fun": value of optimization function, i.e. error of model (float).
+                            "complete_results": complete output of optimization algorithm
+    """
 
     pymoo_problem = PymooProblem(estimator, model)
 
@@ -120,7 +162,8 @@ def DEwrapper(estimator, model):
     )
 
     termination = BestTermination(min_f = estimator.settings["optimizer_DE"]["termination_threshold_error"],
-                                  n_max_gen = estimator.settings["optimizer_DE"]["max_iter"])
+                                  n_max_gen = estimator.settings["optimizer_DE"]["max_iter"],
+                                  terminate_if_no_change=estimator.settings["optimizer_DE"]["termination_after_nochange_iters"])
 
     output = minimize(pymoo_problem,
                       algorithm,
@@ -129,13 +172,27 @@ def DEwrapper(estimator, model):
                       verbose=estimator.settings["optimizer_DE"]["verbose"],
                       save_history=estimator.settings["optimizer_DE"]["save_history"])
 
-    model.set_params(output.X, with_initials=True)
+    model.set_params(output.X, extra_params=True)
     model.set_initials(output.X, dict(estimator.data.iloc[0, :]))
 
     return {"x": output.X, "fun": output.F[0], "complete_results": output}
 
 
 class PymooProblem(Problem):
+    """Implements a method evaluating a set of solutions
+        Arguments:
+            params (list of floats): unknown parameter values that are optimized over iterations.
+            model  (ProGED object Model): see class Model in Model.py
+            estimator (object Estimator): see class Estimator above
+            best_f  (float): current best error (is updated over iterations)
+            optimization_curve (list): saves the best error over iterations (this is manually added, as pymoo's history
+                                        is very heavy)
+            xl (list of floats): lower bounds of each of the parameter
+            xu (list of floats): upper bounds of each of the parameter
+
+        Methods:
+            evaluate: runs objective function
+    """
 
     def __init__(self, estimator, model):
 
@@ -148,7 +205,7 @@ class PymooProblem(Problem):
         self.model = model
         self.estimator = estimator
         self.best_f = estimator.settings['parameter_estimation']['default_error']
-        self.opt_curve = []
+        self.optimization_curve = []
 
     def _evaluate(self, x, out, *args, **kwargs):
         objective = self.estimator.settings["parameter_estimation"]["objective_function"]
@@ -157,37 +214,59 @@ class PymooProblem(Problem):
                                         self.model,
                                         self.estimator) for i in range(len(x))])
         self.best_f = np.min(out["F"])
-        self.opt_curve.append(self.best_f)
+        self.optimization_curve.append(self.best_f)
 
 
 class BestTermination(Termination):
+    """Terminates optimization under certain conditions.
+        Arguments:
+            min_f (float):              if the objective functions reaches this error (min_f), optimization stops.
+                                        In the settings, min_f is set as "termination_threshold_error".
+            max_gen (int):              Maximum number of generations to be created. After that, optimization stops.
+                                        In the settings, max_gen is set as "max_iter".
+            terminate_if_no_change (int): Maximum number of iterations without the change in min_f. After that,
+                                        optimization stops. In the settings, terminate_if_no_change is set
+                                        as "termination_after_nochange_iters".
 
-    def __init__(self, min_f=1e-3, n_max_gen=500) -> None:
+        Methods:
+            update: checks at every iteration if termination critera are met
+    """
+    def __init__(self, min_f=1e-3, n_max_gen=500, terminate_if_no_change=200) -> None:
         super().__init__()
         self.min_f = min_f
         self.max_gen = MaximumGenerationTermination(n_max_gen)
-
+        self.terminate_if_no_change = terminate_if_no_change
     def _update(self, algorithm):
-        terminate_on_const = algorithm.problem.estimator.settings["optimizer_DE"]["termination_after_nochange_iters"]
         if algorithm.problem.best_f < self.min_f:
             self.terminate()
-        elif (len(algorithm.problem.opt_curve) > terminate_on_const+2) and (algorithm.problem.opt_curve[-1] == algorithm.problem.opt_curve[-terminate_on_const]):
+        elif (len(algorithm.problem.optimization_curve) > self.terminate_if_no_change + 2) and \
+             (algorithm.problem.optimization_curve[-1] == algorithm.problem.optimization_curve[-self.terminate_if_no_change]):
             self.terminate()
         return self.max_gen.update(algorithm)
 
 
-### OBJECTIVES ###
+### OBJECTIVE FUNCTIONS ###
 
 def objective_algebraic(params, model, estimator):
+    """
+    Objective function for algebraic models.
 
+    Returns:
+        error (float):  if successfull, returns the root-mean-square error between the true trajectories (X) and
+                            simulated trajectories (X_hat), else it returns the dummy error (10**9).
+    """
+
+    # set the newely estimated parameters
     model.set_params(params)
-    lhs = [str(i) for i in model.lhs_vars]
-    rhs = [str(i) for i in model.rhs_vars]
-    if lhs == rhs:
-        raise ValueError("Left and right hand side variables are the same. This should not happen in algebraic models.")
-    X = np.array(estimator.data[rhs])
-    Y = np.array(estimator.data[lhs])
 
+    # get appropriate data points
+    rhs_vars = [str(i) for i in model.rhs_vars]
+    if model.lhs_vars == rhs_vars:
+        raise ValueError("Left and right hand side variables are the same. This should not happen in algebraic models.")
+    X = np.array(estimator.data[rhs_vars])
+    Y = np.array(estimator.data[model.lhs_vars])
+
+    # estimate the model and calculate the error
     Y_hat = model.evaluate(X)
     error = np.sqrt(np.mean((Y - Y_hat) ** 2))
 
@@ -197,31 +276,44 @@ def objective_algebraic(params, model, estimator):
         return error
 
 def objective_differential(params, model, estimator):
+    """
+    Objective function for differential models. Simulated trajctories are calculated in the function 'simulate_ode'.
 
-    model.set_params(params, with_initials=True)
+    Returns:
+        error (float):  if successfull, returns the root-mean-square error between the true trajectories (X) and
+                            simulated trajectories (X_hat), else it returns the dummy error (10**9).
+    """
+
+    # set the newely estimated parameters and initial states
+    model.set_params(params, extra_params=True)
     model.set_initials(params, dict(estimator.data.iloc[0, :]))
 
+    # get appropriate data points
     X = np.array(estimator.data[[str(i) for i in model.observed_vars]])
+
+    # estimate the model
     X_hat = simulate_ode(estimator, model)
 
-    if estimator.settings['objective_function']["simulate_separately"]:
-        error = np.sqrt(np.mean((X - X_hat.reshape(-1)) ** 2))
-    else:
+    # if successful, calculate the error and optionally extend error with persistent homology calculation.
+    # if not successful or error is not float, return dummy error.
+    if X_hat is not None:
         error = np.sqrt(np.mean((X - X_hat) ** 2))
 
-    if estimator.settings['objective_function']["persistent_homology"]:
-        error = 1
+        if estimator.settings['objective_function']["persistent_homology"]:
+            error = 1
 
-    if np.isnan(error) or np.isinf(error) or not np.isreal(error):
-        return estimator.settings['parameter_estimation']['default_error']
+        if np.isnan(error) or np.isinf(error) or not np.isreal(error):
+            return estimator.settings['parameter_estimation']['default_error']
+        else:
+            return error
     else:
-        return error
+        return estimator.settings['parameter_estimation']['default_error']
 
 
 def simulate_ode(estimator, model):
 
     # Make model function
-    model_function = model.lambdify(list=True, add_time=True)
+    model_function = model.lambdify(add_time=True, list=True)
 
     # Interpolate the data of extra variables
     X_extras = interp1d(estimator.data['t'], estimator.data[model.extra_vars], axis=0, kind='cubic', fill_value="extrapolate") if model.extra_vars != [] else (lambda t: np.array([]))
@@ -233,10 +325,9 @@ def simulate_ode(estimator, model):
         def Jf(t, x):
             return J(*x)
 
-
     # Make function 'rhs' either with or without teacher forcing
+    observability_mask = np.array([item in model.observed_vars for item in model.lhs_vars])
     if estimator.settings['objective_function']["teacher_forcing"]:
-        observability_mask = np.array([item in model.observed_vars for item in model.lhs_vars])
         X_interp = interp1d(estimator.data['t'], estimator.data.loc[:, estimator.data.columns != 't'],
                             axis=0, kind='cubic', fill_value="extrapolate") if estimator.data.shape[1] != 0 else (lambda t: np.array([]))
 
@@ -251,17 +342,29 @@ def simulate_ode(estimator, model):
             return [model_function[i](t, *b) for i in range(len(model_function))]
 
     # Simulate
-    simulation = odeint(rhs,
-                         list(model.initials.values()), # initial states
-                         estimator.data['t'],           # time vector
-                         rtol=estimator.settings['objective_function']['rtol'],
-                         atol=estimator.settings['objective_function']['atol'],
-                         Dfun=Jf,
-                         tfirst=True)
+    simulation, full_output = odeint(rhs,
+                                     list(model.initials.values()), # initial states
+                                     estimator.data['t'],           # time vector
+                                     rtol=estimator.settings['objective_function']['rtol'],
+                                     atol=estimator.settings['objective_function']['atol'],
+                                     Dfun=Jf,
+                                     tfirst=True,
+                                     full_output=True)
 
-    return simulation
+    # Return only trajectories of observed variables, if simulation is successfull, else return dummy error
+    if 'successful' in full_output['message']:
+        return simulation[:, observability_mask]
+    else:
+        return None
 
 def directly_calculate_objective(params, model, estimator):
+    """
+    Directly calculates objective function. It is only possible if no parameters need to be estimated.
+
+    Returns:
+        error (float):  if successfull, returns the root-mean-square error between the true data and
+                            estimated model data, else it returns the dummy error (10**9).
+    """
     if estimator.settings['parameter_estimation']['task_type'] in ("algebraic", "integer-algebraic"):
         return objective_algebraic(params, model, estimator)
     elif estimator.settings['parameter_estimation']['task_type'] == "differential":

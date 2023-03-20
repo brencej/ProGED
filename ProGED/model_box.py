@@ -320,8 +320,8 @@ if __name__ == "__main__":
     symbols = {"x":['x'], "const":"c", "start":"S"}
     
     models = ModelBox()
-    print(models.add_model(expr1_str, symbols, grammar))
-    print(models.add_model(expr2_str, symbols, grammar, p=0.5, code="1"))
+    print(models.add_model(expr1_str, symbols, grammar=grammar))
+    print(models.add_model(expr2_str, symbols, grammar=grammar, p=0.5, code="1"))
     
     print(models)
     
