@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 import sympy as sp
 
+np.random.seed(0)
+
 class Model:
 
     """
