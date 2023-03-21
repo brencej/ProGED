@@ -13,9 +13,11 @@ from ProGED.parameter_estimation import fit_models
 from utils.generate_data_ODE_systems import generate_ODE_data
 from ProGED.configs import settings
 
+np.random.seed(0)
+
+
 def test_grammar_general():
-    np.random.seed(0)
-    
+
     txtgram = "S -> S '+' F [0.2] | F [0.8] \n"
     txtgram += "F -> 'x' [0.5] | 'y' [0.5]"
     grammar = GeneratorGrammar(txtgram)
@@ -29,8 +31,7 @@ def test_grammar_general():
     assert "".join(grammar.code_to_expression('0101')[0]) == "x+y"
     
 def test_grammar_templates():
-    np.random.seed(0)
-   
+
     templates_to_test = ["polynomial", "trigonometric", "polytrig", "simplerational", "rational", "universal"]
     variables = ["'x'", "'y'", "'z'"]
     p_vars = [0.3, 0.3, 0.4]
@@ -41,7 +42,7 @@ def test_grammar_templates():
         assert grammars[i].generate_one()[2] == codes[i]
         
 def test_generate_models():
-    np.random.seed(0)
+
     generator = grammar_from_template("polynomial", {"variables":["'x'", "'y'"], "p_vars":[0.3,0.7]})
     symbols = {"x":['x', 'y'], "start":"S", "const":"C"}
     N = 3
@@ -102,7 +103,7 @@ def test_model_box():
     assert models[1].p == 0.5
         
 def test_parameter_estimation_algebraic_1D():
-    np.random.seed(1)
+
     X = np.linspace(-1, 1, 5).reshape(-1, 1)
     Y = 2.0 * (X + 0.3)
     data = pd.DataFrame(np.hstack((X, Y)), columns=['x', 'y'])
@@ -118,6 +119,7 @@ def test_parameter_estimation_algebraic_1D():
     assert np.abs(models[0].get_error() - 7.15435171733259e-05) < 1e-6
 
 def test_parameter_estimation_algebraic_2D():
+
     X = np.linspace(-1, 1, 5).reshape(-1, 1)
     Y1 = 2.0 * (X + 0.3)
     Y2 = 1.66 * X
@@ -221,7 +223,6 @@ def test_parameter_estimation_ODE_solved_as_algebraic():
     assert abs(models[0].get_error() - 0.04928780981951337) < 1e-6
 
 def test_equation_discoverer():
-    np.random.seed(0)
     def f(x):
         return 2.0 * (x[:, 0] + 0.3)
 
@@ -247,7 +248,6 @@ def test_equation_discoverer_ODE():
     data = pd.DataFrame(np.hstack((ts.reshape(-1, 1), xs.reshape(-1, 1), ys.reshape(-1, 1))), columns=['t', 'x', 'y'])
 
     settings['parameter_estimation']['task_type'] = 'differential'
-    np.random.seed(20)
     ED = EqDisco(data = data,
                  task = None,
                  task_type = "differential",
