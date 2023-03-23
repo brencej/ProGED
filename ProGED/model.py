@@ -51,27 +51,16 @@ class Model:
                  trees={}, code="", p=1, grammar=None, **kwargs):
         """Initialize a Model with the initial parse tree and information on the task."""
 
-        # transform string to sympy expression if not alraedy
-        if isinstance(expr, str):
-            self.expr = list([sp.sympify(ex) for ex in expr.split(",")]) # strip(" ()")
-        elif isinstance(expr, list):
-            self.expr = [sp.sympify(ex) for ex in expr]
-        else:
-            self.expr = expr
+        expr, sym_vars, lhs_vars, sym_params = self.check_initialization_input(expr, sym_vars, lhs_vars, sym_params)
 
         # set system variables (rhs vars and extra vars) and target variables (lhs vars)
+        self.expr = expr
+        self.sym_vars = sym_vars
         self.lhs_vars = lhs_vars
         expr_symbols = [iexpr.free_symbols for iexpr in self.expr]
-        self.rhs_vars =  [item for item in sp.symbols(sym_vars) if item in list(set.union(*expr_symbols))]
+        self.rhs_vars =  [item for item in self.sym_vars if item in list(set.union(*expr_symbols))]
         self.extra_vars = [str(item) for item in self.rhs_vars if str(item) not in self.lhs_vars]
-
-        # transform sym_params to sympy symbols
-        try:
-            sym_params = list(sym_params) if isinstance(sym_params, str) else sym_params
-            self.sym_params = tuple(sp.symbols(sym_params))
-        except ValueError:
-            print("Unknown type passed as sym_params input of Model."
-                  "Valid types: string, tuple or list of strings. Example: ('C1', 'C2', 'C3').")
+        self.sym_params = sym_params
 
         # create dictionary of parameters (keys->parameter names, values->values of parameters)
         if not params:
@@ -95,7 +84,7 @@ class Model:
         self.valid = valid
 
         # set random initial values (should be limited to ODEs?)
-        self.initials = dict(zip(self.lhs_vars, np.random.uniform(low=-5, high=5, size=len(self.lhs_vars))))
+        self.initials = dict(zip(self.lhs_vars, np.zeros(len(self.lhs_vars))))
 
         # observability info (whether data for all state variables is present)
         self.observed_vars = kwargs.get('observed_vars', [str(i) for i in self.rhs_vars])
@@ -296,6 +285,17 @@ class Model:
     def get_full_expr(self):
         return self.full_expr(self.params)
 
+    def split(self):
+        model_splits = []
+        for ilhs, iexpr in enumerate(self.expr):
+            sym_params_split = [item for item in self.sym_params if item in list(iexpr.free_symbols)]
+            model_splits.append(Model(expr=iexpr,
+                                      grammar=self.grammar,
+                                      sym_vars=self.rhs_vars,
+                                      lhs_vars=self.lhs_vars[ilhs],
+                                      sym_params=sym_params_split))
+        return model_splits
+
     def nice_print(self, return_string=False, round_params=2):
         """
         Prints the model in a form of equation.
@@ -330,7 +330,58 @@ class Model:
             return self.estimated["duration"]
         else:
             return 0
-    
+
+    def check_initialization_input(self, expr, sym_vars, lhs_vars, sym_params):
+
+        # transform expression to sympy expression if not already
+        if isinstance(expr, str):
+            expr = list([sp.sympify(ex) for ex in expr.split(",")])  # strip(" ()")
+        elif isinstance(expr, (list, tuple)):
+            expr = [sp.sympify(ex) for ex in expr]
+        elif isinstance(expr, sp.Expr):
+            expr = [expr]
+        else:
+            raise ValueError("Unknown type passed as expr of Model."
+                  "Valid types: string, tuple or list of strings or sympy expression. Example: ['C0*x'].")
+
+        # transform sym_vars to sympy expression if not already
+        if isinstance(sym_vars, str):
+            sym_vars = list([sp.symbols(ex) for ex in expr.split(",")])  # strip(" ()")
+        elif isinstance(sym_vars, (list, tuple)):
+            if not isinstance(sym_vars[0], sp.Symbol):
+                sym_vars = sp.symbols(sym_vars)
+        elif isinstance(sym_vars, sp.Expr):
+            sym_vars = [sym_vars]
+        else:
+            raise ValueError("Unknown type passed as sym_vars of Model."
+                  "Valid types: string, tuple or list of strings or sympy expression. Example: ['x', 'y'].")
+
+        # transform lhs_vars to list of strings if not already
+        if isinstance(lhs_vars, str):
+            lhs_vars = list([ilhs for ilhs in lhs_vars.split(",")])  # strip(" ()")
+        elif isinstance(lhs_vars, sp.Expr):
+            lhs_vars = list([str(ilhs) for ilhs in lhs_vars])
+        elif isinstance(lhs_vars, (list, tuple)):
+            lhs_vars = lhs_vars
+        else:
+            raise ValueError("Unknown type passed as lhs_vars of Model."
+                  "Valid types: string, tuple or list of strings or sympy expression. Example: ['x', 'y'].")
+
+        # transform sym_params to tuple of sympy symbols
+        if isinstance(sym_params, (list, tuple)):
+            if not isinstance(sym_params[0], sp.Symbol):
+                sym_params = sp.symbols(sym_params)
+        elif isinstance(sym_params, str):
+            sym_params = tuple([sp.symbols(sym_params)])
+        elif isinstance(sym_params, sp.Symbol):
+            sym_params = tuple([sym_params])
+        else:
+            raise ValueError("Unknown type passed as sym_params input of Model."
+                            "Valid types: sp.symbol, string, tuple or list of strings/sp.symbols. Example: ('C1', 'C2', 'C3').")
+
+
+        return expr, sym_vars, lhs_vars, sym_params
+
     def __str__(self):
         if self.valid:
             return str(self.full_expr(self.params))

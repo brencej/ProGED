@@ -152,6 +152,24 @@ def test_parameter_estimation_ODE_1D():
     models = fit_models(models, data, settings=settings)
     assert np.abs(models[0].get_error() - 8.60893804568542e-05) < 1e-6
 
+def test_parameter_estimation_ODE_extra_vars():
+    # model: dx = -2x
+    t = np.arange(0, 1, 0.1)
+    x = 3*np.exp(-2*t)
+    y = 5.1*np.exp(-1*t)
+    data = pd.DataFrame(np.vstack((t, x, y)).T, columns=['t', 'x', 'y'])
+
+    models = ModelBox()
+    models.add_model("C*x + y",
+                     symbols={"x": ["x", "y"], "const": "C"},
+                     lhs_vars=["x"])
+
+    settings["parameter_estimation"]["task_type"] = 'differential'
+    settings["optimizer_DE"]["termination_after_nochange_iters"] = 10
+
+    models = fit_models(models, data, settings=settings)
+    assert np.abs(models[0].get_error() - 0.099941324900947) < 1e-6
+
 
 def test_parameter_estimation_ODE_2D():
     # model: dx = -2x
@@ -205,6 +223,23 @@ def test_parameter_estimation_ODE_teacher_forcing():
     models = fit_models(models, data, settings=settings)
     assert abs(models[0].get_error() - 5.7511694660763637e-05) < 1e-6
 
+def test_parameter_estimation_simulate_separately():
+    # model: dx = -2x
+    #        dy = -1y (would have to check the value -1)
+    t = np.arange(0, 1, 0.1)
+    x = 3*np.exp(-2*t)
+    y = 5.1*np.exp(-1*t)
+    data = pd.DataFrame(np.vstack((t, x, y)).T, columns=['t', 'x', 'y'])
+
+    models = ModelBox()
+    models.add_model(["C*x", "C*y"],
+                     symbols={"x": ["x", "y"], "const": "C"})
+
+    settings["parameter_estimation"]["task_type"] = 'differential'
+    settings["parameter_estimation"]["simulate_separately"] = True
+
+    models = fit_models(models, data, settings=settings)
+    assert abs(models[0].get_error() - 0.00026353031019943276) < 1e-6
 
 def test_parameter_estimation_ODE_solved_as_algebraic():
     sim_step = 0.1

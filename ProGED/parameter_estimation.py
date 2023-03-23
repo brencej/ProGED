@@ -116,14 +116,26 @@ class Estimator():
             optmizers_dict = {"DE": DEwrapper, "hyperopt": "hyperopt_fit"}
             optimizer = optmizers_dict[settings["parameter_estimation"]["optimizer"]]
             t1 = time.time()
-            result = optimizer(self, model)
-            result["duration"] = time.time() - t1
+            if settings["parameter_estimation"]["simulate_separately"]:
+                result = {'x': [], 'fun': 0}
+                model_splits = model.split()
+                for model_split in model_splits:
+                    result_split = optimizer(self, model_split)
+                    result['x'].append(result_split['x'][0])
+                    result['fun'] += result_split['fun']
+            else:
+                result = optimizer(self, model)
 
+            result["duration"] = time.time() - t1
             model.set_estimated(result)
 
         return model
 
     def check_observability(self, model):
+        if self.settings["parameter_estimation"]["observed_vars"] and model.observed_vars != self.settings["parameter_estimation"]["observed_vars"]:
+            raise ValueError("Observed variables in the model (model.observed_vars) do not match the observed variables "
+                             "in parameter estimation settings. Correct accordingly.")
+
         unobserved_vars = [str(item) for item in model.rhs_vars if str(item) not in model.observed_vars]
         if unobserved_vars:
             model.unobserved_vars = unobserved_vars
@@ -289,7 +301,7 @@ def objective_differential(params, model, estimator):
     model.set_initials(params, dict(estimator.data.iloc[0, :]))
 
     # get appropriate data points
-    X = np.array(estimator.data[[str(i) for i in model.observed_vars]])
+    X = np.array(estimator.data[[str(i) for i in model.observed_vars if i in model.lhs_vars]])
 
     # estimate the model
     X_hat = simulate_ode(estimator, model)
