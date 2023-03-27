@@ -368,7 +368,9 @@ class Model:
                   "Valid types: string, tuple or list of strings or sympy expression. Example: ['x', 'y'].")
 
         # transform sym_params to tuple of sympy symbols
-        if isinstance(sym_params, (list, tuple)):
+        if len(sym_params) == 0:
+            pass
+        elif isinstance(sym_params, (list, tuple)):
             if not isinstance(sym_params[0], sp.Symbol):
                 sym_params = sp.symbols(sym_params)
         elif isinstance(sym_params, str):

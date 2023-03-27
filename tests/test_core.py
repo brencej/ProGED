@@ -11,7 +11,8 @@ from ProGED.model import Model
 from ProGED.model_box import ModelBox
 from ProGED.parameter_estimation import fit_models
 from utils.generate_data_ODE_systems import generate_ODE_data
-from ProGED.configs import settings
+from ProGED.configs import settings as settings_original
+from copy import deepcopy
 
 np.random.seed(0)
 
@@ -113,6 +114,7 @@ def test_parameter_estimation_algebraic_1D():
                      symbols={"x": ["x", "y"], "const": "C"},
                      lhs_vars=['y'])
 
+    settings = deepcopy(settings_original)
     settings["parameter_estimation"]["task_type"] = 'algebraic'
 
     models = fit_models(models, data, settings=settings)
@@ -130,6 +132,7 @@ def test_parameter_estimation_algebraic_2D():
                      symbols={"x": ["x"], "const": "C"},
                      lhs_vars=['y1', 'y2'])
 
+    settings = deepcopy(settings_original)
     settings["parameter_estimation"]["task_type"] = 'algebraic'
 
     models = fit_models(models, data, settings=settings)
@@ -146,6 +149,7 @@ def test_parameter_estimation_ODE_1D():
     models.add_model("C*x",
                      symbols={"x": ["x"], "const": "C"})
 
+    settings = deepcopy(settings_original)
     settings["parameter_estimation"]["task_type"] = 'differential'
     settings["optimizer_DE"]["termination_after_nochange_iters"] = 50
 
@@ -164,6 +168,7 @@ def test_parameter_estimation_ODE_extra_vars():
                      symbols={"x": ["x", "y"], "const": "C"},
                      lhs_vars=["x"])
 
+    settings = deepcopy(settings_original)
     settings["parameter_estimation"]["task_type"] = 'differential'
     settings["optimizer_DE"]["termination_after_nochange_iters"] = 10
 
@@ -183,6 +188,7 @@ def test_parameter_estimation_ODE_2D():
     models.add_model(["C*x", "C*y"],
                      symbols={"x": ["x", "y"], "const": "C"})
 
+    settings = deepcopy(settings_original)
     settings["parameter_estimation"]["task_type"] = 'differential'
 
     models = fit_models(models, data, settings=settings)
@@ -200,6 +206,7 @@ def test_parameter_estimation_ODE_partial_observability():
                      symbols={"x": ["x", "y"], "const": "C"},
                      observed_vars=["x"])
 
+    settings = deepcopy(settings_original)
     settings["parameter_estimation"]["task_type"] = 'differential'
 
     models = fit_models(models, data, settings=settings)
@@ -217,6 +224,7 @@ def test_parameter_estimation_ODE_teacher_forcing():
                      symbols={"x": ["x", "y"], "const": "C"},
                      observed_vars=["x"])
 
+    settings = deepcopy(settings_original)
     settings["parameter_estimation"]["task_type"] = 'differential'
     settings["objective_function"]["teacher_forcing"] = True
 
@@ -235,11 +243,12 @@ def test_parameter_estimation_simulate_separately():
     models.add_model(["C*x", "C*y"],
                      symbols={"x": ["x", "y"], "const": "C"})
 
+    settings = deepcopy(settings_original)
     settings["parameter_estimation"]["task_type"] = 'differential'
     settings["parameter_estimation"]["simulate_separately"] = True
 
     models = fit_models(models, data, settings=settings)
-    assert abs(models[0].get_error() - 0.00026353031019943276) < 1e-6
+    assert abs(models[0].get_error() - 7.524305872610019e-05) < 1e-6
 
 def test_parameter_estimation_ODE_solved_as_algebraic():
     sim_step = 0.1
@@ -253,7 +262,9 @@ def test_parameter_estimation_ODE_solved_as_algebraic():
                      symbols={"x": ["x"], "const": "C"},
                      lhs_vars=["dx"])
 
+    settings = deepcopy(settings_original)
     settings['parameter_estimation']["task_type"] = 'algebraic'
+
     models = fit_models(models, data, settings=settings)
     assert abs(models[0].get_error() - 0.04928780981951337) < 1e-6
 
@@ -282,6 +293,7 @@ def test_equation_discoverer_ODE():
     ys = (ts+B)*np.exp(a*ts); xs = np.exp(a*ts)
     data = pd.DataFrame(np.hstack((ts.reshape(-1, 1), xs.reshape(-1, 1), ys.reshape(-1, 1))), columns=['t', 'x', 'y'])
 
+    settings = settings_original
     settings['parameter_estimation']['task_type'] = 'differential'
     ED = EqDisco(data = data,
                  task = None,
