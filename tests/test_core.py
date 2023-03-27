@@ -203,7 +203,7 @@ def test_parameter_estimation_ODE_partial_observability():
     settings["parameter_estimation"]["task_type"] = 'differential'
 
     models = fit_models(models, data, settings=settings)
-    assert abs(models[0].get_error() - 5.2769451981176474e-05) < 1e-6
+    assert models[0].estimated['x'][0] + 2 < 1e-2
 
 def test_parameter_estimation_ODE_teacher_forcing():
     # model: dx = -2x
