@@ -1,3 +1,4 @@
+# todo: write documentation for this file (e.g. this are settings for par. esti. only.
 
 import numpy as np
 
@@ -12,8 +13,10 @@ parameter_estimation = {
     "dataset": "./data.csv",
     "observed_vars": None,
     "lhs_vars": None,
-    "optimizer": 'DE', # default is pymoo's DE
+    "optimizer": 'DE',  # default is pymoo's DE
+    # "simulate_separately": True,
     "simulate_separately": False,
+    # set sepa to default!
     "max_constants": 15,
     "param_bounds": ((-10, 10),),
     "default_error": 10 ** 9,
@@ -30,6 +33,7 @@ optimizer_DE = {
     "atol": 0.001,
     "termination_threshold_error": 10 ** (-4),
     "termination_after_nochange_iters": 200,
+    "termination_after_nochange_tolerance": 10 ** (-6),
     "verbose": False,
     "save_history": False,
 }
@@ -37,7 +41,6 @@ optimizer_DE = {
 optimizer_hyperopt = {
     "a": 1,
 }
-
 
 objective_function = {
     "use_jacobian": False,
@@ -48,7 +51,7 @@ objective_function = {
     "default_error": 10 ** 9,
     "persistent_homology": False,
     "persistent_homology_size": 200,
-    "persistent_homology_weight": 0.5,
+    "persistent_homology_weight": 0.6,
 }
 
 settings = {

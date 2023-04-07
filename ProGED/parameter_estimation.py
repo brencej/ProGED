@@ -20,6 +20,7 @@ from pymoo.termination.default import MaximumGenerationTermination
 import ProGED as pg
 from ProGED.model_box import ModelBox
 from ProGED.configs import settings
+from ProGED.external.persistent_homology import ph_init, ph_after
 
 ## FIRST FUNCTION
 def fit_models(models, data=None, settings=settings, pool_map=map):
@@ -113,6 +114,8 @@ class Estimator():
         #else do parameter estimation
         else:
             model = self.check_observability(model)
+            if self.settings["objective_function"]["persistent_homology"]:
+                ph_init(self, model)
             optmizers_dict = {"DE": DEwrapper, "hyperopt": "hyperopt_fit"}
             optimizer = optmizers_dict[settings["parameter_estimation"]["optimizer"]]
             t1 = time.time()
@@ -175,7 +178,9 @@ def DEwrapper(estimator, model):
 
     termination = BestTermination(min_f = estimator.settings["optimizer_DE"]["termination_threshold_error"],
                                   n_max_gen = estimator.settings["optimizer_DE"]["max_iter"],
-                                  terminate_if_no_change=estimator.settings["optimizer_DE"]["termination_after_nochange_iters"])
+                                  terminate_if_no_change=estimator.settings["optimizer_DE"]["termination_after_nochange_iters"],
+                                  terminate_if_no_change_tolerance=estimator.settings["optimizer_DE"]["termination_after_nochange_tolerance"],
+                                  )
 
     output = minimize(pymoo_problem,
                       algorithm,
@@ -236,23 +241,31 @@ class BestTermination(Termination):
                                         In the settings, min_f is set as "termination_threshold_error".
             max_gen (int):              Maximum number of generations to be created. After that, optimization stops.
                                         In the settings, max_gen is set as "max_iter".
-            terminate_if_no_change (int): Maximum number of iterations without the change in min_f. After that,
+            terminate_if_no_change (int): Maximum number of iterations without the meaningful change in min_f. After that,
                                         optimization stops. In the settings, terminate_if_no_change is set
-                                        as "termination_after_nochange_iters".
+                                        as "termination_after_nochange_iters". By meaningful change we mean change
+                                         outside the epsilon-neighbourhood of 0, i.e. absolute change being bigger than
+                                         certain tolerance specified by `terminate_if_no_change_tolerance`.
+            terminate_if_no_change_tolerance (float): Relative tolerance that ignores small changes. It is used in
+                                        conjunction with the `terminate_if_no_change` variable (see above).
 
         Methods:
             update: checks at every iteration if termination critera are met
     """
-    def __init__(self, min_f=1e-3, n_max_gen=500, terminate_if_no_change=200) -> None:
+    def __init__(self, min_f=1e-3, n_max_gen=500, terminate_if_no_change=200, terminate_if_no_change_tolerance=10 ** (-6)) -> None:
         super().__init__()
         self.min_f = min_f
         self.max_gen = MaximumGenerationTermination(n_max_gen)
         self.terminate_if_no_change = terminate_if_no_change
+        self.terminate_if_no_change_tolerance = terminate_if_no_change_tolerance
+
     def _update(self, algorithm):
         if algorithm.problem.best_f < self.min_f:
             self.terminate()
         elif (len(algorithm.problem.optimization_curve) > self.terminate_if_no_change + 2) and \
-             (algorithm.problem.optimization_curve[-1] == algorithm.problem.optimization_curve[-self.terminate_if_no_change]):
+             abs(algorithm.problem.optimization_curve[-1] -
+                 algorithm.problem.optimization_curve[-self.terminate_if_no_change]) \
+                < self.terminate_if_no_change_tolerance:
             self.terminate()
         return self.max_gen.update(algorithm)
 
@@ -289,14 +302,14 @@ def objective_algebraic(params, model, estimator):
 
 def objective_differential(params, model, estimator):
     """
-    Objective function for differential models. Simulated trajctories are calculated in the function 'simulate_ode'.
+    Objective function for differential models. Simulated trajectories are calculated in the function 'simulate_ode'.
 
     Returns:
         error (float):  if successfull, returns the root-mean-square error between the true trajectories (X) and
                             simulated trajectories (X_hat), else it returns the dummy error (10**9).
     """
 
-    # set the newely estimated parameters and initial states
+    # set the newly estimated parameters and initial states
     model.set_params(params, extra_params=True)
     model.set_initials(params, dict(estimator.data.iloc[0, :]))
 
@@ -312,7 +325,7 @@ def objective_differential(params, model, estimator):
         error = np.sqrt(np.mean((X - X_hat) ** 2))
 
         if estimator.settings['objective_function']["persistent_homology"]:
-            error = 1
+            error = ph_after(estimator, model, error, X_hat)
 
         if np.isnan(error) or np.isinf(error) or not np.isreal(error):
             return estimator.settings['parameter_estimation']['default_error']
@@ -328,7 +341,8 @@ def simulate_ode(estimator, model):
     model_function = model.lambdify(add_time=True, list=True)
 
     # Interpolate the data of extra variables
-    X_extras = interp1d(estimator.data['t'], estimator.data[model.extra_vars], axis=0, kind='cubic', fill_value="extrapolate") if model.extra_vars != [] else (lambda t: np.array([]))
+    X_extras = interp1d(estimator.data['t'], estimator.data[model.extra_vars], axis=0, kind='cubic',
+                        fill_value="extrapolate") if model.extra_vars != [] else (lambda t: np.array([]))
 
     # Set jacobian
     Jf = None
@@ -339,6 +353,7 @@ def simulate_ode(estimator, model):
 
     # Make function 'rhs' either with or without teacher forcing
     observability_mask = np.array([item in model.observed_vars for item in model.lhs_vars])
+
     if estimator.settings['objective_function']["teacher_forcing"]:
         X_interp = interp1d(estimator.data['t'], estimator.data.loc[:, estimator.data.columns != 't'],
                             axis=0, kind='cubic', fill_value="extrapolate") if estimator.data.shape[1] != 0 else (lambda t: np.array([]))
@@ -355,15 +370,15 @@ def simulate_ode(estimator, model):
 
     # Simulate
     simulation, full_output = odeint(rhs,
-                                     list(model.initials.values()), # initial states
-                                     estimator.data['t'],           # time vector
+                                     list(model.initials.values()),  # initial states
+                                     estimator.data['t'],            # time vector
                                      rtol=estimator.settings['objective_function']['rtol'],
                                      atol=estimator.settings['objective_function']['atol'],
                                      Dfun=Jf,
                                      tfirst=True,
                                      full_output=True)
 
-    # Return only trajectories of observed variables, if simulation is successfull, else return dummy error
+    # Return only trajectories of observed variables, if simulation is successful, else return dummy error
     if 'successful' in full_output['message']:
         return simulation[:, observability_mask]
     else:
@@ -374,7 +389,7 @@ def directly_calculate_objective(params, model, estimator):
     Directly calculates objective function. It is only possible if no parameters need to be estimated.
 
     Returns:
-        error (float):  if successfull, returns the root-mean-square error between the true data and
+        error (float):  if successful, returns the root-mean-square error between the true data and
                             estimated model data, else it returns the dummy error (10**9).
     """
     if estimator.settings['parameter_estimation']['task_type'] in ("algebraic", "integer-algebraic"):
@@ -387,7 +402,7 @@ def directly_calculate_objective(params, model, estimator):
 if __name__ == '__main__':
     print("--- more parameter_estimation.py examples are included in the folder 'tests' ---")
 
-# test algebraic model with one equation
+    # test algebraic model with one equation
     X = np.linspace(-1, 1, 5).reshape(-1, 1)
     Y = 2.0 * (X + 0.3)
     data = pd.DataFrame(np.hstack((X, Y)), columns=['x', 'y'])
@@ -404,7 +419,7 @@ if __name__ == '__main__':
     print("--- parameter_estimation.py test algebraic model with one equation successfully finished ---")
 
 
-# differential model with two equations and two variables
+    # differential model with two equations and two variables
     t = np.arange(0, 1, 0.1)
     x = 3*np.exp(-2*t)
     y = 5.1*np.exp(-1*t)

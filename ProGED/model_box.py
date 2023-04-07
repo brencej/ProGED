@@ -46,7 +46,7 @@ class ModelBox:
             if not self.verify_expression(expr, sym_vars, symbols_params):
                 return False, exprs
 
-        lhs_vars = kwargs.get('lhs_vars', sym_vars)
+        lhs_vars = kwargs.get('lhs_vars', sym_vars[:len(exprs)])
         kwargs.pop("lhs_vars") if 'lhs_vars' in kwargs.keys() else []
 
         if len(lhs_vars) != len(exprs):

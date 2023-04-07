@@ -26,7 +26,7 @@ Methods:
 
 
 def generate_models(model_generator, symbols, strategy = "monte-carlo", system_size=1,
-                    strategy_settings = {"N":5}, verbosity=0, **kwargs):
+                    strategy_settings = {"N": 5}, verbosity=0, **kwargs):
     """Generate models using given generator and specified strategy.
     
     generate_models is intended as an interface to the generation methods defined in the module.
@@ -108,7 +108,7 @@ def monte_carlo_sampling (model_generator, symbols, N=5, system_size=1, max_repe
                     print("-> ", exprs, p, codes)
                     
                 valid, expr = models.add_model(exprs, symbols, p=p,
-                                               info = {"grammar": model_generator, "code": codes},
+                                               info={"grammar": model_generator, "code": codes},
                                                **kwargs)
                 
                 if verbosity > 1:
