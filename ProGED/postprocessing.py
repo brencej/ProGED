@@ -10,14 +10,14 @@ from ProGED.model_box import ModelBox
 Functions for the postprocessing of equation discovery results.
 """    
 
-def models_statistics (models, data, target_variable_index = -1, success_threshold = 1e-9):
+def models_statistics (models, data, lhs_variable, success_threshold = 1e-9):
     if not isinstance(models, ModelBox):
         raise TypeError("Input to analyze_models must be a ModelBox, but was " + str(type(models)))
     
     models_keys = list(models.keys())
     
-    meanpred = np.mean(data[:, target_variable_index])
-    baseerror = np.sum((data[:, target_variable_index] - meanpred)**2)
+    meanpred = np.mean(data[lhs_variable])
+    baseerror = np.sum((data[lhs_variable] - meanpred)**2)
     if baseerror < 1e-15:
         raise ValueError("Variance of target variable is zero.")
     

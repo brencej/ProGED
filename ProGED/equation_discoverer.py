@@ -210,7 +210,7 @@ class EqDisco:
     def get_stats (self):
         return models_statistics(self.models, 
                                  self.task.data, 
-                                 self.task.lhs_vars,
+                                 self.task.lhs_vars[0],
                                  self.task.success_thr)
 
     def write_results(self, filename=None, dummy=10**8):
