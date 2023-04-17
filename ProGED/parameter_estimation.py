@@ -20,7 +20,7 @@ from pymoo.termination.default import MaximumGenerationTermination
 import ProGED as pg
 from ProGED.model_box import ModelBox
 from ProGED.configs import settings
-from ProGED.external.persistent_homology import ph_init, ph_after
+
 
 ## FIRST FUNCTION
 def fit_models(models, data=None, settings=settings, pool_map=map):
@@ -115,6 +115,7 @@ class Estimator():
         else:
             model = self.check_observability(model)
             if self.settings["objective_function"]["persistent_homology"]:
+                from ProGED.external.persistent_homology import ph_init, ph_after
                 ph_init(self, model)
             optmizers_dict = {"DE": DEwrapper, "hyperopt": "hyperopt_fit"}
             optimizer = optmizers_dict[settings["parameter_estimation"]["optimizer"]]
@@ -325,6 +326,7 @@ def objective_differential(params, model, estimator):
         error = np.sqrt(np.mean((X - X_hat) ** 2))
 
         if estimator.settings['objective_function']["persistent_homology"]:
+            from ProGED.external.persistent_homology import ph_init, ph_after
             error = ph_after(estimator, model, error, X_hat)
 
         if np.isnan(error) or np.isinf(error) or not np.isreal(error):
