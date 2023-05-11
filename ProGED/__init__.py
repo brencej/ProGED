@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 from ProGED.model import Model
-from ProGED.system_model import SystemModel
 from ProGED.model_box import ModelBox, symbolic_difference
 from ProGED.generators.grammar import GeneratorGrammar
 from ProGED.generators.grammar_construction import grammar_from_template

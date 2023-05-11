@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
+# todo: __main__ update to dataFrames
 import json
 
 import numpy as np
+from copy import deepcopy
 
 from ProGED.generate import generate_models
 from ProGED.parameter_estimation import fit_models
@@ -9,6 +11,7 @@ from ProGED.generators.base_generator import BaseExpressionGenerator
 from ProGED.generators.grammar_construction import grammar_from_template
 from ProGED.task import EDTask
 from ProGED.postprocessing import models_statistics
+from ProGED.configs import settings
 
 """
 User-facing module for straightforward equation discovery tasks.
@@ -108,23 +111,22 @@ class EqDisco:
     def __init__(self,
                  task=None,
                  data=None,
-                 target_variable_index=-1,
-                 time_index=None,
-                 variable_names=None,
+                 rhs_vars=None,
+                 lhs_vars=None,
                  constant_symbol="C",
-                 task_type="algebraic",
-                 system_size=1,
+                 task_type="algebraic",  # deprecated: this should be inferred from configs.py/settings['parameter_estimation']['task_type'] or estimation_settings['par_esti']['task_type'].
+                 system_size=1,  # deprecated: this should be inferred from lhs_vars (system_size = len(lhs_vars)).
                  generator="grammar",
                  generator_template_name="universal",
                  variable_probabilities=None,
                  generator_settings={},
                  strategy="monte-carlo",
-                 strategy_settings=None,
+                 strategy_settings={},
                  sample_size=10,
                  max_attempts=1,
                  repeat_limit=100,
                  depth_limit=1000,
-                 estimation_settings=None,
+                 estimation_settings={},
                  success_threshold=1e-8,
                  verbosity=1):
         
@@ -133,9 +135,8 @@ class EqDisco:
                 raise TypeError("Missing inputs. Either task object or data required.")
             else:
                 self.task = EDTask(data=data,
-                                   target_variable_index=target_variable_index,
-                                   time_index=time_index,
-                                   variable_names=variable_names,
+                                   lhs_vars=lhs_vars,
+                                   rhs_vars=rhs_vars,
                                    constant_symbol=constant_symbol,
                                    success_threshold=success_threshold,
                                    task_type=task_type)
@@ -146,7 +147,8 @@ class EqDisco:
             raise TypeError("Missing task information!")
         
         if not variable_probabilities:
-            variable_probabilities = [1/len(self.task.var_names)]*np.sum(self.task.variable_mask)
+            # variable_probabilities = [1/len(self.task.var_names)]*np.sum(self.task.variable_mask)
+            variable_probabilities = [1/len(self.task.rhs_vars)]*len(self.task.rhs_vars)
         generator_settings.update({"variables":self.task.symbols["x"], "p_vars": variable_probabilities})
         if isinstance(generator, BaseExpressionGenerator):
             self.generator = generator
@@ -166,21 +168,13 @@ class EqDisco:
         self.system_size = system_size
             
         self.strategy = strategy
-        if not strategy_settings:
-            self.strategy_settings = {"N": sample_size, "max_repeat": max_attempts}
-        else:
-            self.strategy_settings = strategy_settings
+        self.strategy_settings = {"N": sample_size, "max_repeat": max_attempts}
+        self.strategy_settings.update(strategy_settings)
 
-        self.estimation_settings = {"target_variable_index": target_variable_index,
-                                    "time_index": time_index,
-                                    "verbosity": verbosity}
-        # if not estimation_settings:
-        #     self.estimation_settings = {"target_variable_index": target_variable_index,
-        #                                 "time_index": time_index,
-        #                                 "verbosity": verbosity}
-        #     print(verbosity, 'verb')
-        # else:
-        estimation_settings = {} if estimation_settings is None else estimation_settings
+        self.estimation_settings = deepcopy(settings)
+        self.estimation_settings.update(
+            {"lhs_vars": self.task.lhs_vars,
+             "verbosity": verbosity})
         self.estimation_settings.update(estimation_settings)
         
         self.models = None
@@ -188,28 +182,26 @@ class EqDisco:
         
         self.verbosity = verbosity
 
-    def generate_models(self, strategy_settings=None):
-        strategy_settings = {} if strategy_settings is None else strategy_settings
-        # if not strategy_settings:
-        #     strategy_settings = self.strategy_settings.update(strategy_settings)
-        strategy_settings_preset = dict(self.strategy_settings)
+    def generate_models(self, strategy_settings={}):
+        strategy_settings_preset = deepcopy(self.strategy_settings)
         strategy_settings_preset.update(strategy_settings)
         self.models = generate_models(self.generator, self.task.symbols,
-                                      system_size = self.system_size,
-                                      strategy = self.strategy,
-                                      strategy_settings = strategy_settings_preset,
+                                      lhs_vars=self.task.lhs_vars,
+                                      rhs_vars=self.task.rhs_vars,
+                                      system_size=self.system_size,
+                                      strategy=self.strategy,
+                                      strategy_settings=strategy_settings_preset,
                                       verbosity=self.verbosity)
         return self.models
     
-    def fit_models(self, estimation_settings={}, pool_map=map):
-        # if not estimation_settings:
-        #     estimation_settings = self.estimation_settings
-        estimation_settings_preset = dict(self.estimation_settings)
-        estimation_settings_preset.update(estimation_settings)
+    def fit_models(self, settings={}, pool_map=map):
+
+        estimation_settings_preset = deepcopy(self.estimation_settings)
+        estimation_settings_preset.update(settings)
+
         self.models = fit_models(self.models, self.task.data,
-                                 task_type=self.task.task_type, 
                                  pool_map=pool_map,
-                                 estimation_settings=estimation_settings_preset)
+                                 settings=estimation_settings_preset)
         return self.models
     
     def get_results(self, N=3):
@@ -218,7 +210,7 @@ class EqDisco:
     def get_stats (self):
         return models_statistics(self.models, 
                                  self.task.data, 
-                                 self.task.target_variable_index,
+                                 self.task.lhs_vars[0],
                                  self.task.success_thr)
 
     def write_results(self, filename=None, dummy=10**8):
@@ -241,21 +233,19 @@ class EqDisco:
 
 if __name__ == "__main__":
     print("--- equation_discoverer.py test --- ")
-    np.random.seed(1)
-    
+    import pandas as pd
+    np.random.seed(0)
+
+    # model: 2 (x + 0.3)
     def f(x):
         return 2.0 * (x + 0.3)
     X = np.linspace(-1, 1, 20)
     Y = f(X)
     X = X.reshape(-1, 1)
     Y = Y.reshape(-1, 1)
-    data = np.hstack((X, Y))
+    data = pd.DataFrame(np.hstack((X, Y)), columns=["x", "y"])
         
-    ED = EqDisco(task=None, data=data, target_variable_index=-1, sample_size=100, verbosity=1)
-    
-    #print(ED.generate_models())
-    #print(ED.fit_models())
-    
+    ED = EqDisco(task=None, data=data, rhs_vars=["x"], lhs_vars=["y"], sample_size=1, verbosity=1)
     ED.generate_models()
     ED.fit_models()
     print(ED.get_results())

@@ -11,3 +11,4 @@ ProGED.egg-info/
 /venv/*
 /proged_container.sif
 /proged_container_310.sif
+build/
