@@ -6,7 +6,7 @@ import numpy as np
 import sympy as sp
 import pandas as pd
 
-from scipy.optimize import differential_evolution, minimize
+from scipy.optimize import minimize as sp_minimize
 from scipy.interpolate import interp1d
 from scipy.integrate import solve_ivp, odeint
 
@@ -50,7 +50,7 @@ def check_inputs(settings):
     if settings['parameter_estimation']['task_type'] not in task_types:
         raise ValueError(f"The setting 'task_type' has unsupported value. Allowed options: {task_types}.")
 
-    optimizers = ["DE", "DE_scipy", "hyperopt"]
+    optimizers = ["DE", "DE_scipy", "hyperopt", "local"]
     if settings['parameter_estimation']['optimizer'] not in optimizers:
         raise ValueError(f"The setting 'optimizer' has unsupported value. Allowed options: {optimizers}.")
 
@@ -117,7 +117,7 @@ class Estimator():
             if self.settings["objective_function"]["persistent_homology"]:
                 from ProGED.external.persistent_homology import ph_init, ph_after
                 ph_init(self, model)
-            optmizers_dict = {"DE": DEwrapper, "hyperopt": "hyperopt_fit"}
+            optmizers_dict = {"DE": DEwrapper, "hyperopt": "hyperopt_fit", "local": local_fit}
             optimizer = optmizers_dict[settings["parameter_estimation"]["optimizer"]]
             t1 = time.time()
             if settings["parameter_estimation"]["simulate_separately"]:
@@ -269,6 +269,19 @@ class BestTermination(Termination):
                 < self.terminate_if_no_change_tolerance:
             self.terminate()
         return self.max_gen.update(algorithm)
+    
+
+def local_fit(estimator, model):
+    def f(params):
+        return estimator.settings["parameter_estimation"]["objective_function"](params, model, estimator)
+    bounds = estimator.settings["parameter_estimation"]["param_bounds"][0]
+    output = sp_minimize(f, np.random.uniform(bounds[0], bounds[1], size=len(model.params)))
+
+    model.set_params(output.x, extra_params=True)
+    model.set_initials(output.x, dict(estimator.data.iloc[0, :]))
+
+    return {"x": output.x, "fun": output.fun, "complete_results": output}
+
 
 
 ### OBJECTIVE FUNCTIONS ###
@@ -281,7 +294,6 @@ def objective_algebraic(params, model, estimator):
         error (float):  if successfull, returns the root-mean-square error between the true trajectories (X) and
                             simulated trajectories (X_hat), else it returns the dummy error (10**9).
     """
-
     # set the newely estimated parameters
     model.set_params(params)
 

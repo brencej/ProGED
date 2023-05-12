@@ -128,7 +128,7 @@ class EqDisco:
                  depth_limit=1000,
                  estimation_settings={},
                  success_threshold=1e-8,
-                 verbosity=1):
+                 verbosity=0):
         
         if not task:
             if isinstance(data, type(None)):
@@ -204,7 +204,7 @@ class EqDisco:
                                  settings=estimation_settings_preset)
         return self.models
     
-    def get_results(self, N=3):
+    def get_results(self, N=1):
         return self.models.retrieve_best_models(N)
     
     def get_stats (self):

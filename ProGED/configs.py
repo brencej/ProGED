@@ -13,11 +13,11 @@ parameter_estimation = {
     "dataset": "./data.csv",
     "observed_vars": None,
     "lhs_vars": None,
-    "optimizer": 'DE',  # default is pymoo's DE
+    "optimizer": 'local',  # default is pymoo's DE
     # "simulate_separately": True,
     "simulate_separately": False,
     # set sepa to default!
-    "max_constants": 15,
+    "max_constants": 5, #15
     "param_bounds": ((-10, 10),),
     "default_error": 10 ** 9,
     "timeout": np.inf,
@@ -25,7 +25,7 @@ parameter_estimation = {
 
 optimizer_DE = {
     "strategy": 'DE/best/1/bin',
-    "max_iter": 1000,
+    "max_iter": 200, #1000
     "pop_size": 20,
     "mutation": 0.5,
     "cr": 0.5,

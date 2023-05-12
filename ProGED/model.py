@@ -260,10 +260,11 @@ class Model:
             data_points = np.array(data_points)
 
         # TODO: This was changed, the return of the first sentence should be checked!
-        if type(lamb_expr(np.array([[1], [1]]))) != type(np.array([[1], [1]])):
-            return np.ones(len(data_points))*lamb_expr(1)
-        else:
-            return lamb_expr(data_points)
+        #if type(lamb_expr(np.array([[1], [1]]))) != type(np.array([[1], [1]])):
+            #return np.ones(len(data_points))*lamb_expr(1)
+        #else:
+            #return lamb_expr(data_points)
+        return lamb_expr(data_points)
 
     def full_expr(self, params=None):
         """
