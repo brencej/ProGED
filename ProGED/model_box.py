@@ -54,11 +54,10 @@ class ModelBox:
                              "Set lhs_vars accordingly.")
 
         if str(exprs) in self.models_dict:
-            # extend add_tree first
             if "code" in info:
                 code = info["code"]
             else:
-                code = ""
+                code = "nan"
             self.models_dict[str(exprs)].add_tree(code, p)
         else:
             self.models_dict[str(exprs)] = Model(expr=exprs,
@@ -272,8 +271,8 @@ class ModelBox:
             else: 
                 txt += "\n-> " + str(self.models_dict[m].expr) 
             txt += ", p = " + str(self.models_dict[m].p)
-            txt += ", parse trees = " + str(len(self.models_dict[m].trees))
-            txt += ", valid = " + str(self.models_dict[m].valid)
+            #txt += ", parse trees = " + str(len(self.models_dict[m].trees))
+            #txt += ", valid = " + str(self.models_dict[m].valid)
             if self.models_dict[m].valid:
                 txt += ", error = " + str(self.models_dict[m].get_error())
                 txt += ", time = " + str(self.models_dict[m].get_time())
