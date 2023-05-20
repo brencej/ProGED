@@ -48,7 +48,7 @@ class Model:
     """
     
     def __init__(self, expr, sym_vars, lhs_vars, sym_params=[], params={}, estimated={}, valid=False,
-                 trees={}, code="", p=1, grammar=None, **kwargs):
+                 p=1, info={}, **kwargs):
         """Initialize a Model with the initial parse tree and information on the task."""
 
         expr, sym_vars, lhs_vars, sym_params = self.check_initialization_input(expr, sym_vars, lhs_vars, sym_params)
@@ -90,25 +90,30 @@ class Model:
         self.unobserved_vars = kwargs.get('unobserved_vars', [])
 
         self.extra_vars = [str(item) for item in self.observed_vars if str(item) not in self.lhs_vars]
-
-        # grammar info
-        self.info = kwargs.get('info', {})
-        self.grammar = grammar
-        self.p = p                             # TODO: CHECK IF CORRECT (BEFORE IT WAS 0 BUT MODELBOX TEST FAILED)
-        self.trees = trees  #trees has form {"code":[p,n]}"
-        self.add_tree(code, p)
+        
+        if "code" in kwargs:
+            code = kwargs["code"]
+        elif "code" in info:
+            code = info["code"]
+            info.pop("code")
+        else:
+            code = "nan"
+        
+        self.p = p
+        self.info = info
+        self.info["trees"] = {code: [p, 1]}
 
     def add_tree(self, code, p):
         """Add a new parse tree to the model.
         
         Arguments:
-            code (str): The parse tree code, expressed as a string of integers.
+            tree_info (dict): Dict, containing at least "code": the parse tree code, expressed as a string of integers.
             p (float): Probability of parse tree.
         """
-        if code in self.trees:
-            self.trees[code][1] += 1
+        if code in self.info["trees"]:
+            self.info["trees"][code][1] += 1
         else:
-            self.trees[code] = [p,1]
+            self.info["trees"][code] = [p,1]
             self.p += p
         
     def set_estimated(self, result, valid=True):
