@@ -125,7 +125,7 @@ def test_parameter_estimation_algebraic_1D():
                      lhs_vars=['y'])
 
     settings = deepcopy(settings_original)
-    settings["parameter_estimation"]["task_type"] = 'algebraic'
+    settings["task_type"] = 'algebraic'
 
     models = fit_models(models, data, settings=settings)
     test_params = [1.99991279884777, 0.29999493846396297]
@@ -150,7 +150,7 @@ def test_parameter_estimation_algebraic_2D():
                      lhs_vars=['y1', 'y2'])
 
     settings = deepcopy(settings_original)
-    settings["parameter_estimation"]["task_type"] = 'algebraic'
+    settings["task_type"] = 'algebraic'
 
     models = fit_models(models, data, settings=settings)
     test_params = [1.9999283720986005, 0.29999396346942064, 1.6598867645944537]
@@ -172,7 +172,7 @@ def test_parameter_estimation_ODE_1D():
                      symbols={"x": ["x"], "const": "C"})
 
     settings = deepcopy(settings_original)
-    settings["parameter_estimation"]["task_type"] = 'differential'
+    settings["task_type"] = 'differential'
     settings["optimizer_DE"]["termination_after_nochange_iters"] = 50
 
     models = fit_models(models, data, settings=settings)
@@ -194,7 +194,7 @@ def test_parameter_estimation_ODE_extra_interpolate():
                      lhs_vars=["x"])
 
     settings = deepcopy(settings_original)
-    settings["parameter_estimation"]["task_type"] = 'differential'
+    settings["task_type"] = 'differential'
     settings["optimizer_DE"]["termination_after_nochange_iters"] = 10
 
     models = fit_models(models, data, settings=settings)
@@ -216,7 +216,7 @@ def test_parameter_estimation_ODE_extra_vars():
                      lhs_vars=["x"])
 
     settings = deepcopy(settings_original)
-    settings["parameter_estimation"]["task_type"] = 'differential'
+    settings["task_type"] = 'differential'
     settings["optimizer_DE"]["termination_after_nochange_iters"] = 10
 
     models = fit_models(models, data, settings=settings)
@@ -238,7 +238,7 @@ def test_parameter_estimation_ODE_2D():
                      symbols={"x": ["x", "y"], "const": "C"})
 
     settings = deepcopy(settings_original)
-    settings["parameter_estimation"]["task_type"] = 'differential'
+    settings["task_type"] = 'differential'
 
     models = fit_models(models, data, settings=settings)
 
@@ -263,7 +263,7 @@ def test_parameter_estimation_ODE_partial_observability():
                      observed_vars=["x"])
 
     settings = deepcopy(settings_original)
-    settings["parameter_estimation"]["task_type"] = 'differential'
+    settings["task_type"] = 'differential'
 
     models = fit_models(models, data, settings=settings)
     assert models[0].estimated['x'][0] + 2 < 1e-2
@@ -284,7 +284,7 @@ def test_parameter_estimation_ODE_teacher_forcing():
                      observed_vars=["x"])
 
     settings = deepcopy(settings_original)
-    settings["parameter_estimation"]["task_type"] = 'differential'
+    settings["task_type"] = 'differential'
     settings["objective_function"]["teacher_forcing"] = True
 
     models = fit_models(models, data, settings=settings)
@@ -306,7 +306,7 @@ def test_parameter_estimation_simulate_separately():
                      symbols={"x": ["x", "y"], "const": "C"})
 
     settings = deepcopy(settings_original)
-    settings["parameter_estimation"]["task_type"] = 'differential'
+    settings["task_type"] = 'differential'
     settings["parameter_estimation"]["simulate_separately"] = True
 
     models = fit_models(models, data, settings=settings)
@@ -333,7 +333,7 @@ def test_parameter_estimation_ODE_solved_as_algebraic():
                      lhs_vars=["dx"])
 
     settings = deepcopy(settings_original)
-    settings['parameter_estimation']["task_type"] = 'algebraic'
+    settings["task_type"] = 'algebraic'
 
     models = fit_models(models, data, settings=settings)
     assert abs(models[0].get_error() - 0.04928780981951337) < 1e-6

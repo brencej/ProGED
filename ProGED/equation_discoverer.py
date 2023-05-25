@@ -172,10 +172,12 @@ class EqDisco:
         self.strategy_settings.update(strategy_settings)
 
         self.estimation_settings = deepcopy(settings)
-        self.estimation_settings.update(
-            {"lhs_vars": self.task.lhs_vars,
-             "verbosity": verbosity})
+        est_settings_to_update = {"lhs_vars": self.task.lhs_vars, "verbosity": verbosity}
+        if task_type:
+            est_settings_to_update["task_type"] = task_type
+        self.estimation_settings.update(est_settings_to_update)
         self.estimation_settings.update(estimation_settings)
+        
         
         self.models = None
         self.solution = None
@@ -196,12 +198,12 @@ class EqDisco:
     
     def fit_models(self, settings={}, pool_map=map):
 
-        estimation_settings_preset = deepcopy(self.estimation_settings)
-        estimation_settings_preset.update(settings)
+        estimation_settings = deepcopy(self.estimation_settings)
+        estimation_settings.update(settings)
 
         self.models = fit_models(self.models, self.task.data,
                                  pool_map=pool_map,
-                                 settings=estimation_settings_preset)
+                                 settings=estimation_settings)
         return self.models
     
     def get_results(self, N=1):

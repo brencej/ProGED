@@ -1,4 +1,4 @@
-# todo: write documentation for this file (e.g. this are settings for par. esti. only.
+# todo: write documentation for this file (e.g. this are settings for par. esti. only.)
 
 import numpy as np
 
@@ -9,10 +9,8 @@ experiment = {
 }
 
 parameter_estimation = {
-    "task_type": 'algebraic',
     "dataset": "./data.csv",
     "observed_vars": None,
-    "lhs_vars": None,
     "optimizer": 'local',  # default is pymoo's DE
     # "simulate_separately": True,
     "simulate_separately": False,

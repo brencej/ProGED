@@ -47,11 +47,11 @@ def check_inputs(settings):
     """Checks if correct settings were set. TODO: Should be extended."""
 
     task_types = ["algebraic", "differential"]
-    if settings['parameter_estimation']['task_type'] not in task_types:
+    if settings['task_type'] not in task_types:
         raise ValueError(f"The setting 'task_type' has unsupported value. Allowed options: {task_types}.")
 
     optimizers = ["DE", "DE_scipy", "hyperopt", "local"]
-    if settings['parameter_estimation']['optimizer'] not in optimizers:
+    if settings["parameter_estimation"]['optimizer'] not in optimizers:
         raise ValueError(f"The setting 'optimizer' has unsupported value. Allowed options: {optimizers}.")
 
 
@@ -85,7 +85,7 @@ class Estimator():
         self.settings = settings
 
         # set objective function based on settings and task type
-        if self.settings['parameter_estimation']['task_type'] == 'algebraic':
+        if self.settings['task_type'] == 'algebraic':
             settings['parameter_estimation']['objective_function'] = objective_algebraic
         else:
             settings['parameter_estimation']['objective_function'] = objective_differential
@@ -406,9 +406,9 @@ def directly_calculate_objective(params, model, estimator):
         error (float):  if successful, returns the root-mean-square error between the true data and
                             estimated model data, else it returns the dummy error (10**9).
     """
-    if estimator.settings['parameter_estimation']['task_type'] in ("algebraic", "integer-algebraic"):
+    if estimator.settings['task_type'] in ("algebraic", "integer-algebraic"):
         return objective_algebraic(params, model, estimator)
-    elif estimator.settings['parameter_estimation']['task_type'] == "differential":
+    elif estimator.settings['task_type'] == "differential":
         return objective_differential(params, model, estimator)
 
 
@@ -426,7 +426,7 @@ if __name__ == '__main__':
                      symbols={"x": ["x", "y"], "const": "C"},
                      lhs_vars=['y'])
 
-    settings["parameter_estimation"]["task_type"] = 'algebraic'
+    settings["task_type"] = 'algebraic'
 
     models_fitted0 = pg.fit_models(models, data, settings=settings)
     print("models_fitted0 error: " + str(models_fitted0[0].get_error()))
@@ -443,7 +443,7 @@ if __name__ == '__main__':
     models.add_model(["C*x", "C*y"],
                      symbols={"x": ["x", "y"], "const": "C"})
 
-    settings["parameter_estimation"]["task_type"] = 'differential'
+    settings["task_type"] = 'differential'
 
     models_fitted3 = pg.fit_models(models, data, settings=settings)
     print("models_fitted3 error: " + str(models_fitted3[0].get_error()))

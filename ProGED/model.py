@@ -229,7 +229,7 @@ class Model:
         if add_time:
             # lambdas = [sp.lambdify([sp.symbols("t")] + self.rhs_vars, full_expr, arg) for full_expr in fullexprs]  # currently testing with sym_vars
             # lambdas = [sp.lambdify([sp.symbols("t")] + self.sym_vars, full_expr, arg) for full_expr in fullexprs]
-            lambdas = [sp.lambdify(["t"] + self.lhs_vars + self.extra_vars, full_expr, arg) for full_expr in fullexprs]
+            lambdas = [sp.lambdify(["tdummy"] + self.lhs_vars + self.extra_vars, full_expr, arg) for full_expr in fullexprs]
         else:
             lambdas = [sp.lambdify(self.rhs_vars, full_expr, arg) for full_expr in fullexprs]
 
