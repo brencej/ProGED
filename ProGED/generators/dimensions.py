@@ -37,7 +37,7 @@ def units_dict (variables, units, target_variable_unit = [0,0,0,0,0], unit_symbo
         dictunits[unit_to_string(target_variable_unit, unit_symbols)] = []
         
     for unit in units:
-        if unit_to_string(unit) not in dictunits:
+        if unit_to_string(unit, unit_symbols) not in dictunits:
             dictunits[unit_to_string(unit, unit_symbols)] = []
     return dictunits
 
@@ -57,7 +57,7 @@ def check_rules (units, syms, rules):
             return False
     return True
 
-def expand_production(att_prod, units):
+def expand_production(att_prod, units, unit_symbols=["m", "s", "kg", "T", "V"]):
     prod = _read_production(att_prod[0], standard_nonterm_parser)[0]
     syms = {}; lhs_str = ""; rhs_str = ""
 
@@ -93,7 +93,7 @@ def expand_production(att_prod, units):
         prod_str = lhs_str + " -> " + rhs_str + " [" + str(att_prod[1]) + "]"
         for (sym, unit) in zip(list(syms.keys()), comb):
             #print(prod_str)
-            prod_str = prod_str.replace(sym[1:], sym[1:-1] + "_" + unit_to_string(unit))
+            prod_str = prod_str.replace(sym[1:], sym[1:-1] + "_" + unit_to_string(unit, unit_symbols=unit_symbols))
         dimprods += [prod_str]
 
     # !TODO: add the correct probability procedure from Algorithm 1
@@ -145,11 +145,11 @@ def dimensional_attribute_grammar_to_pcfg(attribute_productions, vars, units, ta
     # expand each production
     dim_prods = []
     for att_prod in attribute_productions:
-        dim_prods += expand_production(att_prod, all_units)
+        dim_prods += expand_production(att_prod, all_units, unit_symbols=unit_symbols)
     
     if append_vars:
     # add the dimensional productions for variables
-        dict_units = units_dict(vars, units, target_variable_unit=target_unit)
+        dict_units = units_dict(vars, units, target_variable_unit=target_unit, unit_symbols=unit_symbols)
         for u, v in dict_units.items():
             for vi in v:
                 dim_prods += ["V_" + u + " -> '" + vi + "' [" + str(1.0/len(v)) + "]"]
