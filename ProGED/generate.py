@@ -95,20 +95,21 @@ def monte_carlo_sampling (model_generator, symbols, N=5, system_size=1, max_repe
         n = 0
         try:
             while not good and n < max_repeat:
-                exprs = []; codes = []; p = 1
+                exprs = []; codes = []; p = 1; trees = []
 
                 for _ in range(system_size):
-                    sample, pi, code = model_generator.generate_one()
+                    sample, pi, code, tree = model_generator.generate_one()
                     exprs += ["".join(sample)]
                     codes += [code]
                     p *= pi
+                    trees += [tree]
                 codes = ",".join(codes)
 
                 if verbosity > 1:
                     print("-> ", exprs, p, codes)
                     
                 valid, expr = models.add_model(exprs, symbols, p=p,
-                                               info={"grammar": model_generator, "code": codes},
+                                               info={"grammar": model_generator, "code": codes, "tree": trees},
                                                **kwargs)
                 
                 if verbosity > 1:

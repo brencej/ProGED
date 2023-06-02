@@ -229,7 +229,7 @@ def generate_sample_alternative(grammar, start, depth = 0, depth_limit = 100):
     if depth > depth_limit:
         raise ProGEDDepthError("Recursion depth exceeded. Raise the depth_limit, lower the probability of recursion or except this error and repeat the sampling.")
     if not isinstance(start, Nonterminal):
-        return [start], 1, ""
+        return [start], 1, "", []
     else:
         prods = grammar.productions(lhs=start)
         if len(prods) < 1:
@@ -239,12 +239,14 @@ def generate_sample_alternative(grammar, start, depth = 0, depth_limit = 100):
         frags = []
         probab = probs[prod_i]
         code = str(prod_i)
+        all_prods = [prods[prod_i]]
         for symbol in prods[prod_i].rhs():
-            frag, p, h = generate_sample_alternative(grammar, symbol, depth = depth + 1)
+            frag, p, h, prods = generate_sample_alternative(grammar, symbol, depth = depth + 1)
             frags += frag
             probab *= p
             code += h
-        return frags, probab, code
+            all_prods += [prods]
+        return frags, probab, code, all_prods
     
 
 def code_to_sample (code, grammar, items=[Nonterminal("S")]):

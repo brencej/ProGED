@@ -56,9 +56,11 @@ class ModelBox:
         if str(exprs) in self.models_dict:
             if "code" in info:
                 code = info["code"]
+                tree = info["tree"]
             else:
                 code = "nan"
-            self.models_dict[str(exprs)].add_tree(code, p)
+                tree = "nan"
+            self.models_dict[str(exprs)].add_tree(code, p, tree)
         else:
             self.models_dict[str(exprs)] = Model(expr=exprs,
                                                  sym_vars=sym_vars,

@@ -91,19 +91,23 @@ class Model:
 
         self.extra_vars = [str(item) for item in self.observed_vars if str(item) not in self.lhs_vars]
         
-        if "code" in kwargs:
+        if "code" in kwargs and "tree" in kwargs:
             code = kwargs["code"]
+            tree = kwargs["tree"]
         elif "code" in info:
             code = info["code"]
+            tree = info["tree"]
             info.pop("code")
+            info.pop("tree")
         else:
             code = "nan"
+            tree = "nan"
         
         self.p = p
         self.info = info
-        self.info["trees"] = {code: [p, 1]}
+        self.info["trees"] = {code: [p, tree]}
 
-    def add_tree(self, code, p):
+    def add_tree(self, code, p, tree):
         """Add a new parse tree to the model.
         
         Arguments:
@@ -111,9 +115,9 @@ class Model:
             p (float): Probability of parse tree.
         """
         if code in self.info["trees"]:
-            self.info["trees"][code][1] += 1
+            self.info["trees"][code][1] = tree
         else:
-            self.info["trees"][code] = [p,1]
+            self.info["trees"][code] = [p, tree]
             self.p += p
         
     def set_estimated(self, result, valid=True):
