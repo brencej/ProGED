@@ -245,7 +245,8 @@ def generate_sample_alternative(grammar, start, depth = 0, depth_limit = 100):
             frags += frag
             probab *= p
             code += h
-            all_prods += [prods]
+            if len(prods) > 0:
+                all_prods += [prods]
         return frags, probab, code, all_prods
     
 
