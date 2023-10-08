@@ -118,9 +118,9 @@ class Estimator():
                 from ProGED.external.persistent_homology import ph_init, ph_after
                 ph_init(self, model)
             optmizers_dict = {"DE": DEwrapper, "hyperopt": "hyperopt_fit", "local": local_fit}
-            optimizer = optmizers_dict[settings["parameter_estimation"]["optimizer"]]
+            optimizer = optmizers_dict[self.settings["parameter_estimation"]["optimizer"]]
             t1 = time.time()
-            if settings["parameter_estimation"]["simulate_separately"]:
+            if self.settings["parameter_estimation"]["simulate_separately"]:
                 result = {'x': [], 'fun': 0}
                 model_splits = model.split()
                 for model_split in model_splits:
