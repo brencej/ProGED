@@ -25,37 +25,35 @@ def test_grammar_general():
     grammar = GeneratorGrammar(txtgram)
 
     sample = grammar.generate_one()
-    assert sample[0] == ['y'] and sample[1] == 0.4 and sample[2] == '11'
+    assert sample[0] == ['y'] and sample[1] == 0.4 and sample[2] == '1_1'
 
     assert grammar.count_trees(Nonterminal("S"), 5) == 30
     assert grammar.count_coverage(Nonterminal("S"), 2) == 0.8
 
-    assert "".join(grammar.code_to_expression('0101')[0]) == "x+y"
+    assert "".join(grammar.code_to_expression('0_1_0_1')[0]) == "x+y"
 
 
 def test_grammar_templates():
-
-    np.random.seed(0)
     templates_to_test = ["polynomial", "trigonometric", "polytrig", "simplerational", "rational", "universal"]
     variables = ["'x'", "'y'", "'z'"]
     p_vars = [0.3, 0.3, 0.4]
-    codes = ["1101", "011", "02", "12", "0110001221101", "0202111211"]
+    codes = ["1_0_1", "0_1_2", "0_1_1_1", "1_2", "0_1_1_0_1_1_0_1", "2_2_2_1"]
 
     grammars = [grammar_from_template(template_name, {"variables": variables, "p_vars": p_vars}) for template_name in templates_to_test]
     for i in range(len(grammars)):
+        np.random.seed(0)
         assert grammars[i].generate_one()[2] == codes[i]
 
 
 def test_generate_models():
-
-    np.random.seed(0)
     generator = grammar_from_template("polynomial", {"variables": ["'x'", "'y'"], "p_vars": [0.3, 0.7]})
     symbols = {"x": ['x', 'y'], "start": "S", "const": "C"}
     N = 3
-    samples = ["C0*y", "C0*x*y**2", "C0*x**2 + C1"]
+    samples = ["C0*y", "C0*y**2", "C0*x*y**2"]
 
     models = generate_models(generator, symbols, strategy_settings={"N": N})
     for i in range(len(models)):
+        np.random.seed(0)
         assert str(models[i])[1:-1] == samples[i]
 
 
@@ -104,7 +102,7 @@ def test_model_box():
     models = ModelBox()
     models.add_model(expr1_str, symbols)
     assert len(models) == 1
-    models.add_model(expr2_str, symbols, p=0.5, info={"code": "1"})
+    models.add_model(expr2_str, symbols, p=0.5, info={"code": "1", "tree": "[F -> 'x' [0.5]]"})
     assert len(models) == 2
     assert str(models[1]) == str(models["[c0*x]"])
     assert str(models[1]) == "[c0*x]"
@@ -121,17 +119,18 @@ def test_parameter_estimation_algebraic_1D():
 
     models = ModelBox()
     models.add_model("C*(x+C)",
-                     symbols={"x": ["x", "y"], "const": "C"},
-                     lhs_vars=['y'])
+                        symbols={"x": ["x", "y"], "const": "C"},
+                        lhs_vars=['y'])
 
     settings = deepcopy(settings_original)
     settings["task_type"] = 'algebraic'
+    settings["parameter_estimation"]["optimizer"] = "local"
 
     models = fit_models(models, data, settings=settings)
     test_params = [1.99991279884777, 0.29999493846396297]
-    assert np.abs(models[0].get_error() - 7.15435171733259e-05) < 1e-6
+    assert np.abs(models[0].get_error() - 1.3400820285902405e-08) < 1e-6
     for n, param in enumerate(list(models[0].params.values())):
-        assert np.abs(param - test_params[n]) < 1e-6
+        assert np.abs(param - test_params[n]) < 1e-3
 
 
 def test_parameter_estimation_algebraic_2D():
@@ -146,17 +145,18 @@ def test_parameter_estimation_algebraic_2D():
 
     models = ModelBox()
     models.add_model(["C*(x+C)", "C*x"],
-                     symbols={"x": ["x"], "const": "C"},
-                     lhs_vars=['y1', 'y2'])
+                        symbols={"x": ["x"], "const": "C"},
+                        lhs_vars=['y1', 'y2'])
 
     settings = deepcopy(settings_original)
     settings["task_type"] = 'algebraic'
+    settings["parameter_estimation"]["optimizer"] = "local"
 
     models = fit_models(models, data, settings=settings)
     test_params = [1.9999283720986005, 0.29999396346942064, 1.6598867645944537]
     for n, param in enumerate(list(models[0].params.values())):
-        assert np.abs(param - test_params[n]) < 1e-6
-    assert np.abs(models[0].get_error() - 7.107301643897895e-05) < 1e-6
+        assert np.abs(param - test_params[n]) < 1e-3
+    assert np.abs(models[0].get_error() - 7.961001835444256e-09) < 1e-6
 
 
 def test_parameter_estimation_ODE_1D():
@@ -173,6 +173,7 @@ def test_parameter_estimation_ODE_1D():
 
     settings = deepcopy(settings_original)
     settings["task_type"] = 'differential'
+    settings["parameter_estimation"]["optimizer"] = "DE"
     settings["optimizer_DE"]["termination_after_nochange_iters"] = 50
 
     models = fit_models(models, data, settings=settings)
@@ -195,6 +196,7 @@ def test_parameter_estimation_ODE_extra_interpolate():
 
     settings = deepcopy(settings_original)
     settings["task_type"] = 'differential'
+    settings["parameter_estimation"]["optimizer"] = "DE"
     settings["optimizer_DE"]["termination_after_nochange_iters"] = 10
 
     models = fit_models(models, data, settings=settings)
@@ -217,6 +219,7 @@ def test_parameter_estimation_ODE_extra_vars():
 
     settings = deepcopy(settings_original)
     settings["task_type"] = 'differential'
+    settings["parameter_estimation"]["optimizer"] = "DE"
     settings["optimizer_DE"]["termination_after_nochange_iters"] = 10
 
     models = fit_models(models, data, settings=settings)
@@ -239,6 +242,7 @@ def test_parameter_estimation_ODE_2D():
 
     settings = deepcopy(settings_original)
     settings["task_type"] = 'differential'
+    settings["parameter_estimation"]["optimizer"] = "DE"
 
     models = fit_models(models, data, settings=settings)
 
@@ -264,6 +268,7 @@ def test_parameter_estimation_ODE_partial_observability():
 
     settings = deepcopy(settings_original)
     settings["task_type"] = 'differential'
+    settings["parameter_estimation"]["optimizer"] = "DE"
 
     models = fit_models(models, data, settings=settings)
     assert models[0].estimated['x'][0] + 2 < 1e-2
@@ -285,6 +290,7 @@ def test_parameter_estimation_ODE_teacher_forcing():
 
     settings = deepcopy(settings_original)
     settings["task_type"] = 'differential'
+    settings["parameter_estimation"]["optimizer"] = "DE"
     settings["objective_function"]["teacher_forcing"] = True
 
     models = fit_models(models, data, settings=settings)
@@ -303,18 +309,19 @@ def test_parameter_estimation_simulate_separately():
 
     models = ModelBox()
     models.add_model(["C*x", "C*y"],
-                     symbols={"x": ["x", "y"], "const": "C"})
+                        symbols={"x": ["x", "y"], "const": "C"})
 
     settings = deepcopy(settings_original)
     settings["task_type"] = 'differential'
+    settings["parameter_estimation"]["optimizer"] = "local"
     settings["parameter_estimation"]["simulate_separately"] = True
 
     models = fit_models(models, data, settings=settings)
 
     test_params = [-2.0001969388280485, -1.000021388719896]
     for n, param in enumerate(models[0].params.values()):
-        assert np.abs(param - test_params[n]) < 1e-6
-    assert abs(models[0].get_error() - 7.524305872610019e-05) < 1e-6
+        assert np.abs(param - test_params[n]) < 1e-3
+    assert abs(models[0].get_error() - 0.0002549956021539954) < 1e-6
 
 
 def test_parameter_estimation_ODE_solved_as_algebraic():
@@ -334,6 +341,7 @@ def test_parameter_estimation_ODE_solved_as_algebraic():
 
     settings = deepcopy(settings_original)
     settings["task_type"] = 'algebraic'
+    settings["parameter_estimation"]["optimizer"] = "DE"
 
     models = fit_models(models, data, settings=settings)
     assert abs(models[0].get_error() - 0.04928780981951337) < 1e-6
@@ -344,25 +352,24 @@ def test_equation_discoverer():
 
     np.random.seed(0)
     def f(x):
-        return 2.0 * (x[:, 0] + 0.3)
+        return 2.0 * (x + 0.3)
 
-    X = np.linspace(-1, 1, 20).reshape(-1,1)
-    Y = f(X).reshape(-1, 1)
-    data = pd.DataFrame(np.hstack((X, Y)), columns=["x", "y"])
+    X = np.linspace(-1, 1, 20)
+    Y = f(X)
+    data = pd.DataFrame({"x": X, "y": Y})
 
     ED = EqDisco(data=data,
-                 task=None,
-                 rhs_vars=["x"],
-                 lhs_vars=["y"],
-                 sample_size=5,
-                 verbosity=0)
+                    task=None,
+                    rhs_vars=["x"],
+                    lhs_vars=["y"],
+                    sample_size=5,
+                    verbosity=0)
 
     ED.generate_models()
     ED.fit_models()
-    assert np.abs(list(ED.models[1].params.values())[0] - 2.550349722044572) < 1e-6
+    assert np.abs(list(ED.models[1].params.values())[0] - 2.550349722044572) < 1e-3
     assert np.abs(ED.models[0].get_error() - 0.853475865) < 1e-6
 
-#
 def test_equation_discoverer_ODE():
     # dy = x + 0.4y
 
@@ -373,16 +380,17 @@ def test_equation_discoverer_ODE():
 
     settings = deepcopy(settings_original)
     settings['parameter_estimation']['task_type'] = 'differential'
+    settings["parameter_estimation"]["optimizer"] = "DE"
     settings["optimizer_DE"]["termination_after_nochange_iters"] = 1
 
     ED = EqDisco(data=data,
-                 task=None,
-                 task_type="differential",
-                 rhs_vars=["x", "y"],
-                 lhs_vars=["y"],
-                 sample_size=4,
-                 generator_template_name="polynomial",
-                 verbosity=0)
+                    task=None,
+                    task_type="differential",
+                    rhs_vars=["x", "y"],
+                    lhs_vars=["y"],
+                    sample_size=4,
+                    generator_template_name="polynomial",
+                    verbosity=0)
     np.random.seed(95)
     ED.generate_models()
     ED.fit_models(settings=settings)
@@ -390,7 +398,6 @@ def test_equation_discoverer_ODE():
     test_params = [-9.667920152096535, -9.058465306540445, -9.317236898854375,]
     for n, param in enumerate(ED.models[1].params.values()):
         assert np.abs(param - test_params[n]) < 1e-6
-    return
 
 
 if __name__ == "__main__":

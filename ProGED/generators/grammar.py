@@ -3,6 +3,7 @@
 import numpy as np
 from nltk import PCFG
 from nltk.grammar import Nonterminal, ProbabilisticProduction
+from nltk.tree import Tree
 
 from ProGED.generators.base_generator import BaseExpressionGenerator, ProGEDMaxAttemptError
 
@@ -212,7 +213,31 @@ class GeneratorGrammar (BaseExpressionGenerator):
     def __repr__ (self):
         return str(self.grammar)
     
+    def code_to_tree (self, code, items=[Nonterminal("S")]):
+        """Reconstructs parse tree and productions from parse tree encoding.
+        Input:
+            code - parse tree encoding in string format, as returned by generate sample
+            items - list containing start symbol for the grammar. Default: [Nonterminal("S")]
+        Output:
+            frags - nltk.tree.Tree
+            productions - list of used productions in string form. The parse tree is ordered top to bottom, left to right.
+            code0 - auxilary variable, used by the recursive nature of the function. Should be an empty string. If not, something went wrong."""
+
+        prods = self.grammar.productions(lhs=items[0])
+        prod = prods[int(code.split("_")[0])]
+        productions = [prod]
+        code0 = "_".join(code.split("_")[1:])
+        frags = []
+        for i,item in enumerate(prod.rhs()):
+            if not isinstance(item, Nonterminal):
+                frags += [str(item)]
+            else:
+                frag, productions_child, code0 = self.code_to_tree(code0, [item])
+                frags += [frag]
+                productions += productions_child
     
+        #print(frags, code0)
+        return Tree(node=str(items[0]), children=frags), productions, code0
 
 def generate_sample_alternative(grammar, start, depth = 0, depth_limit = 100):
     """Samples PCFG once. 
@@ -244,7 +269,8 @@ def generate_sample_alternative(grammar, start, depth = 0, depth_limit = 100):
             frag, p, h, prods = generate_sample_alternative(grammar, symbol, depth = depth + 1)
             frags += frag
             probab *= p
-            code += h
+            if len(h) > 0:
+                code += "_" + h
             if len(prods) > 0:
                 all_prods += [prods]
         return frags, probab, code, all_prods
@@ -260,7 +286,7 @@ def code_to_sample (code, grammar, items=[Nonterminal("S")]):
         frags - expression in list form. Call "".join(frags) to get string.
         productions - list of used productions in string form. The parse tree is ordered top to bottom, left to right.
         code0 - auxilary variable, used by the recursive nature of the function. Should be an empty string. If not, something went wrong."""
-    code0 = code
+    code0 = code.split("_")
     frags = []
     productions=[]
     if len(items) == 1:
@@ -268,18 +294,20 @@ def code_to_sample (code, grammar, items=[Nonterminal("S")]):
             prods = grammar.productions(lhs=items[0])
             prod = prods[int(code0[0])]
             productions += [prod]
-            frag, productions_child, code0 = code_to_sample(code0[1:], grammar, prod.rhs())
+            frag, productions_child, code0 = code_to_sample("_".join(code0[1:]), grammar, prod.rhs())
             frags += frag
             productions += productions_child
         else:
             frags += [items[0]]
     else:
         for item in items:
-            frag, productions_child, code0 = code_to_sample (code0, grammar, [item])
+            frag, productions_child, code0 = code_to_sample("_".join(code0), grammar, [item])
             frags += frag
             productions += productions_child
     #print(frags, code0)
     return frags, productions, code0
+
+
     
 def code_to_sample_alternative(code, grammar, start_symbol=Nonterminal("S")):
     """Alternative implementation of code_to_sample. Just for visualisation.

@@ -38,12 +38,6 @@ class EDTask:
                 differential
         """
 
-        if not isinstance(data, pd.DataFrame):
-            raise ValueError("The data should be in the form of Pandas DataFrame.")
-        if task_type == "differential" and 't' not in data.columns:
-            raise TypeError ("Missing temporal data. Temporal data is required for differential equation task type."
-                             "Specify temporal data column with column name 't'.")
-
         self.data = data
         self.task_type = task_type
         self.lhs_vars = lhs_vars
@@ -56,9 +50,20 @@ class EDTask:
             else:
                 self.constant_symbol = constant_symbol
 
-            self.symbols = {"start":"E", "const": self.constant_symbol, "x": ["'" + v + "'" for v in self.rhs_vars]}
+            self.symbols = {"start":"E", 
+                            "const": self.constant_symbol, 
+                            "x": ["'" + v + "'" for v in self.rhs_vars]}
         else:
             self.symbols = symbols
+
+    def verify_task(self):
+        if self.data is None:
+            raise TypeError("Missing inputs. Either task object or data required.")
+        if not isinstance(self.data, pd.DataFrame):
+            raise ValueError("The data should be in the form of Pandas DataFrame.")
+        if self.task_type == "differential" and 't' not in self.data.columns:
+            raise TypeError ("Missing temporal data. Temporal data is required for differential equation task type."
+                             "Specify temporal data column with column name 't'.")
         
         
 if __name__ == "__main__":

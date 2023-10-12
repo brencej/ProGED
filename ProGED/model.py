@@ -59,7 +59,7 @@ class Model:
         self.lhs_vars = lhs_vars
         expr_symbols = [iexpr.free_symbols for iexpr in self.expr]
         self.rhs_vars = [item for item in self.sym_vars if item in list(set.union(*expr_symbols))]
-        self.sym_params = sym_params
+        self.sym_params = [item for item in sym_params if item in list(set.union(*expr_symbols))]
 
         # create dictionary of parameters (keys->parameter names, values->values of parameters)
         if not params:
@@ -102,6 +102,14 @@ class Model:
         else:
             code = "nan"
             tree = "nan"
+
+        if "grammar" in kwargs:
+            self.grammar = kwargs["grammar"]
+        elif "grammar" in info:
+            self.grammar = info["grammar"]
+            info.pop("grammar")
+        else:
+            self.grammar = None
         
         self.p = p
         self.info = info

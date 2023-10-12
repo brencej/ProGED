@@ -55,7 +55,7 @@ def construct_grammar_polytrig (p_more_terms=[0.7,0.15,0.15], p_higher_terms=0.5
     grammar += construct_production(left="V", items=variables, probs=p_vars)
     return grammar
 
-def construct_grammar_polynomial (p_S = [0.4, 0.6], p_T = [0.4, 0.6], p_vars = [1], p_R = [0.6, 0.4], p_F = [1],
+def construct_grammar_polynomial (p_S = [0.4, 0.6], p_T = [0.4, 0.6], p_vars = [1], p_R = [1, 0], p_F = [1],
                                   functions = ["'exp'"], variables = ["'x'"]):
     grammar = construct_production(left="S", items=["S '+' R", "R"], probs=p_S)
     grammar += construct_production(left="R", items=["T", "'C' '*' F '(' T ')'"], probs=p_R)

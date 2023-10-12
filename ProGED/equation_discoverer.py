@@ -123,7 +123,7 @@ class EqDisco:
                  strategy="monte-carlo",
                  strategy_settings={},
                  sample_size=10,
-                 max_attempts=1,
+                 max_attempts=10,
                  repeat_limit=100,
                  depth_limit=1000,
                  estimation_settings={},
@@ -131,20 +131,15 @@ class EqDisco:
                  verbosity=0):
         
         if not task:
-            if isinstance(data, type(None)):
-                raise TypeError("Missing inputs. Either task object or data required.")
-            else:
-                self.task = EDTask(data=data,
-                                   lhs_vars=lhs_vars,
-                                   rhs_vars=rhs_vars,
-                                   constant_symbol=constant_symbol,
-                                   success_threshold=success_threshold,
-                                   task_type=task_type)
+            self.task = EDTask(data=data,
+                                lhs_vars=lhs_vars,
+                                rhs_vars=rhs_vars,
+                                constant_symbol=constant_symbol,
+                                success_threshold=success_threshold,
+                                task_type=task_type)
                 
         elif isinstance(task, EDTask):
             self.task = task
-        else:
-            raise TypeError("Missing task information!")
         
         if not variable_probabilities:
             # variable_probabilities = [1/len(self.task.var_names)]*np.sum(self.task.variable_mask)
@@ -197,6 +192,7 @@ class EqDisco:
         return self.models
     
     def fit_models(self, settings={}, pool_map=map):
+        self.task.verify_task()
 
         estimation_settings = deepcopy(self.estimation_settings)
         estimation_settings.update(settings)

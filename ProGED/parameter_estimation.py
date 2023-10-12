@@ -97,9 +97,16 @@ class Estimator():
                 else:
                     raise ValueError("Differential task needs to include the time in one of the columns, named"
                                      "either 't' or 'time'.")
+                
+        # if "evaluated_models" in settings:
+        #     self.evaluated_models = settings["evaluated_models"]
+        # else:
+        #     self.evaluated_models = {}
 
     def fit_one(self, model):
-
+        # if str(model) in self.evaluated_models:
+        #     return self.evaluated_models[str(model)]
+        
         # check number of parameters
         # if there is too many parameters, skip:
         if len(model.params) > self.settings["parameter_estimation"]["max_constants"]:
@@ -132,6 +139,8 @@ class Estimator():
 
             result["duration"] = time.time() - t1
             model.set_estimated(result)
+        
+        # self.evaluated_models[str(model)] = model
 
         return model
 

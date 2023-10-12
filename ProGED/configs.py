@@ -9,9 +9,9 @@ experiment = {
 }
 
 parameter_estimation = {
-    "dataset": "./data.csv",
+    # "dataset": "./data.csv",
     "observed_vars": None,
-    "optimizer": 'local',  # default is pymoo's DE
+    "optimizer": 'local', # 'local': scipy.minimize, 'DE': pymoo diff.evol., 'DE_scipy': scipy diff.evol., 'hyperopt': hyperopt 
     # "simulate_separately": True,
     "simulate_separately": False,
     # set sepa to default!

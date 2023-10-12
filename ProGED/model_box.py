@@ -42,6 +42,7 @@ class ModelBox:
         sym_vars = [s.strip("'") for s in symbols["x"]]
 
         exprs, symbols_params = self.string_to_canonic_system(expr_strs, symbols)
+
         for expr in exprs:
             if not self.verify_expression(expr, sym_vars, symbols_params):
                 return False, exprs
@@ -141,7 +142,7 @@ class ModelBox:
                 return False, True, [(eq, c)]
             else:          
                 args = []
-                if isinstance(eq, (sp.add.Add, sp.mul.Mul)):
+                if isinstance(eq, (sp.add.Add, sp.mul.Mul, sp.power.Pow)):
                     has_free_c = False
                     if True in [has_c[i] and not has_var[i] for i in range(len(has_c))]:
                         has_free_c = True
@@ -175,11 +176,12 @@ class ModelBox:
         """
         x = [sympy_symbols(s.strip("'")) for s in symbols["x"]]
         c = sympy_symbols(symbols["const"].strip("'"))
-        
+        dont_touch = x
+
         exprs = self.enumerate_constants_system(expr_strs, symbols)[0]
-        exprs = [self.simplify_constants(expr, c, x)[2][0][1] for expr in exprs]
+        exprs = [self.simplify_constants(expr, c, dont_touch)[2][0][1] for expr in exprs]
         exprs = self.enumerate_constants_system(exprs, symbols)[0]
-        exprs = [self.simplify_constants(expr, c, x)[2][0][1] for expr in exprs]
+        exprs = [self.simplify_constants(expr, c, dont_touch)[2][0][1] for expr in exprs]
         
         exprs, symbols_params = self.enumerate_constants_system(exprs, symbols)
         symbols_params = [sorted(list([s.name for s in (expr.free_symbols - set(x))])) for expr in exprs]
@@ -322,7 +324,6 @@ if __name__ == "__main__":
     
     models = ModelBox()
     print(models.add_model(expr1_str, symbols, grammar=grammar))
-    print(models.add_model(expr2_str, symbols, grammar=grammar, p=0.5, code="1"))
     
     print(models)
     
