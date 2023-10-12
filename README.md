@@ -52,21 +52,26 @@ python3 -m pytest
 First, generate data for a simple 1-dimensional problem:
 ```python3
 import numpy as np
+import pandas as pd
 
 def f(x):
     return 2.0 * (x + 0.3)
-	
-X = np.linspace(-1, 1, 20).reshape(-1,1)
-Y = f(X).reshape(-1,1)
-data = np.hstack((X,Y))
+
+X = np.linspace(-1, 1, 20)
+Y = f(X)
+data = pd.DataFrame({"x": X, "y": Y})
 ```
 ProGED provides an interface for common usage through the class EqDisco:
 ```python3
 from ProGED import EqDisco
 
 ED = EqDisco(data = data,
-             sample_size = 5,
-             verbosity = 1)
+             lhs_vars = ["y"], # list the variable on the left-hand side of each equation in the system of equations, should match columns names in data
+             rhs_vars = ["x"], # list the variables that can appear on the right-hand side of each equation, should match columns names in data
+             sample_size = 5, # number of candidate equations to generate
+             generator = "grammar", # optional, accepts instance of custom generator or grammar
+             generator_template_name = "polynomial", # name of grammar template if not using custom generator, common choices: polynomial, rational, universal
+             verbosity = 1) # level of detail the program prints, 0 is silent besides warnings
 ```
 The algorithm has two main steps: generating the models and fiting the models:
 ```python3
