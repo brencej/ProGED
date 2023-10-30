@@ -149,7 +149,7 @@ class Estimator():
             raise ValueError("Observed variables in the model (model.observed_vars) do not match the observed variables "
                              "in parameter estimation settings. Correct accordingly.")
 
-        unobserved_vars = [str(item) for item in model.rhs_vars if str(item) not in model.observed_vars]
+        unobserved_vars = [str(item) for item in model.sym_vars if str(item) not in model.observed_vars]
         if unobserved_vars:
             model.unobserved_vars = unobserved_vars
             for ivar in unobserved_vars:
