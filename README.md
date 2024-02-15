@@ -1,10 +1,5 @@
 # **Pro**iscovery
 
-ProGED discovers physical laws in data, expressed in the form of equations. 
-A probabilistic context-free grammar (PCFG) is used to generate candidate equations. 
-Their optimal values of their parameters are estimated and their perfomance evaluated.
-The output of ProGED is a list of equations, ordered according to the likelihood that they represent the best model for the data.
-
 ## Scope
 - algebraic equations
 - systems of ordinary differential equations
