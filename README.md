@@ -1,4 +1,4 @@
-# **Pro**babilistic **G**enerative **E**quation **D**iscovery
+# **Pro**iscovery
 
 ProGED discovers physical laws in data, expressed in the form of equations. 
 A probabilistic context-free grammar (PCFG) is used to generate candidate equations. 
