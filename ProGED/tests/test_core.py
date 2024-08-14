@@ -410,7 +410,7 @@ if __name__ == "__main__":
     # test_parameter_estimation_algebraic_1D()
     # test_parameter_estimation_algebraic_2D()
     # test_parameter_estimation_ODE_1D()
-    test_parameter_estimation_ODE_extra_interpolate()
+    #test_parameter_estimation_ODE_extra_interpolate()
     # test_parameter_estimation_ODE_extra_vars()
     # test_parameter_estimation_ODE_2D()
     # test_parameter_estimation_ODE_partial_observability()

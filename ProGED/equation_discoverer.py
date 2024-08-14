@@ -129,6 +129,7 @@ class EqDisco:
                  estimation_settings={},
                  success_threshold=1e-8,
                  verbosity=0):
+                 #config_file="default_config.json"):
         
         if not task:
             self.task = EDTask(data=data,
@@ -159,6 +160,9 @@ class EqDisco:
             raise TypeError ("Invalid generator specification. Expected: class that inherits from "\
                              "generators.base_generator.BaseExpressionGenerator or string, corresponding to template name.\n"\
                              "Input: " + str(type(generator)))
+        
+        self.observed_vars = [v for v in rhs_vars if v in data.columns]
+        self.unobserved_vars = [v for v in rhs_vars if v not in data.columns]
 
         self.system_size = system_size
             
@@ -172,7 +176,6 @@ class EqDisco:
             est_settings_to_update["task_type"] = task_type
         self.estimation_settings.update(est_settings_to_update)
         self.estimation_settings.update(estimation_settings)
-        
         
         self.models = None
         self.solution = None
@@ -188,7 +191,9 @@ class EqDisco:
                                       system_size=self.system_size,
                                       strategy=self.strategy,
                                       strategy_settings=strategy_settings_preset,
-                                      verbosity=self.verbosity)
+                                      verbosity=self.verbosity,
+                                      observed_vars=self.observed_vars,
+                                      unobserved_vars=self.unobserved_vars)
         return self.models
     
     def fit_models(self, settings={}, pool_map=map):
@@ -196,6 +201,8 @@ class EqDisco:
 
         estimation_settings = deepcopy(self.estimation_settings)
         estimation_settings.update(settings)
+
+        estimation_settings["parameter_estimation"]["observed_vars"] = self.observed_vars
 
         self.models = fit_models(self.models, self.task.data,
                                  pool_map=pool_map,

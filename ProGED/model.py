@@ -86,7 +86,7 @@ class Model:
         self.initials = dict(zip(self.lhs_vars, np.zeros(len(self.lhs_vars))))
 
         # observability info (whether data for all state variables is present)
-        self.observed_vars = kwargs.get('observed_vars', [str(i) for i in self.rhs_vars])
+        self.observed_vars = kwargs.get('observed_vars', [str(i) for i in self.sym_vars])
         self.unobserved_vars = kwargs.get('unobserved_vars', [])
 
         self.extra_vars = [str(item) for item in self.observed_vars if str(item) not in self.lhs_vars]

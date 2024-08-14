@@ -146,6 +146,7 @@ class Estimator():
 
     def check_observability(self, model):
         if self.settings["parameter_estimation"]["observed_vars"] and model.observed_vars != self.settings["parameter_estimation"]["observed_vars"]:
+            print(model, model.observed_vars, self.settings["parameter_estimation"]["observed_vars"])
             raise ValueError("Observed variables in the model (model.observed_vars) do not match the observed variables "
                              "in parameter estimation settings. Correct accordingly.")
 
