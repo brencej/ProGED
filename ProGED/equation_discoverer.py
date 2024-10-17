@@ -6,12 +6,13 @@ import numpy as np
 from copy import deepcopy
 
 from ProGED.generate import generate_models
-from ProGED.parameter_estimation import fit_models
+from ProGED.parameter_estimation import fit_models, Estimator
 from ProGED.generators.base_generator import BaseExpressionGenerator
 from ProGED.generators.grammar_construction import grammar_from_template
 from ProGED.task import EDTask
 from ProGED.postprocessing import models_statistics
 from ProGED.configs import settings
+from ProGED.grammar_updater import GrammarUpdater
 
 """
 User-facing module for straightforward equation discovery tasks.
@@ -208,6 +209,38 @@ class EqDisco:
                                  pool_map=pool_map,
                                  settings=estimation_settings)
         return self.models
+    
+    def bayesian_search(self, 
+                        m=5,
+                        max_iter=10,
+                        p_init=None,
+                        thr=1e-9,
+                        eps=1e-1,
+                        iteration_sample_size=10, 
+                        prob_minimum=0.05, 
+                        verbosity=1):
+        
+        self.task.verify_task()
+        estimation_settings = deepcopy(self.estimation_settings)
+        estimation_settings.update(settings)
+        estimation_settings["parameter_estimation"]["observed_vars"] = self.observed_vars
+
+        self.grammar_updater_estimator = Estimator(self.task.data,
+                              estimation_settings)
+        
+        self.updater = GrammarUpdater(self.generator,
+                                 self.task.rhs_vars,
+                                 thr=thr,
+                                 eps=eps,
+                                 sample_size=iteration_sample_size,
+                                 prob_minimum=prob_minimum,
+                                 estimator=self.grammar_updater_estimator)
+        
+        results = self.updater.optimize(p_init=p_init,
+                                   max_iter=max_iter,
+                                   m=m)
+        
+        return results
     
     def get_results(self, N=1):
         return self.models.retrieve_best_models(N)

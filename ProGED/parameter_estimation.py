@@ -108,12 +108,12 @@ class Estimator():
         #     return self.evaluated_models[str(model)]
         
         # check number of parameters
-        # if there is too many parameters, skip:
+        # if there are too many parameters, skip:
         if len(model.params) > self.settings["parameter_estimation"]["max_constants"]:
             print("Model skipped. More model parameters than allowed (check max constant).")
             pass
 
-        #if there is no parameters:
+        #if there are no parameters:
         elif len(model.params) == 0:
             model.set_estimated({"x": [],
                                  "fun": directly_calculate_objective([], model, self)})
