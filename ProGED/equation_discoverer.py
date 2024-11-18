@@ -162,8 +162,12 @@ class EqDisco:
                              "generators.base_generator.BaseExpressionGenerator or string, corresponding to template name.\n"\
                              "Input: " + str(type(generator)))
         
-        self.observed_vars = [v for v in rhs_vars if v in data.columns]
-        self.unobserved_vars = [v for v in rhs_vars if v not in data.columns]
+        if data is not None:
+            self.observed_vars = [v for v in rhs_vars if v in data.columns]
+            self.unobserved_vars = [v for v in rhs_vars if v not in data.columns]
+        else:
+            self.observed_vars = None
+            self.unobserved_vars = None
 
         self.system_size = system_size
             

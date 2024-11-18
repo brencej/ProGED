@@ -89,8 +89,11 @@ class Model:
         self.observed_vars = kwargs.get('observed_vars', [str(i) for i in self.sym_vars])
         self.unobserved_vars = kwargs.get('unobserved_vars', [])
 
-        self.extra_vars = [str(item) for item in self.observed_vars if str(item) not in self.lhs_vars]
-        
+        if self.observed_vars is not None:
+            self.extra_vars = [str(item) for item in self.observed_vars if str(item) not in self.lhs_vars]
+        else:
+            self.extra_vars = None
+
         if "code" in kwargs and "tree" in kwargs:
             code = kwargs["code"]
             tree = kwargs["tree"]
