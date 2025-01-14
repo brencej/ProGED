@@ -122,10 +122,18 @@ class GrammarUpdater:
             err = fitted.get_error()
             self.evaled_models[str(model)] = err
             return err
-        
+
     def fit_model_simple(self, model):
         """Fits a model and returns the error."""
         return self.estimator.fit_one(model).get_error()
+    
+    def fit_models(self, models):
+        """Fits a list of models and returns the errors using ProGED's estimation based on SymPy.
+        Inputs:
+            - models: list of models to fit
+        Outputs:
+            - errors: list of errors of the fitted models"""
+        return [self.fit_model(m) for m in models.values()]
         
     def select_by_rel_eps(self, model, **kwargs):
         """Returns True if the model's error is within the relative error threshold, False otherwise."""
@@ -137,6 +145,10 @@ class GrammarUpdater:
         if model.get_error() - self.best_err < eps*self.best_err:
             return True
         return False
+    
+    def generate_models(self, grammar):
+        """Generates models from a grammar using ProGED's generate_models function."""
+        return pg.generate.generate_models(grammar, {"x":[f"'{v}'" for v in self.vji], "const":"C"}, strategy_settings = {"N":self.sample_size}, lhs_vars=self.estimator.settings["lhs_vars"])
     
     def evaluate_probs(self, p, selection_criterion = None):
         """Evaluates the probability vector p and returns the best model if a solution has been found, otherwise returns 
@@ -156,7 +168,7 @@ class GrammarUpdater:
         else:
             select_f = selection_criterion
 
-        self.evaled_ps += [p]
+        #self.evaled_ps += [p] <- this is redundant, as it is done in the optimize function?
         grammar = get_grammar_from_prods_probs(self.productions, p)
         try:
             grammar = pg.GeneratorGrammar(grammar, depth_limit=50, repeat_limit=1)
@@ -165,11 +177,11 @@ class GrammarUpdater:
                 print("Encountered error with probability vector:", p)
             raise ValueError(e)
 
-        models = pg.generate.generate_models(grammar, {"x":[f"'{v}'" for v in self.vji], "const":"C"}, strategy_settings = {"N":self.sample_size}, lhs_vars=self.estimator.settings["lhs_vars"])
+        models = self.generate_models(grammar)
         if len(models) == 0:
             return np.inf
 
-        self.evaled_errors += [self.fit_model(m) for m in models.values()]
+        self.evaled_errors += self.fit_models(models)
         
         for model in models:
             if model.get_error() < self.thr:
