@@ -121,14 +121,22 @@ def monte_carlo_sampling (model_generator, symbols, N=5, system_size=1, max_repe
                     
                 if valid:
                     good = True
+                    
                 n += 1
     
-            if verbosity > 0 and len(models) > 0:
+            if verbosity > 1 and len(models) > 0:
                 print(models[-1])
+
+            if verbosity > 0:
+                if (n + current_total) % (max_total_repeats//10 + 1) == 0:
+                    print(f"Progress: {round(current_total/max_total_repeats*100, 1)}%, models: {len(models)}")
+
         except ProGEDMaxAttemptError:
             n += 1
         
         current_total += n
+
+
         
     return models
 

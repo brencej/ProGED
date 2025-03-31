@@ -7,6 +7,8 @@ from collections import defaultdict
 import ProGED as pg
 
 from ProGED.configs import settings
+from ProGED.generators.grammar import ProGEDDepthError, ProGEDDeadEndError
+from ProGED.generators.base_generator import ProGEDMaxAttemptError
 #settings["task_type"] = "algebraic"
 #settings["lhs_vars"]= ["y"]
 
@@ -43,7 +45,7 @@ def count_productions(tree, prod_dict):
     """Counts the number of times each production is used in a parse tree."""
     prod = str(tree[0]).split("[")[0].strip()
     prod_dict[prod] += 1
-
+ 
     if len(tree) == 1:
         return prod_dict
     
@@ -103,6 +105,7 @@ class GrammarUpdater:
         self.evaled_ps = []
         self.best_err = np.inf
         self.best_model = None
+        self.n_selected = []
 
         if data is None and estimator is None:
             raise ValueError("Either data or estimator object must be provided.")
@@ -116,11 +119,11 @@ class GrammarUpdater:
     def fit_model(self, model):
         """Fits a model and returns the error, while maintaining a cache of already fitted models."""
         if str(model) in self.evaled_models:
-            return self.evaled_models[str(model)]
+            return self.evaled_models[str(model)]["err"]
         else:
             fitted = self.estimator.fit_one(model)
             err = fitted.get_error()
-            self.evaled_models[str(model)] = err
+            self.evaled_models[str(model)] = {"err": err, "p": model.p, "code": list(model.info["trees"].keys())}
             return err
 
     def fit_model_simple(self, model):
@@ -148,7 +151,11 @@ class GrammarUpdater:
     
     def generate_models(self, grammar):
         """Generates models from a grammar using ProGED's generate_models function."""
-        return pg.generate.generate_models(grammar, {"x":[f"'{v}'" for v in self.vji], "const":"C"}, strategy_settings = {"N":self.sample_size}, lhs_vars=self.estimator.settings["lhs_vars"])
+        return pg.generate.generate_models(grammar, 
+                                           symbols={"x":[f"'{v}'" for v in self.vji], "const":"C"}, 
+                                           strategy_settings = {"N":self.sample_size,
+                                                                "max_repeat": 1}, 
+                                           lhs_vars=self.estimator.settings["lhs_vars"])
     
     def evaluate_probs(self, p, selection_criterion = None):
         """Evaluates the probability vector p and returns the best model if a solution has been found, otherwise returns 
@@ -169,6 +176,8 @@ class GrammarUpdater:
             select_f = selection_criterion
 
         #self.evaled_ps += [p] <- this is redundant, as it is done in the optimize function?
+        if self.verbosity > 2:
+            print("- Constructing grammar")
         grammar = get_grammar_from_prods_probs(self.productions, p)
         try:
             grammar = pg.GeneratorGrammar(grammar, depth_limit=50, repeat_limit=1)
@@ -177,17 +186,27 @@ class GrammarUpdater:
                 print("Encountered error with probability vector:", p)
             raise ValueError(e)
 
-        models = self.generate_models(grammar)
+        if self.verbosity > 2:
+            print("- Generating models")
+        try:
+            models = self.generate_models(grammar)
+        except (ProGEDMaxAttemptError, ProGEDDepthError, ProGEDDeadEndError, RecursionError):
+            return -1, None, None, None
+        
         if len(models) == 0:
-            return np.inf
+            return -1, None, None, None
 
+        if self.verbosity > 2:
+            print("- Fitting models")
         self.evaled_errors += self.fit_models(models)
         
+        if self.verbosity > 2:
+            print("- Checking models")
         for model in models:
             if model.get_error() < self.thr:
                 self.best_model = model
                 self.best_err = model.get_error()
-                return True, None, None, None
+                return 1, None, None, None
             
             if model.get_error() < self.best_err:
                 self.best_model = model
@@ -197,16 +216,27 @@ class GrammarUpdater:
         selected_models = []
         errs = []
 
+        if self.verbosity > 2:
+            print("- Selecting models")
+
+        n_selected = 0
         for model in models:
             if select_f(model):
+                if self.verbosity > 2:
+                    print(f"--> Selected: {model} with error {model.get_error()}")
+                n_selected += 1
                 prods = defaultdict(int)
                 for prob, tree in list(model.info["trees"].values()): 
                     prods = count_productions(tree[0], prods)
                 prods_counts += [prods]
                 selected_models += [model]
                 errs += [model.get_error()]
+
+        self.n_selected += [n_selected]
+        if self.verbosity > 1:
+            print(f"-> {n_selected} models selected")
         
-        return False, prods_counts, errs, models
+        return 0, prods_counts, errs, models
     
     def update_p(self, p, prods_counts, errs, models, update_fun=None, **kwargs):
         """Updates the probabilities based on the number of times each production is used 
@@ -256,27 +286,38 @@ class GrammarUpdater:
 
         for i in range(max_iter):
             if self.verbosity > 0:
-                print(f"Iteration {i}")
+                print(f"--- Iteration {i}")
             
             success, productions, errors, models = self.evaluate_probs(p)
-            if success:
+            if success == 1:
                 if self.verbosity > 0:
-                    print("Solution found")
-                return self.best_model, p #self.generate_grammar(p, vji=self.vji)
+                    print("Solution found:", self.best_err, self.best_model)
+                return self.best_model, p
             
-            self.evaled_ps += [p]
+            elif success == -1:
+                if self.verbosity > 0:
+                    print("Iteration failed, reverting to previous probability vector")
+                p = self.evaled_ps[-1]
             
-            if len(productions) > 0:
-                p = self.update_p(p, productions, errors, models, **kwargs)
             else:
-                if self.verbosity > 1:
-                    print("No models found")
+                self.evaled_ps += [p]
+                
+                if self.verbosity > 2:
+                    print("- Updating probabilities")
+                if len(productions) > 0:
+                    p = self.update_p(p, productions, errors, models, **kwargs)
+                else:
+                    if self.verbosity > 1:
+                        print("No models selected")
+                
+                if self.verbosity > 0:
+                    print(f"Best error: {self.best_err}", self.best_model, "p=", p)
             
-            if self.verbosity > 0:
-                print(f"Best error: {self.best_err}", self.best_model, "p=", p)
-        
         if self.verbosity > 0:
             print("Max iterations reached")
+        
+        if self.verbosity > 0:
+            print("Final evaluation")
         success, productions, errors, models = self.evaluate_probs(p)
         self.evaled_ps += [p]
         return self.best_model, p

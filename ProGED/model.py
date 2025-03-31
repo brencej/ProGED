@@ -106,13 +106,13 @@ class Model:
             code = "nan"
             tree = "nan"
 
-        if "grammar" in kwargs:
-            self.grammar = kwargs["grammar"]
-        elif "grammar" in info:
-            self.grammar = info["grammar"]
-            info.pop("grammar")
-        else:
-            self.grammar = None
+        # if "grammar" in kwargs:
+        #     self.grammar = kwargs["grammar"]
+        # elif "grammar" in info:
+        #     self.grammar = info["grammar"]
+        #     info.pop("grammar")
+        # else:
+        #     self.grammar = None
         
         self.p = p
         self.info = info

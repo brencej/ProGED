@@ -260,7 +260,7 @@ class EqDisco:
         models = self.models.models_dict
         for eq in models.keys():
             model = models[eq]
-            for tree in model.trees.keys():
+            for tree in model.info["trees"].keys():
                 try:
                     res.append({"eq": eq, "error": model.get_error(dummy=dummy), "p": model.p, "code": tree})
                 except Exception as error:

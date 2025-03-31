@@ -10,7 +10,7 @@ from ProGED.model_box import ModelBox
 Functions for the postprocessing of equation discovery results.
 """    
 
-def models_statistics (models, data, lhs_variable, success_threshold = 1e-9):
+def models_statistics (models, data, lhs_variable, success_threshold = 1e-7):
     if not isinstance(models, ModelBox):
         raise TypeError("Input to analyze_models must be a ModelBox, but was " + str(type(models)))
     
@@ -46,9 +46,9 @@ def models_statistics (models, data, lhs_variable, success_threshold = 1e-9):
     for m in models_keys:
         p_all += [models[m].p]
         
-        if models[m].valid and not models[m].get_error()>=10**9:
+        if models[m].valid and not models[m].get_error() >= 10**9:
             vmodels[m]=models[m]
-            N_unique_trees += len(models[m].trees)
+            N_unique_trees += len(models[m].info["trees"])
             
             mse = models[m].get_error()+1e-32
             logMSE += [np.log10(mse)]
